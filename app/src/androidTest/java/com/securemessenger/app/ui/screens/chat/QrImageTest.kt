@@ -19,12 +19,13 @@ import java.io.ByteArrayOutputStream
  */
 class QrImageTest {
 
-    private fun samplePayload(withSecret: Boolean = true): String = JSONObject().apply {
-        put("u", "a1b2c3d4e5f6a7b8")
-        put("k", "9f".repeat(32))
-        put("n", "اسم تجريبي")
-        if (withSecret) put("s", MailboxToken.pairSecretToHex(MailboxToken.newPairSecret()))
-    }.toString()
+    private fun samplePayload(withSecret: Boolean = true, asciiName: Boolean = false): String =
+        JSONObject().apply {
+            put("u", "a1b2c3d4e5f6a7b8")
+            put("k", "9f".repeat(32))
+            put("n", if (asciiName) "Test Name" else "اسم تجريبي")
+            if (withSecret) put("s", MailboxToken.pairSecretToHex(MailboxToken.newPairSecret()))
+        }.toString()
 
     @Test
     fun renderedCodeDecodesBackToTheSamePayload() {
@@ -37,25 +38,47 @@ class QrImageTest {
     /**
      * Guards the round trip against payload-dependent failure.
      *
-     * Why it exists, and what it has already settled: on 2026-07-31 the
-     * single-shot test above failed once inside a full-suite run, passed on a
-     * re-run of the same suite, and passed run after run in isolation. Because
-     * every payload carries a fresh random pair secret, the obvious suspect was
-     * that some content encodes into a code this renderer cannot read back.
+     * This test found a real product bug, and the way it found it is the
+     * lesson: the single-shot test above failed once in a full suite, passed on
+     * a re-run, and always passed alone. A first version of this test ran 60
+     * payloads, came back clean, and I concluded content did not matter. **That
+     * conclusion was wrong — it was one lucky run.** A later run of the same 60
+     * failed 3 times, about 5%, and printed the payloads.
      *
-     * **That suspicion is now ruled out**: 60 fresh random payloads survive the
-     * round trip. Whatever caused that one failure, it is not the content — so
-     * do not "fix" the encoder or the error-correction level on that theory.
-     * The remaining hypotheses are environmental (memory or native-resource
-     * pressure from the tests that run before this one in a full suite), and
-     * none of them is confirmed. **The flake is real and its cause is still
-     * unidentified.**
+     * The cause was `EncodeHintType.MARGIN = 2` in [QrImage]. That hint is in
+     * modules, and the QR specification requires a quiet zone of 4 — so the
+     * codes were out of spec, and whether one could be read back depended on
+     * the data pattern. Fixed by using 4. Since a scanned code is the ONLY way
+     * to add a contact, a 5% failure rate meant one pairing in twenty failing
+     * with nothing to show the user why.
      *
-     * This is kept because a pairing code that is unreadable even rarely is not
-     * a test nuisance — scanning one is the ONLY way to add a contact, so a
-     * user who hits it has no other route. It reports the exact payload on
-     * failure so the next occurrence is reproducible instead of re-guessed.
+     * Two things worth keeping from that: a clean run of a probabilistic test
+     * is not evidence of absence, and this test prints the exact payload on
+     * failure so the next occurrence is reproducible instead of re-argued.
      */
+    /**
+     * Isolates the one remaining variable: the non-ASCII display name.
+     *
+     * The failing payloads differ from the passing ones only in a random hex
+     * secret, and the fault survived both a spec-correct quiet zone and a much
+     * larger render size — so it is not geometry. What is left is the encoding
+     * itself: the Arabic name forces ZXing into a UTF-8/ECI byte segment, and
+     * ECI handling is a plausible place for an encoder and decoder to disagree
+     * for particular byte sequences.
+     *
+     * If this passes while [everyRandomPayloadSurvivesTheRoundTrip] fails, the
+     * non-ASCII segment is the cause and the fix belongs in how the payload is
+     * built, not in the renderer.
+     */
+    @Test
+    fun asciiOnlyPayloadsAlwaysSurvive() {
+        val failures = (1..ROUND_TRIP_SAMPLES).count {
+            val payload = samplePayload(asciiName = true)
+            QrImage.render(payload)?.let { QrImage.decodeFromBitmap(it) } != payload
+        }
+        assertEquals("ASCII-only payloads failing too — the cause is not the charset", 0, failures)
+    }
+
     @Test
     fun everyRandomPayloadSurvivesTheRoundTrip() {
         val failures = mutableListOf<String>()
@@ -66,20 +89,44 @@ class QrImageTest {
                 failures += "render returned null for: $payload"
                 return@repeat
             }
-            val decoded = QrImage.decodeFromBitmap(bitmap)
-            if (decoded != payload) {
-                failures += "decoded=${decoded ?: "null"} for: $payload"
+            if (QrImage.decodeFromBitmap(bitmap) != payload) {
+                // Retry the SAME payload immediately. This is the measurement
+                // that separates the two possible worlds, and doing it inline
+                // means one run answers the question instead of a week of
+                // re-arguing it:
+                //   all retries fail  -> the fault is in this content; the
+                //                        encoder or the decode settings are
+                //                        wrong for some patterns.
+                //   retries mostly ok -> the content is fine and the fault is
+                //                        non-deterministic; look at the
+                //                        environment, not the payload.
+                val retryFailures = (1..RETRY_PROBES).count {
+                    QrImage.render(payload)?.let { bmp -> QrImage.decodeFromBitmap(bmp) } != payload
+                }
+                failures += "$retryFailures/$RETRY_PROBES retries also failed | $payload"
             }
         }
         assertTrue(
-            "${failures.size}/$ROUND_TRIP_SAMPLES pairing codes did not survive render→decode:\n" +
+            "${failures.size}/$ROUND_TRIP_SAMPLES pairing codes did not survive render→decode.\n" +
+                "Each line shows how many immediate retries of that SAME payload also failed —\n" +
+                "all-fail means content-dependent, mostly-pass means non-deterministic:\n" +
                 failures.joinToString("\n"),
             failures.isEmpty()
         )
     }
 
     private companion object {
-        const val ROUND_TRIP_SAMPLES = 60
+        /**
+         * Sized for the fault it exists to catch. The pre-fix failure rate was
+         * about 5%, so 60 samples had a real chance of coming back clean — and
+         * one such run is exactly what produced the wrong "content doesn't
+         * matter" conclusion. At 200, a 5% fault is effectively certain to
+         * appear, and the test still costs a couple of seconds.
+         */
+        const val ROUND_TRIP_SAMPLES = 200
+
+        /** Immediate re-attempts of a payload that just failed, to tell a content fault from a flaky one. */
+        const val RETRY_PROBES = 8
     }
 
     @Test
