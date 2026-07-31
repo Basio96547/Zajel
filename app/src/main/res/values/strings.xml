@@ -1,53 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  هذا الملف صغير عن قصد، وليس ناقصاً.
+
+  واجهة التطبيق مكتوبة بالكامل بـJetpack Compose ونصوصها مضمَّنة في الشيفرة
+  مباشرةً (لغة واحدة، لا توطين). فما يبقى هنا هو حصراً ما يقرأه *النظام* لا
+  الواجهة: اسم التطبيق الذي يعرضه المُشغِّل، ونصوص قنوات الإشعارات.
+
+  حُذف من هذا الملف 26 نصاً كانت يتيمة تماماً (2026-07-31) — لا مرجع لأيٍّ
+  منها في أي كود أو مانيفست. أحدها `stealth_mode_dialer` كانت قيمته
+  `*#73287#` وهي **خاطئة** (الصحيح `*#*#73287#*#*`)، وهو بالضبط خطر إبقاء
+  نصوص لا يستعملها أحد: تتقادم بصمت ثم يبني عليها أحدهم لاحقاً.
+
+  القاعدة إذن: لا تُضف نصاً هنا إلا إن كان النظام هو من سيقرأه. نص الواجهة
+  محلّه الشيفرة.
+-->
 <resources>
     <string name="app_name">حاسبة متقدمة</string>
-    <string name="app_name_decoy">Calculator</string>
 
-    <!-- Authentication -->
-    <string name="biometric_prompt_title">المصادقة الحيوية</string>
-    <string name="biometric_prompt_subtitle">استخدم بصمة الإصبع أو التعرف على الوجه لفتح التطبيق</string>
-    <string name="biometric_negative_button">استخدام كلمة المرور</string>
-    <string name="auth_failed">فشلت المصادقة</string>
-    <string name="auth_error">خطأ في المصادقة</string>
-
-    <!-- Security warnings -->
-    <string name="screenshot_blocked">لا يمكن أخذ لقطة شاشة لأسباب أمنية</string>
-    <string name="screen_recording_blocked">تم حظر تسجيل الشاشة</string>
-
-    <!-- Messages -->
-    <string name="message_self_destruct">هذه الرسالة ستُدمر تلقائياً بعد %1$d ثانية</string>
-    <string name="message_expired">انتهت صلاحية هذه الرسالة</string>
-    <string name="message_decrypted">تم فك التشفير</string>
-    <string name="message_encrypting">جاري التشفير…</string>
-
-    <!-- QR Code -->
-    <string name="qr_scan_title">مسح رمز QR للتحقق</string>
-    <string name="qr_generate_title">رمز التحقق الخاص بك</string>
-    <string name="qr_verified">تم التحقق من المفتاح بنجاح</string>
-    <string name="qr_verification_failed">فشل التحقق من المفتاح</string>
-
-    <!-- Decoy mode -->
-    <string name="decoy_mode_active">أنت الآن في الوضع الوهمي</string>
-    <string name="decoy_mode_description">هذه نسخة مزيفة من التطبيق تحمي بياناتك الحقيقية</string>
-
-    <!-- Stealth mode -->
-    <string name="stealth_mode_enabled">تم إخفاء أيقونة التطبيق</string>
-    <string name="stealth_mode_dialer">*#73287#</string> <!-- Secret code to restore -->
-
-    <!-- Errors -->
-    <string name="error_network">خطأ في الاتصال</string>
-    <string name="error_encryption">خطأ في التشفير</string>
-    <string name="error_decryption">خطأ في فك التشفير</string>
-    <string name="error_database">خطأ في قاعدة البيانات</string>
-    <string name="error_generic">حدث خطأ غير متوقع</string>
-
-    <!-- Permissions -->
-    <string name="permission_camera_needed">يحتاج التطبيق للوصول للكاميرا لمسح رمز QR</string>
-
-    <!-- Background delivery. Every one of these strings is visible to anyone
-         who opens the notification shade or the app's notification settings,
-         so all of them speak in the app's public calculator identity and none
-         of them mention messages, contacts or encryption. -->
+    <!-- التسليم في الخلفية. كل نص هنا يراه أي شخص يفتح لوحة الإشعارات أو
+         إعدادات إشعارات التطبيق، فكلها تتكلم بهوية الحاسبة العلنية، ولا يذكر
+         أيٌّ منها رسالةً ولا جهة اتصال ولا تشفيراً. -->
     <string name="channel_engine">محرك الحساب</string>
     <string name="channel_updates">التحديثات</string>
     <string name="notif_engine_running">جاهزة</string>
