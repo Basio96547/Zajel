@@ -46,10 +46,65 @@ class MediaSandboxGeometryTest {
     }
 
     @Test
+    fun acceptsAVeryWidePanorama() {
+        // 10:1. An earlier version capped BOTH sides at 4x the requested bound,
+        // which silently rejected any aspect ratio past 4:1 — a real 360°
+        // panorama among them. The smaller side is what the request governs;
+        // the long side is bounded by the byte ceiling, not by a ratio.
+        assertTrue(
+            "a 10:1 panorama is a real photograph, not an attack",
+            MediaSandbox.isPlausibleResult(4000, 400, 400, 4000L * 400 * 4)
+        )
+    }
+
+    @Test
     fun refusesAnAbsurdClaimedSize() {
         assertFalse(
             "50000x50000 is ~10GB; it must be refused before reaching createBitmap",
             MediaSandbox.isPlausibleResult(50_000, 50_000, 400, Long.MAX_VALUE)
+        )
+    }
+
+    /**
+     * Pins the arithmetic to Long, which the test above does NOT do.
+     *
+     * With a 400px bound, 50000x50000 is rejected by the *side* gate before any
+     * multiplication happens — so that test would still pass if the area maths
+     * were written in Int, and would tell us nothing. These inputs deliberately
+     * clear the side gate (a 20000 bound allows a smaller side up to 80000) so
+     * execution actually reaches `width * height`.
+     *
+     * 50000 * 50000 = 2.5e9, past Int.MAX_VALUE (2.147e9). In Int that wraps
+     * negative, which makes `needed > MAX_PIXEL_BYTES` false and
+     * `bufferBytes >= needed` true for any buffer at all — the guard would
+     * return true for the single most dangerous input it can receive. In Long
+     * it is 1e10 bytes and refused. If someone ever "simplifies" those .toLong()
+     * calls away, this is the test that fails.
+     */
+    @Test
+    fun areaArithmeticDoesNotOverflowIntoAcceptance() {
+        assertFalse(
+            "50000x50000 past the side gate must still be refused — Int overflow would accept it",
+            MediaSandbox.isPlausibleResult(50_000, 50_000, 20_000, Long.MAX_VALUE)
+        )
+        // Just inside the Int overflow threshold (46341^2 > 2^31) with a buffer
+        // claim that only a wrapped, negative `needed` would ever satisfy.
+        assertFalse(
+            MediaSandbox.isPlausibleResult(46_341, 46_341, 20_000, 0L)
+        )
+        // The far corner, and the one that actually found a bug: Int.MAX_VALUE
+        // on both axes is ~1.8e19 bytes, past Long's ~9.2e18 ceiling. Moving
+        // the arithmetic to Long fixed the Int wrap but not this one — Long
+        // wraps negative here too and every later check inverts identically.
+        // The fix was ordering, not width: cap each side against the byte
+        // ceiling BEFORE multiplying, so the product is provably in range.
+        assertFalse(
+            "Long overflows here too — the per-side cap must run before the multiplication",
+            MediaSandbox.isPlausibleResult(Int.MAX_VALUE, Int.MAX_VALUE, Int.MAX_VALUE, Long.MAX_VALUE)
+        )
+        // A side past the byte ceiling on its own, with an innocent other side.
+        assertFalse(
+            MediaSandbox.isPlausibleResult(Int.MAX_VALUE, 4, Int.MAX_VALUE, Long.MAX_VALUE)
         )
     }
 

@@ -57,15 +57,18 @@ object MediaSandbox {
     private const val BIND_TIMEOUT_MS = 5_000L
 
     /**
-     * How far past the requested bound a returned image may legally sit.
-     * inSampleSize halves until the *smaller* side is under the bound, so a
-     * very wide panorama can exceed it on one axis; 4x covers that with room
-     * to spare while still refusing an absurd claim.
+     * How far past the requested bound the *smaller* side of a returned image
+     * may sit. inSampleSize halves until the smaller side fits and then stops,
+     * so this is the axis the request actually governs; the longer one is
+     * bounded by [MAX_PIXEL_BYTES] instead.
      */
     private const val SIZE_SLACK = 4
 
     /** Absolute ceiling on one decoded frame, whatever the requested bound was. */
     private const val MAX_PIXEL_BYTES = 64L * 1024 * 1024
+
+    /** ARGB_8888. Long so every area computation stays in Long — see isPlausibleResult. */
+    private const val BYTES_PER_PIXEL = 4L
 
     /**
      * One decode at a time. Not for correctness — the service could take
@@ -192,14 +195,35 @@ object MediaSandbox {
      *
      * So the trusted side decides what is plausible, rather than believing what
      * it is told:
-     *  - neither side may exceed [SIZE_SLACK]x the bound we asked for. Sampling
-     *    halves until the *smaller* side fits, so a long panorama can legally
-     *    overshoot on one axis — but not without limit.
-     *  - the total must fit [MAX_PIXEL_BYTES].
+     *  - the **smaller** side may not exceed [SIZE_SLACK]x the bound we asked
+     *    for. Only the smaller side, because inSampleSize halves until the
+     *    smaller side fits and then stops — so the longer side of a wide image
+     *    is legitimately unbounded by the request. Capping both sides at 4x, as
+     *    an earlier version did, rejected any aspect ratio past 4:1 and would
+     *    have thrown away real 360° panoramas.
+     *  - the total must fit [MAX_PIXEL_BYTES]. This, not the side limit, is
+     *    what actually bounds the allocation — a 100000x600 strip passes the
+     *    side check and dies here.
      *  - the shared buffer must actually hold that many bytes. Claiming a large
      *    image while sending a small buffer is the cheapest lie available, and
      *    `copyPixelsFromBuffer` would otherwise be the thing to notice — after
      *    the oversized allocation had already been attempted.
+     *
+     * **Overflow is the whole difficulty here, and it bites twice.**
+     *
+     * In Int, `width * height` wraps above 46341x46341: the product goes
+     * negative, `needed > MAX_PIXEL_BYTES` becomes false, and
+     * `bufferBytes >= needed` becomes true for *any* buffer — the guard waves
+     * through precisely the input it exists to stop. Hence Long throughout.
+     *
+     * But Long alone is **not** enough, which is not obvious and was a real bug
+     * here until a test caught it: `Int.MAX_VALUE` on both axes gives
+     * ~1.8e19 bytes and Long tops out near 9.2e18, so it wraps negative too and
+     * every later check inverts exactly the same way. The per-side ceiling is
+     * therefore applied *before* any multiplication, which makes the product
+     * provably in range rather than merely wider. `MediaSandboxGeometryTest`
+     * pins both cases with inputs that clear the side gate, so the arithmetic
+     * is genuinely reached instead of short-circuiting earlier.
      *
      * Extracted and internal so it can be tested directly: the interesting
      * inputs here are hostile ones, and there is no way to make a real sandbox
@@ -212,9 +236,17 @@ object MediaSandbox {
         bufferBytes: Long
     ): Boolean {
         if (width <= 0 || height <= 0 || maxDimension <= 0) return false
-        val limit = maxDimension.toLong() * SIZE_SLACK
-        if (width > limit || height > limit) return false
-        val needed = width.toLong() * height.toLong() * 4
+        // Absolute per-side ceiling BEFORE any multiplication. Long is not wide
+        // enough on its own: Int.MAX_VALUE squared times four is ~1.8e19 and
+        // Long tops out at ~9.2e18, so the product wraps negative and every
+        // check after it inverts — the same failure Int has, one size up. No
+        // side can legitimately exceed the byte ceiling divided by four
+        // anyway, so refusing here costs nothing and makes the multiplication
+        // below provably safe.
+        val maxSide = MAX_PIXEL_BYTES / BYTES_PER_PIXEL
+        if (width > maxSide || height > maxSide) return false
+        if (minOf(width, height).toLong() > maxDimension.toLong() * SIZE_SLACK) return false
+        val needed = width.toLong() * height.toLong() * BYTES_PER_PIXEL
         if (needed > MAX_PIXEL_BYTES) return false
         return bufferBytes >= needed
     }
