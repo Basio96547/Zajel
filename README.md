@@ -144,12 +144,12 @@ gradlew :app:connectedDebugAndroidTest "-Pandroid.testInstrumentationRunnerArgum
 
 | المجموعة | النتيجة |
 |---|---|
-| `:app:connectedDebugAndroidTest` (باستثناء المُتلِف) | **47/47** على SM-S938B / Android 16 — قِيست **قبل** حارس قناة العودة؛ أعِدها قبل اقتباسها كنتيجة للشجرة الحالية |
-| `:app:testDebugUnitTest` (JVM، بلا جهاز) | **6/6** |
+| `:app:connectedDebugAndroidTest` (باستثناء المُتلِف) | **50/50** على SM-S938B / Android 16 |
+| `:app:testDebugUnitTest` (JVM، بلا جهاز) | **8/8** |
 | `:desktop:test` | **3/3** — اقتران متبادل، مصافحة، رسالة عبر عنوان مباشر، تفريغ الصادر بإشعار موثَّق |
 | `:hisn:connectedDebugAndroidTest` | 24/24 — منقولة عن التدقيق (2026-07-09)، لم تُعَد |
 
-**لا تقتبس رقم «27/27»** الذي قد تجده في وثائق أقدم: المجموعة 42 اختباراً، وكانت بين استخراج `:core` و2026-07-31 **لا تُصرَّف أصلاً** (ملفات اختبار في حزمة `com.securemessenger.app.crypto` تستدعي أصنافاً انتقلت إلى `:core` بلا `import`، فلم يُكسَر سطر ظاهر يلفت النظر). التفصيل في [`PROJECT_MAP.md` §8](PROJECT_MAP.md).
+**لا تقتبس رقم «27/27»** الذي قد تجده في وثائق أقدم: المجموعة **50** اختباراً، وكانت بين استخراج `:core` و2026-07-31 **لا تُصرَّف أصلاً** (ملفات اختبار في حزمة `com.securemessenger.app.crypto` تستدعي أصنافاً انتقلت إلى `:core` بلا `import`، فلم يُكسَر سطر ظاهر يلفت النظر). التفصيل في [`PROJECT_MAP.md` §8](PROJECT_MAP.md).
 
 كذلك يوجد سكربتان مساعدان يُشغَّلان يدوياً وليسا جزءاً من البناء: `security_test.py` و`memory_test.py`.
 

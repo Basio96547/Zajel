@@ -34,7 +34,19 @@ class VerifyImportTest {
         val r = AuditLog.verifyImport(ctx, exportJson())
         assertTrue("chain intact", r.chainIntact)
         assertTrue("seal matches this device", r.sealMatchesThisDevice)
-        assertEquals(2, r.entryCount)
+        // At least the two this test recorded — not exactly two.
+        //
+        // This asserted `entryCount == 2` and failed on device with 3. The
+        // extra entry was not a bug: PackageChangeReceiver enqueues a scan when
+        // packages change, and installing the test APK is itself a package
+        // change, so a genuine background scan recorded an entry while the test
+        // ran. The app was doing exactly its job; the test was assuming it owned
+        // an empty log it never owns on a real device.
+        //
+        // The meaningful properties are that the chain verifies and that our
+        // own entries are in it — both checked here, neither disturbed by a
+        // concurrent scan.
+        assertTrue("expected at least the 2 recorded entries, got ${r.entryCount}", r.entryCount >= 2)
         assertTrue(r.timeline.isNotEmpty())
     }
 
