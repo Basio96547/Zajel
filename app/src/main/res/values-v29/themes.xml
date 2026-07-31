@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  API 29+ override: android:forceDarkAllowed doesn't exist before API 29, so
+  it can't live in the base values/themes.xml now that minSdk is 26. Android
+  picks this whole style over the base one automatically on API 29+ — every
+  other item must be repeated here too, since a qualified style replaces the
+  base one rather than merging with it.
+-->
+<resources>
+    <style name="Theme.SecureMessenger" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:colorPrimary">@color/primary</item>
+        <item name="android:colorPrimaryDark">@color/primary_dark</item>
+        <item name="android:colorAccent">@color/accent</item>
+        <item name="android:statusBarColor">@color/status_bar</item>
+        <item name="android:navigationBarColor">@color/nav_bar</item>
+        <item name="android:windowBackground">@color/background</item>
+        <item name="android:forceDarkAllowed">false</item>
+    </style>
+</resources>

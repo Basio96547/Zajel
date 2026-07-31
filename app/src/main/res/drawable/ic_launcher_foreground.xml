@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Calculator glyph: the app disguises itself as "حاسبة متقدمة" (Advanced Calculator). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- calculator body -->
+    <path
+        android:fillColor="#EDE6D6"
+        android:pathData="M22,18 L86,18 L86,90 L22,90 Z" />
+
+    <!-- screen -->
+    <path
+        android:fillColor="#0E1621"
+        android:pathData="M30,26 L78,26 L78,48 L30,48 Z" />
+
+    <!-- lit digits on the screen -->
+    <path
+        android:fillColor="#3D8BFF"
+        android:pathData="M34,36 L52,36 L52,42 L34,42 Z" />
+
+    <!-- key grid: row 1 -->
+    <path android:fillColor="#E8721C" android:pathData="M30,54 L44,54 L44,63 L30,63 Z" />
+    <path android:fillColor="#1B2733" android:pathData="M46,54 L60,54 L60,63 L46,63 Z" />
+    <path android:fillColor="#3D8BFF" android:pathData="M62,54 L76,54 L76,63 L62,63 Z" />
+
+    <!-- key grid: row 2 -->
+    <path android:fillColor="#1B2733" android:pathData="M30,65 L44,65 L44,74 L30,74 Z" />
+    <path android:fillColor="#1B2733" android:pathData="M46,65 L60,65 L60,74 L46,74 Z" />
+    <path android:fillColor="#3D8BFF" android:pathData="M62,65 L76,65 L76,74 L62,74 Z" />
+
+    <!-- key grid: row 3 -->
+    <path android:fillColor="#1B2733" android:pathData="M30,76 L44,76 L44,85 L30,85 Z" />
+    <path android:fillColor="#1B2733" android:pathData="M46,76 L60,76 L60,85 L46,85 Z" />
+    <path android:fillColor="#E8721C" android:pathData="M62,76 L76,76 L76,85 L62,85 Z" />
+</vector>

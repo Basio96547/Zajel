@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Required permissions only -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.USE_BIOMETRIC" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <!-- Local-only peer-to-peer transport: there is no external server at all
+         — every device advertises itself and finds contacts via mDNS/NSD on
+         the same network, then connects directly. CHANGE_WIFI_MULTICAST_STATE
+         is needed for the mDNS multicast packets NSD relies on to actually be
+         received on some Wi-Fi drivers/APs that otherwise filter them. -->
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <!-- Voice messages: requested at runtime, only used while recording. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
+    <!-- Background delivery (opt-in, off by default — see AppSettings). Android
+         has no way to keep a socket open or poll usefully from the background
+         without a foreground service, and none without a visible notification.
+         dataSync is the honest type: this synchronises the user's own messages
+         between their own devices. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- Explicitly NOT requested: -->
+    <!-- READ_CONTACTS, CAMERA, READ_EXTERNAL_STORAGE, WRITE_EXTERNAL_STORAGE -->
+    <!-- These would be requested only when needed via runtime permission -->
+
+    <application
+        android:name=".SecureMessengerApp"
+        android:allowBackup="false"
+        android:autoRevokePermissions="allowed"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:enableOnBackInvokedCallback="true"
+        android:fullBackupContent="false"
+        android:hardwareAccelerated="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:networkSecurityConfig="@xml/network_security_config"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.SecureMessenger"
+        android:usesCleartextTraffic="true"
+        tools:targetApi="35">
+
+        <!-- Not exported: the public launch entry point is LauncherAlias below.
+             Keeping MainActivity itself unexported stops any other installed app
+             from launching the real messenger activity directly. -->
+        <activity
+            android:name=".ui.MainActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.SecureMessenger"
+            android:windowSoftInputMode="adjustResize" />
+
+        <!-- Alias for Stealth Mode (can be disabled programmatically) -->
+        <activity-alias
+            android:name=".LauncherAlias"
+            android:enabled="true"
+            android:exported="true"
+            android:targetActivity=".ui.MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- Service for background message cleanup -->
+        <service
+            android:name=".service.MessageCleanupService"
+            android:exported="false"
+            android:foregroundServiceType="shortService" />
+
+        <!-- Keeps the transport alive while the app is closed, so a message
+             arrives when it is sent instead of when the recipient next opens
+             the app. Opt-in; see MessengerService's own doc comment for why a
+             foreground service is the only option Android leaves here. -->
+        <service
+            android:name=".service.MessengerService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
+        <!-- Boot receiver to re-schedule cleanup jobs -->
+        <receiver
+            android:name=".receiver.BootReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Stealth-mode re-entry: dialing the secret code brings the launcher
+             icon back. SECRET_CODE is a protected broadcast only the system
+             dialer can send, so exporting this receiver is safe. It only
+             re-enables the icon — it does NOT bypass the access code + biometric
+             gate, which still guard the messenger itself. -->
+        <receiver
+            android:name=".receiver.SecretCodeReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.provider.Telephony.SECRET_CODE" />
+                <data android:scheme="android_secret_code" android:host="73287" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Stealth-mode re-entry, second path: a Quick Settings tile that does
+             the same recovery as SecretCodeReceiver above, for devices whose
+             dialer never delivers the SECRET_CODE broadcast. exported="true"
+             is required for the system to bind this — BIND_QUICK_SETTINGS_TILE
+             is a signature-level permission only the system UI holds, so no
+             third-party app can invoke it. Label/icon deliberately reuse the
+             app's own public calculator identity (see StealthExitTileService's
+             own doc comment) — the tile is visible to anyone who opens the
+             Quick Settings editor, so it must not be a giveaway either. -->
+        <service
+            android:name=".service.StealthExitTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_launcher_foreground"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
+        <!-- Security: Disable screenshot in recent apps -->
+        <meta-data
+            android:name="android.support.PARENT_ACTIVITY"
+            android:value=".ui.MainActivity" />
+
+        <!-- Lets us hand a decrypted-to-cache media file to another app (e.g. a
+             video player) via a content:// URI instead of a raw file path. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_provider_paths" />
+        </provider>
+
+    </application>
+
+</manifest>

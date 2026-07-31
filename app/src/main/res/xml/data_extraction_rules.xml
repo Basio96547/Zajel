@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Correct schema for android:dataExtractionRules (API 31+). The previous file
+  used the older <full-backup-content> schema, which is silently ignored here,
+  so these exclusions did nothing. Backup/transfer is already disabled via
+  allowBackup=false + fullBackupContent=false, but these rules make the
+  exclusion explicit (and correct) should either ever be re-enabled.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="sharedpref" />
+        <exclude domain="database" />
+        <exclude domain="file" />
+        <exclude domain="external" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="sharedpref" />
+        <exclude domain="database" />
+        <exclude domain="file" />
+        <exclude domain="external" />
+    </device-transfer>
+</data-extraction-rules>

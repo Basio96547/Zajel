@@ -1,0 +1,28 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "sm-blind-mailbox",
+	"main": "src/index.ts",
+	"compatibility_date": "2026-01-15",
+	"durable_objects": {
+		"bindings": [
+			{
+				"name": "MAILBOX",
+				"class_name": "BlindMailbox"
+			}
+		]
+	},
+	"migrations": [
+		{
+			"tag": "v1",
+			"new_sqlite_classes": ["BlindMailbox"]
+		}
+	],
+	// Deliberately off. Observability samples request metadata into Cloudflare's
+	// logging pipeline; for a service whose entire purpose is not retaining
+	// anything about who talked to whom, that is the one feature we do not want.
+	// Debug a deployment with `wrangler tail` while you are watching it, then
+	// stop — nothing is written down.
+	"observability": {
+		"enabled": false
+	}
+}

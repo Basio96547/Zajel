@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Two kinds of connection exist, with deliberately different rules.
+
+  Local peer-to-peer is a direct ws:// socket to another instance of this app
+  on the same network — a raw, dynamic IP, not a fixed hostname a
+  <domain-config> could target, and with no CA that could ever issue a
+  certificate for it. Cleartext is permitted for exactly that reason: the
+  payload riding over it is already fully Double-Ratchet/sealed-sender
+  encrypted at the application layer before it touches the socket, so a bare
+  local WebSocket carries no more real exposure than the on-disk SQLCipher
+  store already assumes.
+
+  The blind mailbox relay is the opposite case: a real hostname with a real
+  certificate. It gets cleartext explicitly forbidden below, so nothing can
+  strip TLS off it and watch the (already encrypted, already unlinkable)
+  blobs go by, or learn which mailbox ids a device is asking about.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">workers.dev</domain>
+    </domain-config>
+</network-security-config>

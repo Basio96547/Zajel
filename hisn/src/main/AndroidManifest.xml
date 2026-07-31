@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!--
+      Needed to audit which apps are installed and how they were installed
+      (sideloaded vs. store) and what permissions they hold. This is a security
+      auditor, which is exactly the declared-use exception for QUERY_ALL_PACKAGES.
+    -->
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"
+        tools:ignore="QueryAllPackagesPermission" />
+    <!-- Alert the user when a scan finds a clear change in device hygiene. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <application
+        android:name=".HisnApp"
+        android:allowBackup="false"
+        android:icon="@drawable/ic_hisn"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.Hisn">
+
+        <activity
+            android:name=".ui.MainActivity"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:theme="@style/Theme.Hisn">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name=".ui.VerifyActivity"
+            android:exported="false"
+            android:label="التحقّق من سجلّ"
+            android:theme="@style/Theme.Hisn" />
+
+        <!-- Immediate scan when apps are installed/removed/replaced (protected
+             system broadcast). -->
+        <receiver
+            android:name=".scan.PackageChangeReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.PACKAGE_ADDED" />
+                <action android:name="android.intent.action.PACKAGE_REMOVED" />
+                <action android:name="android.intent.action.PACKAGE_REPLACED" />
+                <data android:scheme="package" />
+            </intent-filter>
+        </receiver>
+
+    </application>
+
+</manifest>

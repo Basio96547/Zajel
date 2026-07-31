@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Base application theme (forced dark mode) -->
+    <style name="Theme.SecureMessenger" parent="android:Theme.Material.Light.NoActionBar">
+        <!-- Primary brand color -->
+        <item name="android:colorPrimary">@color/primary</item>
+        <item name="android:colorPrimaryDark">@color/primary_dark</item>
+        <item name="android:colorAccent">@color/accent</item>
+
+        <!-- Status bar -->
+        <item name="android:statusBarColor">@color/status_bar</item>
+        <item name="android:navigationBarColor">@color/nav_bar</item>
+
+        <!-- Window background -->
+        <item name="android:windowBackground">@color/background</item>
+
+        <!-- forceDarkAllowed (API 29+) lives in values-v29/themes.xml — the
+             attribute doesn't exist before API 29, and minSdk is 26. -->
+    </style>
+
+    <!-- Splash screen theme -->
+    <style name="Theme.SecureMessenger.Splash" parent="Theme.SecureMessenger">
+        <item name="android:windowBackground">@drawable/splash_background</item>
+    </style>
+</resources>
