@@ -90,6 +90,20 @@
             android:exported="false"
             android:foregroundServiceType="dataSync" />
 
+        <!-- Decodes peer-controlled images away from everything worth stealing.
+             isolatedProcess puts it in the restricted isolated_app SELinux
+             domain with an empty permission set — no network, no app files, no
+             Keystore — so a memory-safety bug in a native image parser lands in
+             an empty box behind a Binder boundary instead of in the process
+             holding the database key and every ratchet session. It is bound on
+             demand and unbound when idle, and Android destroys an isolated
+             process as soon as its last binding goes. -->
+        <service
+            android:name=".media.MediaSandboxService"
+            android:process=":mediaSandbox"
+            android:isolatedProcess="true"
+            android:exported="false" />
+
         <!-- Boot receiver to re-schedule cleanup jobs -->
         <receiver
             android:name=".receiver.BootReceiver"

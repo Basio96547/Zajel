@@ -63,6 +63,9 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+        // The one AIDL interface in the project: the boundary to the isolated
+        // media-decoding process. AGP 8 no longer enables AIDL by default.
+        aidl = true
     }
 
     packaging {

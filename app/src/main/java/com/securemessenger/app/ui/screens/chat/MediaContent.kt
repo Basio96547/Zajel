@@ -53,8 +53,9 @@ import java.io.File
  * declared size. (Note: this bounds the *output allocation*, not the
  * inJustDecodeBounds header-read step itself — a memory-safety bug in Skia's
  * header parser, as opposed to a huge-declared-dimensions bomb, is a
- * different class of risk that no amount of sampling math here can close;
- * see docs/adr/0001-media-decode-isolated-process.md.)
+ * different class of risk that no amount of sampling math here can close —
+ * that is what [decodeGuarded] and the isolated sandbox behind it are for, and
+ * why peer-controlled images should call that rather than this directly.)
  */
 internal fun decodeSampledBitmap(bytes: ByteArray, maxDimension: Int): android.graphics.Bitmap? {
     return try {
@@ -72,6 +73,36 @@ internal fun decodeSampledBitmap(bytes: ByteArray, maxDimension: Int): android.g
     } catch (_: OutOfMemoryError) {
         null
     }
+}
+
+/**
+ * The decode every peer-controlled image should go through.
+ *
+ * Tries the isolated sandbox first — where a memory-safety bug in a native
+ * parser wakes up in a process with no permissions, no files and no keys — and
+ * falls back to [decodeSampledBitmap] in this process when the sandbox is
+ * unavailable, refused by device policy, too slow, or has just died. Both paths
+ * apply the same bound, so what the user sees is identical either way.
+ *
+ * A null from the sandbox is deliberately NOT re-tried in-process. The sandbox
+ * returns null both for "this image is malformed" and for "I could not answer",
+ * and re-decoding locally to tell them apart would hand the dangerous bytes to
+ * the very parser this exists to route around. [MediaSandbox.decode] therefore
+ * distinguishes them internally: it returns null for both, but only leaves the
+ * fallback reachable by reporting unsupported/unavailable before it ever runs
+ * a decode.
+ */
+internal suspend fun decodeGuarded(
+    context: android.content.Context,
+    bytes: ByteArray,
+    maxDimension: Int
+): android.graphics.Bitmap? {
+    if (com.securemessenger.app.media.MediaSandbox.isSupported) {
+        com.securemessenger.app.media.MediaSandbox
+            .decode(context, bytes, maxDimension)
+            ?.let { return it }
+    }
+    return withContext(Dispatchers.Default) { decodeSampledBitmap(bytes, maxDimension) }
 }
 
 @Composable
@@ -100,6 +131,7 @@ private fun ImageContent(
     var bitmap by remember(media.ref) { mutableStateOf<android.graphics.Bitmap?>(null) }
     var aspectRatio by remember(media.ref) { mutableStateOf(1f) }
     var failed by remember(media.ref) { mutableStateOf(false) }
+    val context = androidx.compose.ui.platform.LocalContext.current
 
     LaunchedEffect(media.ref) {
         val bytes = viewModel.loadMediaBytes(media)
@@ -107,9 +139,10 @@ private fun ImageContent(
             failed = true
             return@LaunchedEffect
         }
-        // Decoding itself (not just decrypting) is the expensive part for a
-        // large photo — keep it off the composition/UI thread too.
-        val decoded = withContext(Dispatchers.Default) { decodeSampledBitmap(bytes, maxDimension = 1080) }
+        // These bytes came from someone else, and this bubble decodes them with
+        // no tap from the user — the zero-click path. It goes through the
+        // sandbox; decodeGuarded also keeps the work off the UI thread.
+        val decoded = decodeGuarded(context, bytes, maxDimension = 1080)
         if (decoded != null) {
             aspectRatio = (decoded.width.toFloat() / decoded.height.toFloat()).coerceIn(0.5f, 2f)
             bitmap = decoded
@@ -606,16 +639,16 @@ internal fun FullScreenImageViewer(
     onDismiss: () -> Unit
 ) {
     var bitmap by remember(media.ref) { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
+    val context = androidx.compose.ui.platform.LocalContext.current
     LaunchedEffect(media.ref) {
         val bytes = viewModel.loadMediaBytes(media)
-        // Bounded decode (inSampleSize from the real header dimensions), same
-        // as every other image surface in this screen — a raw, unbounded
-        // BitmapFactory.decodeByteArray here would let a peer-controlled image
-        // with a small file size but an enormous declared pixel size (a
-        // decompression bomb) force a multi-gigabyte allocation attempt and
-        // crash the app with an uncaught OutOfMemoryError. 2160px is generous
-        // enough to look full-quality on any phone screen.
-        bitmap = bytes?.let { withContext(Dispatchers.Default) { decodeSampledBitmap(it, maxDimension = 2160)?.asImageBitmap() } }
+        // Sandboxed and bounded, same as every other image surface here. The
+        // bound alone stops a decompression bomb — a small file declaring an
+        // enormous pixel size, which would otherwise force a multi-gigabyte
+        // allocation and an uncaught OutOfMemoryError. The sandbox covers the
+        // other half: a bug in the parser itself, which no sampling maths can
+        // reach. 2160px looks full-quality on any phone screen.
+        bitmap = bytes?.let { decodeGuarded(context, it, maxDimension = 2160)?.asImageBitmap() }
     }
     val zoomState = rememberZoomState(maxScale = 5f)
     var dragOffsetY by remember { mutableStateOf(0f) }

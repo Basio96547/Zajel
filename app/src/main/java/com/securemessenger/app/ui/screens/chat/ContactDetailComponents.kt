@@ -37,10 +37,19 @@ internal fun MediaGridTile(
     val local = remember(message.id) { repository.decryptMediaDescriptor(message) }
     var bitmap by remember(message.id) { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
 
+    val context = androidx.compose.ui.platform.LocalContext.current
+
     LaunchedEffect(message.id) {
         if (local?.mediaType == MediaCodec.TYPE_IMAGE) {
             val bytes = repository.loadDecryptedMediaBytes(local)
-            bitmap = bytes?.let { BitmapFactory.decodeByteArray(it, 0, it.size)?.asImageBitmap() }
+            // This used to be a raw BitmapFactory.decodeByteArray with no
+            // bound at all — the only image surface in the app that had none,
+            // despite showing exactly the same peer-controlled bytes as the
+            // chat bubbles. A grid tile is ~100dp, so 400px is already generous
+            // and the missing bound was pure exposure: a small file declaring
+            // an enormous pixel size would have attempted a huge allocation
+            // here. Now bounded AND sandboxed, like every other image path.
+            bitmap = bytes?.let { decodeGuarded(context, it, maxDimension = 400)?.asImageBitmap() }
         }
     }
 

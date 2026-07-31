@@ -353,9 +353,13 @@ internal fun AlbumBubble(
 @Composable
 private fun AlbumThumbnail(media: MediaCodec.LocalMedia, viewModel: ConversationViewModel, onClick: () -> Unit) {
     var bitmap by remember(media.ref) { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
+    val context = androidx.compose.ui.platform.LocalContext.current
     LaunchedEffect(media.ref) {
         val bytes = viewModel.loadMediaBytes(media)
-        bitmap = bytes?.let { withContext(Dispatchers.Default) { decodeSampledBitmap(it, maxDimension = 400)?.asImageBitmap() } }
+        // Album thumbnails render as soon as the bubble appears, with no tap —
+        // another zero-click decode of someone else's bytes, so it goes through
+        // the sandbox like the single-image bubble does.
+        bitmap = bytes?.let { decodeGuarded(context, it, maxDimension = 400)?.asImageBitmap() }
     }
     Box(
         modifier = Modifier
