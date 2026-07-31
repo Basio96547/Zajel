@@ -9,12 +9,17 @@
 
 ## 1. شجرة المجلد الأعلى
 
+**موقع المشروع:** `C:\Users\PC\Desktop\SecureMessenger` — وهو جذر مستودع Git.
+
+نُقل إلى هنا في 2026-07-31 من `Desktop\تطبيق مراسلة\SecureMessenger`. **أبقِه تحت مسار بأحرف ASCII؛** الاسم العربي كان يفرض حيلتين حُذفتا بعد النقل (§11.6).
+
+بقيت في المجلد العربي القديم ملفات **خارج المستودع** لم تُنقل، فهي ليست جزءاً من المشروع:
+
 ```
-Desktop\تطبيق مراسلة\
-├── SecureMessenger\            ← المشروع الفعلي
-├── prompt_kotlin_compose.md    ← برومبت عربي لتوليد التطبيق (8.7 ك.ب، مرجع تاريخي)
-├── .claude\settings.local.json ← قائمة أذونات أوامر gradle/adb لهذه الجلسات
-├── .idea\                      ← إعدادات Android Studio (7 ملفات)
+Desktop\تطبيق مراسلة\          ← لم يعد يحوي المشروع
+├── prompt_kotlin_compose.md    ← برومبت عربي لتوليد التطبيق (مرجع تاريخي)
+├── .claude\settings.local.json ← أذونات أوامر gradle/adb، ومساراتها تشير للمكان القديم
+├── .idea\                      ← إعدادات Android Studio قديمة
 ├── .wrangler\cache\            ← wrangler-account.json (انظر §7)
 └── .uploads\                   ← فارغ
 ```
@@ -23,7 +28,7 @@ Desktop\تطبيق مراسلة\
 SecureMessenger\
 ├── settings.gradle.kts   → include(":core", ":app", ":desktop", ":hisn")
 ├── build.gradle.kts      → AGP 8.13.2 · Kotlin 2.0.21 · KSP 2.0.21-1.0.26 · Compose MP 1.7.1
-├── gradle.properties     → overridePathCheck · JDK=Android Studio JBR · relayUrl
+├── gradle.properties     → JDK=Android Studio JBR · relayUrl
 ├── core\      :core     مكتبة Kotlin/JVM — البروتوكول المشترك
 ├── app\       :app      تطبيق أندرويد   com.securemessenger.app
 ├── desktop\   :desktop  عميل Compose Desktop
@@ -180,18 +185,20 @@ relayUrl=https://sm-blind-mailbox.basil0552106933.workers.dev
 ### كيف تُشغَّل
 
 ```bash
-gradlew :app:connectedDebugAndroidTest     # يحتاج جهازاً/محاكياً
+gradlew :desktop:test                      # لا يحتاج جهازاً
 gradlew :hisn:connectedDebugAndroidTest    # يحتاج جهازاً/محاكياً
-gradlew :desktop:testDirect                # ← وليس :desktop:test
+
+# :app — استثنِ الاختبار المُتلِف على أي جهاز فيه بيانات حقيقية
+gradlew :app:connectedDebugAndroidTest "-Pandroid.testInstrumentationRunnerArguments.notClass=com.securemessenger.app.network.AckAuthenticationTest"
 ```
 
-**`gradlew :desktop:test` لا يعمل من هذا المسار.** Gradle يمرّر مسار الأصناف إلى عامل الاختبار عبر ملف مولَّد يقرأه العامل بترميز النظام الافتراضي، وهو على ويندوز صفحة ترميز قديمة لا UTF-8 — فكل مدخل يحوي حرفاً عربياً يفكّ إلى مسار غير موجود، وتفشل كل الاختبارات بـ`ClassNotFoundException` رغم أنها تُصرَّف سليمة. `testDirect` مهمة `JavaExec` تمرّر المسار على سطر الأوامر مباشرة فتتجاوز المشكلة. نقل المشروع إلى مسار إنجليزي يُلغي الحاجة إليها.
+**`:desktop:testDirect` لم يعد موجوداً** — حُذف 2026-07-31 مع نقل المشروع إلى مسار ASCII. كان يوجد لأن عامل اختبار Gradle يفكّ ملف مسار الأصناف بترميز ويندوز القديم، فتصير كل مداخل المسار العربي مسارات غير موجودة وتموت الاختبارات بـ`ClassNotFoundException` رغم أنها تُصرَّف سليمة. `gradlew :desktop:test` القياسي يعمل الآن — **مُتحقَّق منه فعلياً بعد النقل**.
 
 ### آخر نتيجة تشغيل موثَّقة
 
 | المجموعة | النتيجة | حالة التحقّق |
 |---|---|---|
-| `:desktop:testDirect` | **OK (3 tests)** | ✅ شُغِّلت فعلاً 2026-07-31 |
+| `:desktop:test` | **3/3** | ✅ شُغِّلت فعلاً 2026-07-31، عبر مهمة Gradle القياسية بعد النقل |
 | `:app:connectedDebugAndroidTest` | **42/42** على SM-S938B / Android 16 | ✅ **شُغِّلت فعلاً 2026-07-31** — باستثناء `AckAuthenticationTest` (انظر التحذير المُتلِف أدناه). العدد **42 لا 27**؛ الرقم القديم متجاوَز مرتين: المجموعة نمت، وكانت معطّلة عن التصريف |
 | `:hisn:connectedDebugAndroidTest` | 24/24 | 📄 منقولة عن التدقيق (2026-07-09) — **لم تُعَد هنا** |
 
@@ -219,7 +226,7 @@ gradlew :desktop:testDirect                # ← وليس :desktop:test
 >
 > **الأثر على الأرقام:** قيمة «27/27» تسبق استخراج `:core`، وأي اقتباس لها كنتيجة *حالية* غير صحيح. أُصلح بإضافة الاستيرادات، والمجموعة تُصرَّف الآن — **لكن تشغيلها الفعلي لا يزال ينتظر جهازاً**. لا تقتبس الرقم قبل تشغيل حقيقي.
 
-تحذيرات ظهرت أثناء تشغيل `testDirect` وهي **متوقَّعة لا أعطال**: `mDNS unavailable` و`port 47601 unavailable` (نسختا الاختبار تعملان على نفس الجهاز فتتنازعان المنفذ، والاحتياط بمنفذ يخصّصه النظام يعمل) و`peer socket error` عند إغلاق المقبس في نهاية الاختبار.
+تحذيرات تظهر أثناء اختبارات الكمبيوتر وهي **متوقَّعة لا أعطال**: `mDNS unavailable` و`port 47601 unavailable` (نسختا الاختبار تعملان على نفس الجهاز فتتنازعان المنفذ، والاحتياط بمنفذ يخصّصه النظام يعمل) و`peer socket error` عند إغلاق المقبس في نهاية الاختبار.
 
 ---
 
@@ -289,5 +296,11 @@ gradlew :desktop:testDirect                # ← وليس :desktop:test
    **الدرس، وهو أهمّ من البند:** الوثيقة الأمنية ليست مصدراً أوّلياً — الشيفرة هي. بند مؤرَّخ في تدقيق قد يكون قد أُصلح بعده بلا تحديث، وقد يكون الخطر الحقيقي في مكان لم ينظر إليه التدقيق أصلاً. كِلا الأمرين وقع هنا في وقت واحد.
 5. **`docs/adr/0001`** (عزل فكّ الوسائط في عملية منفصلة) لا يزال **«مقترَحاً» ولم يُنفَّذ.** بُدئ العمل فيه 2026-07-31 وأُوقف عمداً: الـADR نفسه يقدّر ٤–٧ أيام، وقيمته الأمنية كلها في احتواء الانهيار والتعليق — أي في الأجزاء التي لا تثبت إلا بتشغيل طويل على جهاز. مسار IPC نصف مبنيّ في مسار وسائط حسّاس أسوأ من عدمه، فحُذف ما بُدئ (واجهة AIDL) بدل تركه يوحي بتقدّم. نقطة الإدماج حين يُستأنف واضحة: كل عرض للصور يمرّ عبر `decodeSampledBitmap` في `MediaContent.kt` وحدها، فالتغليف بنسخة `suspend` تتراجع إلى الحالي عند أي فشل يكفي لتغطية كل المسارات دفعة واحدة.
    ملاحظة جانبية وُجدت أثناء ذلك: `ContactDetailComponents.kt:43` يستدعي `BitmapFactory.decodeByteArray` **خاماً بلا `inSampleSize`** — بخلاف بقية مسارات العرض، وبخلاف ما يصفه الـADR §7 من أن الفكّ المحدود مطبَّق في كل مسارات العرض.
-6. **المسار العربي** يفرض `android.overridePathCheck=true` ومهمة `testDirect`. نقل المشروع إلى مسار إنجليزي يُلغي الحيلتين.
+6. ~~المسار العربي يفرض `android.overridePathCheck=true` ومهمة `testDirect`.~~ **حُلَّ 2026-07-31.** نُقل المشروع من `Desktop\تطبيق مراسلة\SecureMessenger` إلى **`Desktop\SecureMessenger`**، وحُذفت الحيلتان معاً: سطر `overridePathCheck` من `gradle.properties`، ومهمة `testDirect` من `desktop/build.gradle.kts`.
+
+   **مُتحقَّق لا مفترَض:** `:app:assembleDebug` نجح **بلا** `overridePathCheck`، و`:desktop:test` القياسي أعطى 3/3 — وكلاهما كان مستحيلاً قبل النقل.
+
+   **عقبة عملية تستحق التسجيل:** النقل فشل ثلاث مرات بـ«الملف مستخدَم من عملية أخرى» رغم إيقاف عفاريت Gradle. لم يكن أيٌّ من محتويات المجلد مقفولاً (فُحصت واحداً واحداً) — المقفول كان المجلد نفسه، لأن **خادم `adb`** الذي أطلقه Gradle أثناء اختبارات الجهاز وَرِث المجلد مسارَ عملٍ له وبقي حيّاً بعد انتهاء Gradle. `adb kill-server` حرّره فوراً. تذكّرها قبل أي نقل لاحق.
+
+   **ما لم يُنقَل، عمداً:** `.claude` و`.idea` و`.wrangler` و`prompt_kotlin_compose.md` بقيت في المجلد العربي — كلها خارج المستودع. يلزمك إعادة فتح المشروع في Android Studio من المسار الجديد، وأذونات `.claude/settings.local.json` القديمة تشير لمسار لم يعد موجوداً.
 7. **`README.md`** كان يصف بنية ميتة حتى 2026-07-31؛ أُعيدت كتابته في نفس جولة هذه الوثيقة.

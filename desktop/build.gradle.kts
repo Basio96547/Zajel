@@ -51,12 +51,11 @@ dependencies {
 
 tasks.withType<Test>().configureEach {
     useJUnit()
-    // This project lives under a path containing Arabic characters. Gradle
-    // hands the test worker its classpath through a generated manifest, and the
-    // worker JVM reads that back using its *platform* default charset — which
-    // on Windows is a legacy codepage, not UTF-8. The decoded path then points
-    // nowhere and every test class fails to load with ClassNotFoundException,
-    // which looks exactly like a broken test but isn't one.
+    // Ordinary hygiene, no longer a workaround: Gradle hands the test worker
+    // its classpath through a generated file that the worker decodes with the
+    // platform default charset, which on Windows is still a legacy codepage.
+    // Pinning UTF-8 keeps that correct whatever the project path turns out to
+    // be — including if this repo is ever moved back under a non-ASCII path.
     jvmArgs("-Dfile.encoding=UTF-8", "-Dsun.jnu.encoding=UTF-8")
     systemProperty("java.io.tmpdir", layout.buildDirectory.dir("tmp/test").get().asFile.absolutePath)
     testLogging {
@@ -77,28 +76,12 @@ compose.desktop {
     }
 }
 
-/**
- * Runs the desktop tests WITHOUT Gradle's test worker.
- *
- * This project lives under a path containing Arabic characters. Gradle hands
- * its test worker the classpath indirectly (a generated manifest), and the
- * worker JVM resolves those entries using the platform default charset, which
- * on Windows is a legacy codepage rather than UTF-8 — every entry decodes to a
- * path that does not exist, and `gradlew :desktop:test` fails with
- * ClassNotFoundException on classes that compiled perfectly well. It is the
- * same root cause as the `android.overridePathCheck=true` line :app needs.
- *
- * JavaExec passes the classpath straight through on the command line, so it is
- * unaffected. Moving the project to an ASCII path would remove the need for
- * this task entirely.
- *
- *     gradlew :desktop:testDirect
- */
-tasks.register<JavaExec>("testDirect") {
-    group = "verification"
-    description = "Run the desktop tests directly, bypassing Gradle's test worker (non-ASCII path workaround)."
-    dependsOn(tasks.named("testClasses"))
-    classpath = sourceSets["test"].runtimeClasspath
-    mainClass.set("org.junit.runner.JUnitCore")
-    args("com.securemessenger.desktop.LoopbackMessagingTest")
-}
+// A `testDirect` JavaExec task used to live here, running the tests outside
+// Gradle's test worker. It existed for exactly one reason: the project sat
+// under a path containing Arabic characters, and the worker decoded its
+// generated classpath file with the Windows legacy codepage, so every entry
+// resolved to a path that did not exist and all tests died with
+// ClassNotFoundException despite compiling. The project moved to an ASCII path
+// on 2026-07-31, `gradlew :desktop:test` works normally, and the task was
+// deleted rather than kept "just in case" — a workaround nobody needs is a
+// second way to run the tests that will quietly drift from the first.
