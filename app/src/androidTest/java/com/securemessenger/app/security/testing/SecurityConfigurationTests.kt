@@ -85,12 +85,22 @@ class SecurityConfigurationTests {
             // discovery relies on — some Wi-Fi drivers/APs otherwise filter them.
             "android.permission.CHANGE_WIFI_MULTICAST_STATE",
             "android.permission.ACCESS_NETWORK_STATE",
-            // Runtime-requested, only while actually recording/scanning:
+            // Runtime-requested, only while actually recording:
             "android.permission.RECORD_AUDIO",   // voice messages
-            "android.permission.CAMERA",         // QR key verification / pairing
-            // Contributed by dependency library manifests, not requested directly by us:
-            "android.permission.FOREGROUND_SERVICE",  // androidx.work (MessageCleanupService scheduling)
-            "android.permission.USE_FINGERPRINT",     // androidx.biometric's pre-API28 compat shim
+            // Background delivery (MessengerService), opt-in and off by default.
+            // Android offers no way to keep a socket alive from the background
+            // without a foreground service, and no foreground service without a
+            // visible notification — so these three travel together, and the
+            // feature is a switch rather than a constant precisely because they
+            // weaken the calculator disguise. Added to the manifest when that
+            // feature landed; this list was not updated with it, which is what
+            // made this test fail rather than any permission creep.
+            "android.permission.FOREGROUND_SERVICE",
+            "android.permission.FOREGROUND_SERVICE_DATA_SYNC",
+            "android.permission.POST_NOTIFICATIONS",
+            // Contributed by dependency library manifests, not requested by us:
+            "android.permission.CAMERA",          // zxing-android-embedded (QR scanning)
+            "android.permission.USE_FINGERPRINT", // androidx.biometric's pre-API28 compat shim
             // Platform-synthesized (Android 13+) for a dependency's dynamically
             // registered, non-exported broadcast receiver — not something any
             // app manifest declares directly.
@@ -99,12 +109,18 @@ class SecurityConfigurationTests {
 
         val requestedPermissions = packageInfo.requestedPermissions ?: emptyArray()
 
-        requestedPermissions.forEach { permission ->
-            assertTrue(
-                "App requests unexpected permission: $permission",
-                allowedPermissions.contains(permission)
-            )
-        }
+        // Collected and asserted once, rather than failing on the first
+        // offender: permissions usually arrive in groups (a feature pulls in
+        // three at a time, as the background-delivery set above shows), and a
+        // failure naming only the first sends the reader round the loop once
+        // per permission instead of showing the whole drift at a glance.
+        val unexpected = requestedPermissions.filterNot { allowedPermissions.contains(it) }
+        assertTrue(
+            "App requests ${unexpected.size} permission(s) not on the reviewed allowlist: " +
+                "${unexpected.joinToString()}. Each one is a deliberate decision — add it here " +
+                "WITH the reason it exists, or remove it from the manifest.",
+            unexpected.isEmpty()
+        )
     }
 
     @Test
