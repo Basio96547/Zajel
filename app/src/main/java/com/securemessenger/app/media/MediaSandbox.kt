@@ -57,6 +57,17 @@ object MediaSandbox {
     private const val BIND_TIMEOUT_MS = 5_000L
 
     /**
+     * How far past the requested bound a returned image may legally sit.
+     * inSampleSize halves until the *smaller* side is under the bound, so a
+     * very wide panorama can exceed it on one axis; 4x covers that with room
+     * to spare while still refusing an absurd claim.
+     */
+    private const val SIZE_SLACK = 4
+
+    /** Absolute ceiling on one decoded frame, whatever the requested bound was. */
+    private const val MAX_PIXEL_BYTES = 64L * 1024 * 1024
+
+    /**
      * One decode at a time. Not for correctness — the service could take
      * concurrent calls — but because each in-flight decode holds a full pixel
      * buffer, and a screenful of bubbles decoding at once would multiply that
@@ -145,8 +156,10 @@ object MediaSandbox {
         val shared = pixelsOf(result) ?: return null
         val width = result.getInt(KEY_WIDTH)
         val height = result.getInt(KEY_HEIGHT)
-        if (width <= 0 || height <= 0) {
+        if (!isPlausibleResult(width, height, maxDimension, shared.size.toLong())) {
+            Log.w(TAG, "sandbox returned implausible geometry ${width}x$height — discarding")
             shared.close()
+            dropConnection(context)
             return null
         }
 
@@ -161,6 +174,49 @@ object MediaSandbox {
         } finally {
             shared.close()
         }
+    }
+
+    /**
+     * Whether a reply is worth acting on at all — the guard on the **return**
+     * channel, which is the one direction where a compromised sandbox gets to
+     * speak to a process that still holds everything.
+     *
+     * The pixels themselves are harmless: they are copied as raw bytes and
+     * never re-parsed, so there is no decoder on this side to attack. The
+     * numbers beside them are not harmless. `width` and `height` are
+     * attacker-chosen integers that feed straight into an allocation, so a
+     * sandbox that answers "50000 x 50000" would have the *main* process
+     * attempt ten gigabytes and die of OutOfMemoryError — turning a contained
+     * compromise back into a crash of the very process the sandbox exists to
+     * protect.
+     *
+     * So the trusted side decides what is plausible, rather than believing what
+     * it is told:
+     *  - neither side may exceed [SIZE_SLACK]x the bound we asked for. Sampling
+     *    halves until the *smaller* side fits, so a long panorama can legally
+     *    overshoot on one axis — but not without limit.
+     *  - the total must fit [MAX_PIXEL_BYTES].
+     *  - the shared buffer must actually hold that many bytes. Claiming a large
+     *    image while sending a small buffer is the cheapest lie available, and
+     *    `copyPixelsFromBuffer` would otherwise be the thing to notice — after
+     *    the oversized allocation had already been attempted.
+     *
+     * Extracted and internal so it can be tested directly: the interesting
+     * inputs here are hostile ones, and there is no way to make a real sandbox
+     * produce them.
+     */
+    internal fun isPlausibleResult(
+        width: Int,
+        height: Int,
+        maxDimension: Int,
+        bufferBytes: Long
+    ): Boolean {
+        if (width <= 0 || height <= 0 || maxDimension <= 0) return false
+        val limit = maxDimension.toLong() * SIZE_SLACK
+        if (width > limit || height > limit) return false
+        val needed = width.toLong() * height.toLong() * 4
+        if (needed > MAX_PIXEL_BYTES) return false
+        return bufferBytes >= needed
     }
 
     @Suppress("DEPRECATION")

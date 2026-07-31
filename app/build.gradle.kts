@@ -175,9 +175,13 @@ dependencies {
     implementation("androidx.work:work-runtime-ktx:2.9.0")
 
     // Testing
-    // No JVM unit-test source set: every test here touches libsodium, whose
-    // native library cannot load outside an instrumented run, so they all live
-    // in androidTest (junit arrives transitively via androidx.test.ext:junit).
+    // Almost everything here is instrumented, because almost every test touches
+    // libsodium and its native library cannot load outside a device run. The
+    // JVM source set exists for the exceptions — logic that touches neither
+    // Android nor native code, where needing a connected phone would only make
+    // the test harder to run. MediaSandboxGeometryTest (the guard on what the
+    // sandbox is allowed to claim on its way back) is the first of those.
+    testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
     androidTestImplementation(platform("androidx.compose:compose-bom:2023.10.01"))

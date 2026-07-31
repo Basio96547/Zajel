@@ -121,15 +121,20 @@ class MediaSandboxTest {
     }
 
     /**
-     * The containment claim, tested the only way it can be: kill the process
-     * outright, exactly as a successful memory-safety exploit or the
-     * out-of-memory killer would, and see what survives.
+     * Survivability, which is **not** the same thing as containment — worth
+     * stating precisely, because it is easy to claim more than this proves.
      *
-     * Two assertions matter. The app process is still running — trivially true
-     * because this test keeps executing, which is the point: today, without the
-     * sandbox, a native crash in the decoder would have taken this process with
-     * it. And the next decode succeeds, proving the client notices the death,
-     * discards the binding and builds a fresh process instead of wedging.
+     * What it shows: the sandbox dying does not take the app with it, and the
+     * client recovers rather than wedging. That covers the decoder crashing on
+     * a malformed frame and the out-of-memory killer choosing the sandbox —
+     * both real, both previously fatal to the whole app.
+     *
+     * What it does NOT show: containment of a *live* compromise. A successful
+     * exploit does not kill the process; it keeps it alive and works inside it.
+     * Nothing here simulates that, and no test in this file does. Containment
+     * comes from the isolated_app SELinux domain and the empty permission set —
+     * which is why [sandboxRunsUnderItsOwnIsolatedUid] is the test carrying
+     * that claim, not this one.
      */
     @Test
     fun killingTheSandboxLeavesTheAppAliveAndItRecovers() {
@@ -153,4 +158,9 @@ class MediaSandboxTest {
         assertNotNull("after the sandbox was killed, the next decode must rebuild it", after)
         assertEquals(120, after!!.width)
     }
+
+    // The return-channel guard is deliberately NOT tested here. It is pure
+    // arithmetic that touches nothing Android, so tying it to a connected
+    // device would make a check on hostile input harder to run than the code
+    // paths that need hardware. It lives in src/test — MediaSandboxGeometryTest.
 }
