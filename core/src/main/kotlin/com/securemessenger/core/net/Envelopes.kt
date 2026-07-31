@@ -16,7 +16,7 @@ import org.json.JSONObject
  *
  * Every frame has the same two-layer shape:
  *
- *   { "type": …, "id": …?, "recipientId": …?, "sealed": base64(crypto_box_seal(inner)) }
+ *   { "type": …, "id": …?, "sealed": base64(crypto_box_seal(inner)) }
  *
  * The outer layer is plain routing metadata — the minimum a transport needs to
  * hand the frame to the right place. The inner object holds everything that
@@ -24,9 +24,20 @@ import org.json.JSONObject
  * is anonymously sealed to the recipient's identity key, so neither a device
  * sharing the LAN nor the blind relay ever sees any of it.
  *
- * `id`/`recipientId` are present only on frames the recipient must acknowledge.
- * The ephemeral ones — typing, challenge, bundle_announce — carry no id because
- * nothing retries them.
+ * `id` is present only on frames the recipient must acknowledge. The ephemeral
+ * ones — typing, challenge, bundle_announce — carry no id, because nothing
+ * retries them. It is a random UUID and says nothing about who either party is.
+ *
+ * **There is deliberately no recipient field out here.** One used to be written
+ * (`recipientId`), and nothing in either client ever read it back — it was a
+ * write-only field that put a stable user id in the clear on every message,
+ * receipt and typing frame travelling the local `ws://` socket, which is
+ * precisely the linkage the rotating discovery token exists to deny a passive
+ * observer. Removed 2026-07-31. A direct socket needs no such field: a frame
+ * arriving on our own server is by definition addressed to us, and one we
+ * cannot unseal is not ours to read. Do not reintroduce it — routing that a
+ * transport genuinely needs belongs to the transport (the relay's mailbox id),
+ * not to a field naming a person.
  */
 object Envelopes {
 
@@ -54,14 +65,12 @@ object Envelopes {
         type: String,
         inner: JSONObject,
         recipientPublicKey: ByteArray,
-        envelopeId: String? = null,
-        recipientId: String? = null
+        envelopeId: String? = null
     ): JSONObject {
         val sealed = LibsodiumWrapper.sealTo(inner.toString().toByteArray(Charsets.UTF_8), recipientPublicKey)
         return JSONObject().apply {
             put("type", type)
             envelopeId?.let { put("id", it) }
-            recipientId?.let { put("recipientId", it) }
             put("sealed", B64.encode(sealed))
         }
     }

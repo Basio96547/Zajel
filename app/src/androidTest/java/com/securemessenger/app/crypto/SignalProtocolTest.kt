@@ -1,5 +1,7 @@
 package com.securemessenger.app.crypto
 
+import com.securemessenger.core.crypto.LibsodiumWrapper
+import com.securemessenger.core.crypto.SignalProtocol
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test

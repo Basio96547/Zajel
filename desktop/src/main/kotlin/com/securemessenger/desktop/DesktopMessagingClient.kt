@@ -331,7 +331,7 @@ class DesktopMessagingClient(
         persistSession(contactId)
 
         val envelope = Envelopes.seal(
-            Envelopes.TYPE_MESSAGE, inner, contact.publicKey, envelopeId, contactId
+            Envelopes.TYPE_MESSAGE, inner, contact.publicKey, envelopeId
         ).toString()
 
         store.addMessage(

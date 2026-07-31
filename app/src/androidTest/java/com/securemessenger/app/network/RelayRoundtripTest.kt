@@ -2,6 +2,7 @@ package com.securemessenger.app.network
 
 import com.securemessenger.app.BuildConfig
 import com.securemessenger.core.crypto.MailboxToken
+import com.securemessenger.core.net.RelayBlob
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request

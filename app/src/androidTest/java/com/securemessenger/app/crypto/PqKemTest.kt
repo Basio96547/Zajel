@@ -1,5 +1,6 @@
 package com.securemessenger.app.crypto
 
+import com.securemessenger.core.crypto.PqKem
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse

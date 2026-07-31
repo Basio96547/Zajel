@@ -1,5 +1,11 @@
 package com.securemessenger.app.crypto
 
+// These live in :core now. This file sits in com.securemessenger.app.crypto and
+// used to reach them unqualified, back when they were in this same package —
+// which is exactly why the move to :core broke it silently: a same-package call
+// has no import line to update, so nothing pointed at it.
+import com.securemessenger.core.crypto.LibsodiumWrapper
+import com.securemessenger.core.crypto.MessagePadding
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals

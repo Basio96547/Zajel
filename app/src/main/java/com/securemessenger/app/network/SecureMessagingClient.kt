@@ -776,7 +776,7 @@ class SecureMessagingClient(
 
             // The routing id lets the recipient's ack be matched back to this
             // exact outbox entry.
-            val envelope = sealedEnvelope("message", inner, recipientPublicKey, envelopeId, recipientId)
+            val envelope = sealedEnvelope("message", inner, recipientPublicKey, envelopeId)
 
             enqueueAndSend(envelopeId, recipientId, envelope.toString(), clientMessageId = messageId)
     }
@@ -854,20 +854,23 @@ class SecureMessagingClient(
      * identity of its own) wrapped in the thinnest possible routing header.
      * Frames the recipient must acknowledge carry an [envelopeId] to ack
      * against; ephemeral ones (typing, challenge, bundle_announce) don't.
+     *
+     * Who the frame is *for* is stated only inside the seal. The outer header
+     * used to repeat it in the clear as `recipientId`, which no receiver ever
+     * read — see the note in Envelopes.
      */
     private fun sealedEnvelope(
         type: String,
         inner: JSONObject,
         recipientPublicKey: ByteArray,
-        envelopeId: String? = null,
-        recipientId: String? = null
+        envelopeId: String? = null
     ): JSONObject =
         // Delegated to :core so this app and the desktop client build byte-
         // identical frames. Any change to the frame shape must happen there, in
         // one file, or the two platforms quietly stop being able to read each
         // other's messages.
         com.securemessenger.core.net.Envelopes.seal(
-            type, inner, recipientPublicKey, envelopeId, recipientId
+            type, inner, recipientPublicKey, envelopeId
         )
 
     /** Unseal a sealed-sender envelope (used for both chat messages and read receipts). */
@@ -891,7 +894,7 @@ class SecureMessagingClient(
                 put("messageIds", JSONArray(messageIds))
                 ackToken?.let { put("ackToken", it) }
             }
-            val envelope = sealedEnvelope("receipt", inner, recipientPublicKey, envelopeId, recipientId)
+            val envelope = sealedEnvelope("receipt", inner, recipientPublicKey, envelopeId)
 
             enqueueAndSend(envelopeId, recipientId, envelope.toString())
             true
@@ -925,7 +928,7 @@ class SecureMessagingClient(
         try {
             val recipientPublicKey = getContactIdentityKey(recipientId) ?: return@withContext false
             val inner = JSONObject().apply { put("senderId", userId) }
-            val envelope = sealedEnvelope("typing", inner, recipientPublicKey, recipientId = recipientId)
+            val envelope = sealedEnvelope("typing", inner, recipientPublicKey)
             sendToContact(recipientId, envelope.toString())
         } catch (e: Exception) {
             false
