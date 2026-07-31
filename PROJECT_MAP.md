@@ -201,7 +201,7 @@ gradlew :app:connectedDebugAndroidTest "-Pandroid.testInstrumentationRunnerArgum
 | `:desktop:test` | **3/3** | ✅ شُغِّلت فعلاً 2026-07-31، عبر مهمة Gradle القياسية بعد النقل |
 | `:app:testDebugUnitTest` (JVM، بلا جهاز) | **8/8** | ✅ شُغِّلت فعلاً 2026-07-31 |
 | `:app:connectedDebugAndroidTest` | **50/50** على SM-S938B / Android 16 | ✅ شُغِّلت فعلاً 2026-07-31 **بعد** حارس قناة العودة وإصلاح رمز الاقتران. باستثناء `AckAuthenticationTest` |
-| `:hisn:connectedDebugAndroidTest` | 24/24 | 📄 منقولة عن التدقيق (2026-07-09) — **لم تُعَد هنا** |
+| `:hisn:connectedDebugAndroidTest` | **24/24** على SM-S938B / Android 16 | ✅ شُغِّلت فعلاً 2026-07-31 — وكانت **23/24** حتى أُصلح اختبار يفترض ملكية سجلّ تدقيق فارغ (فحص حقيقي يسجّل مدخلة عند تثبيت الاختبار نفسه) |
 
 **ما يُعَدّ بالضبط، لأن الأرقام تُخلَط بسهولة:** كل عدد أعلاه هو **طرق اختبار (`@Test`) نفّذها المُشغِّل**، لا تأكيدات ولا أصناف. تفكيك الـ47:
 
