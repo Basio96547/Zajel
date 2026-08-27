@@ -119,11 +119,19 @@ class SecureDatabaseMigrationTest {
             }
             oldDb.close()
 
-            // 2) Reopen the SAME file through the real production path, at
-            //    version 11, with only MIGRATION_10_11 registered — no
-            //    destructive fallback, so a shape mismatch throws here
-            //    instead of silently "succeeding".
-            val db = Room.databaseBuilder(context, SecureDatabase::class.java, dbName)
+            // 2) Reopen the SAME file at version 11 with only MIGRATION_10_11
+            //    registered — no destructive fallback, so a shape mismatch
+            //    throws here instead of silently "succeeding".
+            //
+            //    [V11SchemaDatabase], not the real SecureDatabase: this test
+            //    is about one migration step, and the real class is at v12.
+            //    Opening it here asked Room for a 10 -> 12 path, got only the
+            //    10 -> 11 half, and failed with "A migration from 10 to 12 was
+            //    required but not found" — the test's own comment already said
+            //    "at version 11" while the code no longer was. The 11 -> 12
+            //    step has its own test below; chaining both here would test
+            //    neither in isolation.
+            val db = Room.databaseBuilder(context, V11SchemaDatabase::class.java, dbName)
                 .openHelperFactory(SupportOpenHelperFactory(passphrase))
                 .addMigrations(SecureDatabase.MIGRATION_10_11)
                 .build()

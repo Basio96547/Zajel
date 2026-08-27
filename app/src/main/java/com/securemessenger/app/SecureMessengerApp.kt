@@ -2,6 +2,7 @@ package com.securemessenger.app
 
 import android.app.Application
 import android.content.Context
+import android.os.Build
 import com.securemessenger.app.crypto.AndroidKeyStoreManager
 import com.securemessenger.core.crypto.ChatPayloads
 import com.securemessenger.core.crypto.MediaCodec
@@ -21,6 +22,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
+import java.io.File
 
 class SecureMessengerApp : Application() {
 
@@ -188,6 +190,30 @@ class SecureMessengerApp : Application() {
     override fun onCreate() {
         super.onCreate()
 
+        // NOTHING BELOW THIS LINE MAY RUN IN THE MEDIA SANDBOX.
+        //
+        // Android creates one Application instance per process, and the image
+        // decoder in MediaSandboxService lives in its own `:mediaSandbox`
+        // process — so every line of this method was running inside the
+        // permissionless isolated box too. That is wrong twice:
+        //
+        //  - it crashed. An isolated process gets no content providers, so
+        //    androidx.startup never runs there, so WorkManager cannot exist
+        //    there, so schedulePeriodicCleanup below threw
+        //    IllegalStateException out of Application.onCreate and the
+        //    platform killed the process on sight — every single bind, in a
+        //    retry loop. Incoming images could not decode at all.
+        //  - it contradicted the sandbox's whole design. ADR 0001 says the
+        //    box holds no keys and touches no app storage; this method was
+        //    installing libsodium and calling getOrCreateMasterKey() in it,
+        //    with the failure swallowed by a catch. The box should not be
+        //    *trying*.
+        //
+        // MediaSandboxService needs nothing from this class — it takes bytes
+        // over IPC and hands pixels back — so the correct amount of
+        // application startup for that process is none of it.
+        if (isMediaSandboxProcess()) return
+
         // Hand :core its platform pieces before anything can touch crypto.
         // :core compiles against the LazySodium API but ships no native library
         // of its own precisely so this app and the desktop client can each
@@ -240,9 +266,47 @@ class SecureMessengerApp : Application() {
         instance = this
     }
 
+    /**
+     * True only inside the isolated media-decode process declared as
+     * `android:process=":mediaSandbox"` in the manifest.
+     *
+     * Fails toward normal startup on purpose: if the process name cannot be
+     * read at all, this returns false and `onCreate` runs in full, which is
+     * exactly the behaviour that shipped before. A detection failure must not
+     * be able to leave the *real* app without its crypto and its cleanup job.
+     */
+    private fun isMediaSandboxProcess(): Boolean {
+        val name = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            // Static on Application, not a property of the instance.
+            android.app.Application.getProcessName()
+        } else {
+            // The only way to ask before API 28, and one an isolated process
+            // is still allowed to make about itself. cmdline is NUL-padded.
+            try {
+                File("/proc/self/cmdline").readText().substringBefore('\u0000').trim()
+            } catch (_: Exception) {
+                null
+            }
+        }
+        // Substring, not endsWith, and the difference is not cosmetic: an
+        // *isolated* service does not run under the bare `:mediaSandbox` name
+        // the manifest asks for. The platform gives each isolated service
+        // instance its own process named `<package>:<process>:<ServiceClass>`:
+        //
+        //   com.securemessenger.app:mediaSandbox:com.securemessenger.app.media.MediaSandboxService
+        //
+        // The first version of this guard used endsWith, which is false for
+        // that string, so it shipped, compiled, and changed nothing at all —
+        // the sandbox kept dying in a retry loop exactly as before.
+        return name?.contains(MEDIA_SANDBOX_PROCESS_MARKER) == true
+    }
+
     companion object {
         // Singleton instance for global access
         lateinit var instance: SecureMessengerApp
             private set
+
+        /** Must stay in step with `android:process` on MediaSandboxService in AndroidManifest.xml. */
+        private const val MEDIA_SANDBOX_PROCESS_MARKER = ":mediaSandbox"
     }
 }
