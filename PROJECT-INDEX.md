@@ -5,7 +5,7 @@
 ابحث هنا أولاً بـ Grep قبل فتح أي ملف مصدر كامل. سطر `يُستخدم في:` تحت أي class/object/interface = تطابق استيراد FQN فعلي، أفضل-جهد وليس مضموناً 100%.
 ⚠ بجانب اسم ملف = يتجاوز 300 سطر.
 
-**129** ملف مفحوص، **2408** تعريفاً.
+**129** ملف مفحوص، **2406** تعريفاً.
 
 
 ## app/
@@ -165,7 +165,7 @@ data class OldContact ( @PrimaryKey val id: String, val publicKey: ByteArray, va
   - L149 `@Test fun testCleartextTrafficIntentionallyAllowedForLocalP2P ()` — Cleartext IS intentionally allowed — there is no external server at
   - L165 `@Test fun testSecureRandomGeneration ()`
 
-### app/src/androidTest/java/com/securemessenger/app/ui/HomeScreenshotTest.kt (108 سطر)  [package com.securemessenger.app.ui]
+### app/src/androidTest/java/com/securemessenger/app/ui/HomeScreenshotTest.kt (109 سطر)  [package com.securemessenger.app.ui]
 - L36 `@RunWith(AndroidJUnit4::class) class HomeScreenshotTest` — Photographs the home screen so a human can judge it.
   - L39 `val compose`
   - L41 `private val sample`
@@ -174,17 +174,18 @@ data class OldContact ( @PrimaryKey val id: String, val publicKey: ByteArray, va
   - L76 `@Test fun captureHomeEmpty ()`
   - L78 `private fun capture (name: String, dark: Boolean, contacts: List<ContactUiModel>)`
 
-### app/src/androidTest/java/com/securemessenger/app/ui/LiquidHomeRenderTest.kt (198 سطر)  [package com.securemessenger.app.ui]
-- L52 `@RunWith(AndroidJUnit4::class) class LiquidHomeRenderTest` — The redesigned home screen, rendered on a real device.
-  - L55 `val compose`
-  - L57 `private val unreadContact`
-  - L66 `private val pinnedContact`
-  - L79 `@Test fun chatRowRendersItsNamePreviewAndUnreadCount_inDark ()`
-  - L94 `@Test fun chatRowRenders_inLight ()`
-  - L108 `@Test fun aRowStillReportsTheClickTheScreenExistsToDeliver ()`
-  - L128 `@Test fun theEntranceAnimationLeavesTheRowVisible ()`
-  - L145 `@Test fun theAuroraAndItsSurfacesDrawWithoutFailing ()`
-  - L172 `@Test fun theNavBarRendersEveryTabAndReportsSelection ()`
+### app/src/androidTest/java/com/securemessenger/app/ui/LiquidHomeRenderTest.kt (229 سطر)  [package com.securemessenger.app.ui]
+- L51 `@RunWith(AndroidJUnit4::class) class LiquidHomeRenderTest` — The redesigned home screen, rendered on a real device.
+  - L54 `val compose`
+  - L56 `private val unreadContact`
+  - L65 `private val pinnedContact`
+  - L78 `@Test fun chatRowRendersItsNamePreviewAndUnreadCount_inDark ()`
+  - L93 `@Test fun chatRowRenders_inLight ()`
+  - L107 `@Test fun aRowStillReportsTheClickTheScreenExistsToDeliver ()`
+  - L127 `@Test fun theEntranceAnimationLeavesTheRowVisible ()`
+  - L144 `@Test fun theAuroraAndItsSurfacesDrawWithoutFailing ()`
+  - L171 `@Test fun everyDestinationTheBottomBarUsedToOwnIsStillReachable ()`
+  - L209 `@Test fun thePendingRequestsBannerIsAbsentWhenThereAreNone ()`
 
 ### app/src/androidTest/java/com/securemessenger/app/ui/screens/chat/QrImageTest.kt (189 سطر)  [package com.securemessenger.app.ui.screens.chat]
 - L20 `class QrImageTest` — Covers pairing by picture rather than by camera: the code has to survive
@@ -1197,10 +1198,9 @@ data class OutgoingConnectionRequest ( @PrimaryKey val recipientIdentityPublicKe
 - L146 `@Composable
 private fun LaunchedEffectPressState (source: MutableInteractionSource, onPressed: (Boolean) -> Unit)`
 
-### app/src/main/java/com/securemessenger/app/ui/liquid/LiquidGlass.kt (432 سطر) ⚠  [package com.securemessenger.app.ui.liquid]
+### app/src/main/java/com/securemessenger/app/ui/liquid/LiquidGlass.kt (323 سطر) ⚠  [package com.securemessenger.app.ui.liquid]
 - L95 `@Immutable
 data class LiquidPalette ( /** The page floor the aurora is painted onto. */ val floor: Color, /** Three drifting light sources. Order is back-to-front. */ val blobs: List<Color>, val surface: Color, val surfaceRaised: Color, /** Top-edge highlight painted over a surface's fill. */ val sheen: Color, val edgeHigh: Color, val edgeLow: Color, val onSurface: Color, val muted: Color, val shadow: Color, )`
-  يُستخدم في: app/src/androidTest/java/com/securemessenger/app/ui/LiquidHomeRenderTest.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatListScreen.kt
 - L97 `val floor : Color,` — The page floor the aurora is painted onto.
 - L99 `val blobs : List<Color>,` — Three drifting light sources. Order is back-to-front.
 - L100 `val surface : Color,`
@@ -1230,16 +1230,8 @@ private fun rememberLiquidPalette (dark: Boolean): LiquidPalette`
   - L292 `val spread`
 - L309 `@Composable fun rememberPressScale ( source: MutableInteractionSource, pressedScale: Float = 0.972f ): State<Float>` — Press feedback as a spring rather than a ripple. Glass does not ripple; it
   - L313 `val pressed`
-- L324 `data class LiquidNavItem ( val label: String, val icon: ImageVector, /** 0 shows no badge at all. */ val badgeCount: Int = 0, )`
-  يُستخدم في: app/src/androidTest/java/com/securemessenger/app/ui/LiquidHomeRenderTest.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatListScreen.kt
-- L325 `val label : String,`
-- L326 `val icon : ImageVector,`
-- L328 `val badgeCount : Int` — 0 shows no badge at all.
-- L342 `@Composable fun LiquidNavBar ( items: List<LiquidNavItem>, selectedIndex: Int, onSelect: (Int) -> Unit, modifier: Modifier = Modifier, )` — The floating navigation pill.
-  - L348 `val palette`
-  - L349 `val primary`
 
-### app/src/main/java/com/securemessenger/app/ui/navigation/AppNavigation.kt (494 سطر) ⚠  [package com.securemessenger.app.ui.navigation]
+### app/src/main/java/com/securemessenger/app/ui/navigation/AppNavigation.kt (499 سطر) ⚠  [package com.securemessenger.app.ui.navigation]
 - L45 `sealed class Screen (val route: String)`
   - L46 `object Calculator`
   - L47 `object Loading`
@@ -1402,49 +1394,54 @@ private fun ChatListItemDarkPreview ()`
 @Composable
 private fun ChatListItemLightPreview ()`
 
-### app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatListScreen.kt (651 سطر) ⚠  [package com.securemessenger.app.ui.screens.chat]
-- L74 `@Composable fun ChatListScreen ( onConversationClick: (String) -> Unit, onSettingsClick: () -> Unit, onNewChatClick: () -> Unit, onProfileClick: () -> Unit = {}, viewModel: ChatListViewModel = viewModel(), connectionRequestsViewModel: ConnectionRequestsViewModel = viewModel() )` — The home screen, rebuilt on the liquid-glass layer in
-  - L82 `val contacts`
-  - L83 `val isLoading`
-  - L84 `val incomingRequests`
+### app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatListScreen.kt (722 سطر) ⚠  [package com.securemessenger.app.ui.screens.chat]
+- L72 `@Composable fun ChatListScreen ( onConversationClick: (String) -> Unit, onSettingsClick: () -> Unit, onNewChatClick: () -> Unit, onProfileClick: () -> Unit = {}, onConnectionRequestsClick: () -> Unit = {}, viewModel: ChatListViewModel = viewModel(), connectionRequestsViewModel: ConnectionRequestsViewModel = viewModel() )` — The home screen, rebuilt on the liquid-glass layer in
+  - L81 `val contacts`
+  - L82 `val isLoading`
+  - L83 `val incomingRequests`
 - L110 `@OptIn(ExperimentalFoundationApi::class)
 @Composable
-internal fun ChatListContent ( contacts: List<ContactUiModel>, isLoading: Boolean, pendingRequestCount: Int, onConversationClick: (String) -> Unit, onTogglePin: (String) -> Unit, onSettingsClick: () -> Unit, onNewChatClick: () -> Unit, onProfileClick: () -> Unit, modifier: Modifier = Modifier )`
-- L275 `@Composable
-private fun HeaderTitle (collapse: Float, conversationCount: Int)`
-  - L276 `val palette`
-- L316 `private fun conversationSubtitle (count: Int): String`
-- L326 `@Composable
-private fun LockChip ()`
-  - L327 `val primary`
-- L357 `@Composable
+internal fun ChatListContent ( contacts: List<ContactUiModel>, isLoading: Boolean, pendingRequestCount: Int, onConversationClick: (String) -> Unit, onTogglePin: (String) -> Unit, onSettingsClick: () -> Unit, onNewChatClick: () -> Unit, onProfileClick: () -> Unit, onConnectionRequestsClick: () -> Unit, modifier: Modifier = Modifier )`
+- L267 `@Composable
+private fun HeaderTitle ( collapse: Float, conversationCount: Int, onSettingsClick: () -> Unit, onProfileClick: () -> Unit )`
+  - L273 `val palette`
+  - L274 `val primary`
+- L333 `private fun conversationSubtitle (count: Int): String`
+- L343 `@Composable
+private fun HeaderAction ( icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, onClick: () -> Unit )`
+  - L348 `val palette`
+- L374 `@Composable
+private fun PendingRequestsBanner (count: Int, onClick: () -> Unit)`
+  - L375 `val primary`
+- L411 `private fun pendingRequestsLabel (count: Int): String`
+- L428 `@Composable
 private fun LiquidConnectionStrip ()`
-  - L358 `val palette`
-  - L359 `val state`
-- L414 `@Composable
+  - L429 `val palette`
+  - L430 `val state`
+- L485 `@Composable
 private fun SearchField ( value: String, onValueChange: (String) -> Unit, modifier: Modifier = Modifier )`
-  - L419 `val palette`
-  - L420 `val primary`
-  - L421 `val interaction`
-  - L422 `val focused`
-- L476 `@Composable
+  - L490 `val palette`
+  - L491 `val primary`
+  - L492 `val interaction`
+  - L493 `val focused`
+- L547 `@Composable
 private fun NewChatButton (collapsed: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier)`
-  - L477 `val primary`
-- L508 `@Composable
+  - L548 `val primary`
+- L579 `@Composable
 private fun EmptyState (onNewChatClick: () -> Unit, topPadding: androidx.compose.ui.unit.Dp)`
-  - L509 `val palette`
-  - L510 `val primary`
-  - L511 `val breath`
-  - L512 `val scale`
-- L576 `@Composable
+  - L580 `val palette`
+  - L581 `val primary`
+  - L582 `val breath`
+  - L583 `val scale`
+- L647 `@Composable
 private fun NoResults (query: String, topPadding: androidx.compose.ui.unit.Dp)`
-  - L577 `val palette`
-- L603 `@Composable
+  - L648 `val palette`
+- L674 `@Composable
 private fun LoadingList (topPadding: androidx.compose.ui.unit.Dp)`
-- L616 `@Composable
+- L687 `@Composable
 private fun ChatListItemSkeleton ()`
-- L639 `private fun Modifier (onClick: () -> Unit): Modifier`
-  - L640 `val interaction`
+- L710 `private fun Modifier (onClick: () -> Unit): Modifier`
+  - L711 `val interaction`
 
 ### app/src/main/java/com/securemessenger/app/ui/screens/chat/ComposeStrips.kt (126 سطر)  [package com.securemessenger.app.ui.screens.chat]
 - L28 `@Composable

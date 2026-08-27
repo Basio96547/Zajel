@@ -196,6 +196,25 @@ fun LiquidTheme(
  */
 @Composable
 fun AuroraBackdrop(modifier: Modifier = Modifier, parallaxPx: () -> Float = { 0f }) {
+    Box(modifier = modifier.fillMaxSize().auroraBackground(parallaxPx = parallaxPx))
+}
+
+/**
+ * The same backdrop as a modifier, which is what lets every screen in the app
+ * have it.
+ *
+ * The composable above was the home screen's private toy. Exposing the
+ * drawing as a modifier is what allowed `GlassComponents.glassBackground` —
+ * the page background twelve other screens already call — to be re-pointed at
+ * the aurora without editing a single one of those screens.
+ *
+ * [floor] overrides the palette's page colour so a screen can keep its own
+ * base tone under the same moving light.
+ */
+fun Modifier.auroraBackground(
+    floor: Color? = null,
+    parallaxPx: () -> Float = { 0f }
+): Modifier = composed {
     val palette = LocalLiquid.current
     val drift = rememberInfiniteTransition(label = "aurora")
     val a by drift.animateFloat(
@@ -214,8 +233,8 @@ fun AuroraBackdrop(modifier: Modifier = Modifier, parallaxPx: () -> Float = { 0f
         label = "auroraC"
     )
 
-    Canvas(modifier = modifier.fillMaxSize()) {
-        drawRect(palette.floor)
+    drawBehind {
+        drawRect(floor ?: palette.floor)
         // Nearer layers shift more than far ones, which is what makes the
         // page read as having actual distance behind it.
         val shift = parallaxPx()
@@ -260,7 +279,6 @@ fun Modifier.liquidSurface(
     shape: Shape = RoundedCornerShape(22.dp),
     raised: Boolean = false,
     elevation: Dp = 12.dp,
-    fill: Color? = null,
 ): Modifier = composed {
     val palette = LocalLiquid.current
     this
@@ -272,7 +290,7 @@ fun Modifier.liquidSurface(
             spotColor = palette.shadow
         )
         .clip(shape)
-        .background(fill ?: if (raised) palette.surfaceRaised else palette.surface)
+        .background(if (raised) palette.surfaceRaised else palette.surface)
         .background(
             Brush.verticalGradient(
                 0.0f to palette.sheen,

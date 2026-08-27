@@ -11,6 +11,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import com.securemessenger.app.ui.liquid.LiquidTheme
 
 /**
  * Design system — one place for spacing, shape and the chat-bubble palette.
@@ -29,8 +30,6 @@ object Dims {
     val s12 = 12.dp
     val s16 = 16.dp
     val s24 = 24.dp
-
-    val avatar = 48.dp
     val avatarSmall = 38.dp
     val avatarContactDetail = 84.dp
     val avatarProfile = 96.dp
@@ -48,7 +47,6 @@ data class MessengerColors(
     val sentMeta: Color,
     val receivedMeta: Color,
     val readTick: Color,
-    val online: Color,
     // Thin, low-alpha separators between rows (settings sections, composer
     // top edge, chat-list rows).
     val divider: Color,
@@ -65,7 +63,6 @@ data class MessengerColors(
     val onboardingGradient: List<Color>,
     val glassCard: Color,
     val glassCardStrong: Color,
-    val glassBorder: Color,
     val glassOnCard: Color,
 )
 
@@ -75,14 +72,14 @@ val LocalMessengerColors = staticCompositionLocalOf {
         sentBubble = Brand, receivedBubble = Color(0xFF1A1E27),
         onSent = Color.White, onReceived = Color(0xFFEEF0F4),
         sentMeta = Color(0xFFD8F0FB), receivedMeta = Color(0xFF6B7180),
-        readTick = Color.White, online = SemanticGreen,
+        readTick = Color.White,
         divider = Color(0x0FFFFFFF),
         headerBorder = Color(0xFF1C1F27),
         listGradient = listOf(Color(0xFF0B0D12), Color(0xFF0B0D12)),
         chatGradient = listOf(Color(0xFF0B0D12), Color(0xFF0B0D12)),
         onboardingGradient = listOf(Color(0xFF141826), Color(0xFF0A0C11)),
         glassCard = Color(0x0DFFFFFF), glassCardStrong = Color(0x17FFFFFF),
-        glassBorder = Color(0xFF23262E), glassOnCard = Color(0xFFF2F4F8)
+        glassOnCard = Color(0xFFF2F4F8)
     )
 }
 
@@ -121,14 +118,14 @@ private val DarkMessenger = MessengerColors(
     receivedBubble = Color(0xFF1A1E27),
     onSent = Color.White, onReceived = Color(0xFFEEF0F4),
     sentMeta = Color(0xFFD8F0FB), receivedMeta = Color(0xFF6B7180),
-    readTick = Color.White, online = SemanticGreen,
+    readTick = Color.White,
     divider = Color(0x0FFFFFFF),
     headerBorder = Color(0xFF1C1F27),
     listGradient = listOf(Color(0xFF0B0D12), Color(0xFF0B0D12)),
     chatGradient = listOf(Color(0xFF0B0D12), Color(0xFF0B0D12)),
     onboardingGradient = listOf(Color(0xFF141826), Color(0xFF0A0C11)),
     glassCard = Color(0x0DFFFFFF), glassCardStrong = Color(0x17FFFFFF),
-    glassBorder = Color(0xFF23262E), glassOnCard = Color(0xFFF2F4F8)
+    glassOnCard = Color(0xFFF2F4F8)
 )
 
 private val LightMessenger = MessengerColors(
@@ -136,14 +133,14 @@ private val LightMessenger = MessengerColors(
     receivedBubble = Color(0xE6FFFFFF),
     onSent = Color.White, onReceived = Color(0xFF1A1D24),
     sentMeta = Color(0xFFD8F0FB), receivedMeta = Color(0xFF9AA0AC),
-    readTick = Color.White, online = SemanticGreen,
+    readTick = Color.White,
     divider = Color(0x0F000000),
     headerBorder = Color(0xFFDBE0E8),
     listGradient = listOf(Color(0xFFEEF1F5), Color(0xFFE6EBF1)),
     chatGradient = listOf(Color(0xFFE9EEF4), Color(0xFFE0E6EE)),
     onboardingGradient = listOf(Color(0xFFF4F7FB), Color(0xFFE4EAF1)),
     glassCard = Color(0xBFFFFFFF), glassCardStrong = Color(0xCCFFFFFF),
-    glassBorder = Color(0xFFDFE3EA), glassOnCard = Color(0xFF1A1D24)
+    glassOnCard = Color(0xFF1A1D24)
 )
 
 // Generous, Telegram-like rounding — cards/sheets/dialogs default to this
@@ -168,7 +165,7 @@ fun MessengerTheme(
             colorScheme = colorScheme,
             typography = Typography,
             shapes = ConcreteShapes,
-            content = content
+            content = { LiquidTheme(dark = darkTheme) { content() } }
         )
     }
 }

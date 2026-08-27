@@ -2,6 +2,7 @@ package com.securemessenger.app.ui
 
 import android.graphics.Bitmap
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.captureToImage
@@ -10,6 +11,8 @@ import androidx.compose.ui.test.onRoot
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.securemessenger.app.ui.screens.chat.ChatListContent
+import com.securemessenger.app.ui.screens.loading.LoadingScreen
+import com.securemessenger.app.ui.screens.settings.StealthModeScreen
 import com.securemessenger.app.ui.theme.MessengerTheme
 import com.securemessenger.app.ui.viewmodel.ContactUiModel
 import org.junit.Assert.assertTrue
@@ -75,6 +78,47 @@ class HomeScreenshotTest {
     @Test
     fun captureHomeEmpty() = capture("home-empty", dark = true, contacts = emptyList())
 
+    /**
+     * Two screens this redesign never opened.
+     *
+     * The design was generalised by re-pointing the shared primitives —
+     * glassBackground, glassCard, GlassTopBar — at the liquid layer, rather
+     * than by rewriting fourteen screens. That claim is either true or it is
+     * not, and these captures are how you tell: neither LoadingScreen nor
+     * StealthModeScreen was edited, so whatever they look like now, they
+     * inherited.
+     */
+    @Test
+    fun captureUntouchedLoadingScreen() =
+        captureContent("screen-loading", dark = true) { LoadingScreen() }
+
+    @Test
+    fun captureUntouchedStealthScreen() = captureContent("screen-stealth", dark = true) {
+        // One setContent per test — the rule refuses a second, so these are
+        // two tests rather than one with two captures in it.
+        StealthModeScreen(onBackClick = {}, onEnableStealth = {})
+    }
+
+    /** Renders any screen under the app's real theme and writes the frame to a PNG. */
+    private fun captureContent(name: String, dark: Boolean, content: @Composable () -> Unit) {
+        compose.setContent { MessengerTheme(darkTheme = dark) { content() } }
+        compose.waitForIdle()
+        writeRootTo(name)
+    }
+
+    private fun writeRootTo(name: String) {
+        val bitmap = compose.onRoot().captureToImage().asAndroidBitmap()
+        val dir = File(
+            InstrumentationRegistry.getInstrumentation().targetContext.getExternalFilesDir(null),
+            "screenshots"
+        ).apply { mkdirs() }
+        val out = File(dir, "$name.png")
+        out.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+
+        assertTrue("captured image has no area", bitmap.width > 100 && bitmap.height > 100)
+        assertTrue("nothing was written to ${out.absolutePath}", out.length() > 0)
+    }
+
     private fun capture(name: String, dark: Boolean, contacts: List<ContactUiModel>) {
         compose.setContent {
             MessengerTheme(darkTheme = dark) {
@@ -93,16 +137,6 @@ class HomeScreenshotTest {
             }
         }
         compose.waitForIdle()
-
-        val bitmap = compose.onRoot().captureToImage().asAndroidBitmap()
-        val dir = File(
-            InstrumentationRegistry.getInstrumentation().targetContext.getExternalFilesDir(null),
-            "screenshots"
-        ).apply { mkdirs() }
-        val out = File(dir, "$name.png")
-        out.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
-
-        assertTrue("captured image has no area", bitmap.width > 100 && bitmap.height > 100)
-        assertTrue("nothing was written to ${out.absolutePath}", out.length() > 0)
+        writeRootTo(name)
     }
 }

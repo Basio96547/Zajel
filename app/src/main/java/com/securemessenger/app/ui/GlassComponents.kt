@@ -29,6 +29,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.securemessenger.app.ui.liquid.LocalLiquid
+import com.securemessenger.app.ui.liquid.auroraBackground
+import com.securemessenger.app.ui.liquid.liquidSurface
 import com.securemessenger.app.ui.theme.LocalMessengerColors
 
 /**
@@ -36,23 +39,27 @@ import com.securemessenger.app.ui.theme.LocalMessengerColors
  * translucent "frosted" surfaces floating on top of it.
  */
 
-/** The diagonal pastel-gradient page backdrop every glass screen sits on. */
-fun Modifier.glassBackground(colors: List<Color>): Modifier = this.background(
-    Brush.linearGradient(
-        colors = colors,
-        start = androidx.compose.ui.geometry.Offset(0f, 0f),
-        end = androidx.compose.ui.geometry.Offset(1000f, 1400f)
-    )
-)
+/**
+ * The page backdrop every glass screen sits on — now the drifting aurora the
+ * home screen was rebuilt around.
+ *
+ * The signature is unchanged on purpose, and that is the whole point: twelve
+ * screens already call this, so re-pointing it at
+ * [com.securemessenger.app.ui.liquid.auroraBackground] gave all of them the
+ * new backdrop without one of them being edited. [colors] still decides the
+ * page's base tone; the moving light on top of it comes from the theme.
+ */
+fun Modifier.glassBackground(colors: List<Color>): Modifier =
+    this.auroraBackground(floor = colors.firstOrNull())
 
-/** The radial backdrop reserved for onboarding/security moments (Setup, Loading, Stealth Mode). */
-fun Modifier.onboardingBackground(colors: List<Color>): Modifier = this.background(
-    Brush.radialGradient(
-        colors = colors,
-        center = androidx.compose.ui.geometry.Offset.Unspecified,
-        radius = 1200f
-    )
-)
+/**
+ * The backdrop for onboarding and security moments (Setup, Loading, Stealth
+ * Mode). Same aurora, deliberately: those screens used to be the one place
+ * with a different backdrop shape, and there was never a reason for the app
+ * to change materials the moment it asks you to trust it.
+ */
+fun Modifier.onboardingBackground(colors: List<Color>): Modifier =
+    this.auroraBackground(floor = colors.lastOrNull())
 
 /**
  * The single reusable "glass card" surface — a translucent rounded panel
@@ -61,12 +68,17 @@ fun Modifier.onboardingBackground(colors: List<Color>): Modifier = this.backgrou
  * chain. Pass [strong] for the slightly more opaque variant used on
  * emphasized cards (e.g. dialogs, the input bar).
  */
-fun Modifier.glassCard(radius: Dp = 16.dp, strong: Boolean = false): Modifier = composed {
-    val mc = LocalMessengerColors.current
-    this
-        .clip(RoundedCornerShape(radius))
-        .background(if (strong) mc.glassCardStrong else mc.glassCard)
-}
+fun Modifier.glassCard(radius: Dp = 16.dp, strong: Boolean = false): Modifier =
+    // Forty-seven call sites across the app, and none of them changed: the
+    // signature is the same, the material underneath is not. Every card,
+    // sheet, dialog and input bar in the app now gets the shadow, the
+    // top-edge sheen and the light-catching hairline border that the home
+    // screen's rows were rebuilt with, instead of a flat translucent fill.
+    this.liquidSurface(
+        shape = RoundedCornerShape(radius),
+        raised = strong,
+        elevation = if (strong) 12.dp else 6.dp
+    )
 
 /**
  * The single top bar used by every screen — a floating frosted pill matching
@@ -95,7 +107,7 @@ fun GlassTopBar(
             .statusBarsPadding()
             .padding(horizontal = 12.dp, vertical = 8.dp)
             .height(56.dp)
-            .glassCard(radius = 26.dp)
+            .liquidSurface(shape = RoundedCornerShape(26.dp), raised = true, elevation = 16.dp)
             .padding(horizontal = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -136,7 +148,6 @@ fun GlassTopBar(
 data class GlassNavItem(
     val label: String,
     val icon: ImageVector,
-    val selectedIcon: ImageVector = icon,
     /** e.g. pending connection-request count on "جهات الاتصال" — 0 shows no badge at all. */
     val badgeCount: Int = 0
 )
@@ -164,7 +175,7 @@ fun GlassBottomNavBar(
             // unbounded height Scaffold's bottomBar slot can pass down,
             // which made the whole bar balloon to cover the entire screen.
             .height(64.dp)
-            .glassCard(radius = 26.dp)
+            .liquidSurface(shape = RoundedCornerShape(26.dp), raised = true, elevation = 16.dp)
             .padding(vertical = 8.dp, horizontal = 6.dp)
     ) {
         val itemWidth = maxWidth / items.size
@@ -208,7 +219,7 @@ fun GlassBottomNavBar(
                         }
                     }) {
                         Icon(
-                            imageVector = if (selected) item.selectedIcon else item.icon,
+                            imageVector = item.icon,
                             contentDescription = item.label,
                             tint = tint,
                             modifier = Modifier.size(23.dp)
