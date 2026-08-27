@@ -74,17 +74,27 @@ fun KeyVerificationScreen(
     // is not open does not merely leave the screen loading forever — it
     // throws out of a LaunchedEffect, which is not a state this composable
     // can recover from. Now it fails visibly and says so.
-    var loadFailed by remember { mutableStateOf(false) }
+    // "Finished" is the state that matters, not "threw".
+    //
+    // The first version of this guard only caught exceptions, and the
+    // photograph showed why that was not enough: these reads return null
+    // rather than throwing when there is nothing to read, so every field sat
+    // on "جاري التحميل…" forever with loadFailed still false. A screen that
+    // has finished loading and has nothing is not loading — it failed, and
+    // should say so.
+    var loadAttempted by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         try {
             myPublicKeyHex = repository.getPublicKeyHex()
             fingerprint = repository.getPublicKeyFingerprint()
             myUserId = repository.getUserId()
         } catch (e: Exception) {
-            loadFailed = true
+            // Leave the fields null; the label below reads that as failure.
+        } finally {
+            loadAttempted = true
         }
     }
-    val pendingLabel = if (loadFailed) "تعذّر قراءة مفاتيحك" else "جاري التحميل..."
+    val pendingLabel = if (loadAttempted) "تعذّر قراءة مفاتيحك" else "جاري التحميل..."
 
     val qrData = myPublicKeyHex ?: ""
     val myQRBitmap = remember(qrData) {
@@ -119,8 +129,19 @@ fun KeyVerificationScreen(
                                 contentDescription = "رمز التحقق",
                                 modifier = Modifier.fillMaxSize()
                             )
-                        } else {
+                        } else if (!loadAttempted) {
                             CircularProgressIndicator()
+                        } else {
+                            // A spinner that never stops is a lie told slowly.
+                            // Once the read has been attempted and produced no
+                            // key, there is no code to draw and no more
+                            // spinning to do.
+                            Icon(
+                                imageVector = Icons.Default.ErrorOutline,
+                                contentDescription = null,
+                                modifier = Modifier.size(40.dp),
+                                tint = SemanticColors.red
+                            )
                         }
                     }
                 } else {

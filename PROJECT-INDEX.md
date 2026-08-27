@@ -5,7 +5,7 @@
 ابحث هنا أولاً بـ Grep قبل فتح أي ملف مصدر كامل. سطر `يُستخدم في:` تحت أي class/object/interface = تطابق استيراد FQN فعلي، أفضل-جهد وليس مضموناً 100%.
 ⚠ بجانب اسم ملف = يتجاوز 300 سطر.
 
-**130** ملف مفحوص، **2413** تعريفاً.
+**130** ملف مفحوص، **2418** تعريفاً.
 
 
 ## app/
@@ -191,19 +191,21 @@ data class OldContact ( @PrimaryKey val id: String, val publicKey: ByteArray, va
   - L171 `@Test fun everyDestinationTheBottomBarUsedToOwnIsStillReachable ()`
   - L209 `@Test fun thePendingRequestsBannerIsAbsentWhenThereAreNone ()`
 
-### app/src/androidTest/java/com/securemessenger/app/ui/ScreenTourTest.kt (121 سطر)  [package com.securemessenger.app.ui]
-- L42 `@RunWith(AndroidJUnit4::class) class ScreenTourTest` — A walk through the app, one screen per test.
-  - L45 `val compose`
-  - L47 `@Test fun tourCalculator ()`
-  - L51 `@Test fun tourSetup ()`
-  - L55 `@Test fun tourSettings ()`
-  - L62 `@Test fun tourProfile ()`
-  - L66 `@Test fun tourNewChat ()`
-  - L70 `@Test fun tourUsernameSearch ()`
-  - L74 `@Test fun tourKeyVerification ()`
-  - L78 `@Test fun tourConnectionRequests ()`
-  - L82 `@Test fun tourContactDetail ()`
-  - L106 `private fun shoot (name: String, content: @Composable () -> Unit)`
+### app/src/androidTest/java/com/securemessenger/app/ui/ScreenTourTest.kt (206 سطر)  [package com.securemessenger.app.ui]
+- L59 `@RunWith(AndroidJUnit4::class) class ScreenTourTest` — A walk through the app, one screen per test.
+  - L62 `val compose`
+  - L64 `@Test fun tourCalculator ()`
+  - L68 `@Test fun tourSetup ()`
+  - L72 `@Test fun tourSettings ()`
+  - L79 `@Test fun tourProfile ()`
+  - L83 `@Test fun tourNewChat ()`
+  - L87 `@Test fun tourUsernameSearch ()`
+  - L91 `@Test fun tourKeyVerification ()`
+  - L95 `@Test fun tourConnectionRequests ()`
+  - L99 `@Test fun tourContactDetail ()`
+  - L125 `@Test fun tourConversation ()` — The conversation — the app's most-used screen, and until now the only
+  - L165 `private val sampleConversation`
+  - L191 `private fun shoot (name: String, content: @Composable () -> Unit)`
 
 ### app/src/androidTest/java/com/securemessenger/app/ui/screens/chat/QrImageTest.kt (189 سطر)  [package com.securemessenger.app.ui.screens.chat]
 - L20 `class QrImageTest` — Covers pairing by picture rather than by camera: the code has to survive
@@ -1324,17 +1326,17 @@ private fun RowScope (btn: CalcButton, wide: Boolean)`
 - L369 `private data class CalcButton (val label: String, val color: Color, val textColor: Color, val onClick: () -> Unit)`
 - L371 `private fun Int ()`
 
-### app/src/main/java/com/securemessenger/app/ui/screens/chat/AlbumBubble.kt (107 سطر)  [package com.securemessenger.app.ui.screens.chat]
-- L30 `@Composable
-internal fun AlbumBubble ( images: List<MessageUiModel>, viewModel: ConversationViewModel, onOpenImageViewer: (MediaCodec.LocalMedia) -> Unit )`
-  - L35 `val mc`
-  - L36 `val isSent`
-  - L37 `val shape`
-  - L38 `val columns`
-- L81 `@Composable
-private fun AlbumThumbnail (media: MediaCodec.LocalMedia, viewModel: ConversationViewModel, onClick: () -> Unit)`
-  - L82 `var bitmap`
-  - L83 `val context`
+### app/src/main/java/com/securemessenger/app/ui/screens/chat/AlbumBubble.kt (106 سطر)  [package com.securemessenger.app.ui.screens.chat]
+- L29 `@Composable
+internal fun AlbumBubble ( images: List<MessageUiModel>, loadMedia: MediaLoader, onOpenImageViewer: (MediaCodec.LocalMedia) -> Unit )`
+  - L34 `val mc`
+  - L35 `val isSent`
+  - L36 `val shape`
+  - L37 `val columns`
+- L80 `@Composable
+private fun AlbumThumbnail (media: MediaCodec.LocalMedia, loadMedia: MediaLoader, onClick: () -> Unit)`
+  - L81 `var bitmap`
+  - L82 `val context`
 
 ### app/src/main/java/com/securemessenger/app/ui/screens/chat/AttachmentPicking.kt (40 سطر)  [package com.securemessenger.app.ui.screens.chat]
 - L13 `internal fun createCameraOutputUri (context: android.content.Context): Uri`
@@ -1348,58 +1350,58 @@ private fun AlbumThumbnail (media: MediaCodec.LocalMedia, viewModel: Conversatio
   - L32 `var fileName`
   - L37 `val bytes`
 
-### app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatCommon.kt (248 سطر)  [package com.securemessenger.app.ui.screens.chat]
-- L45 `@Composable fun ShimmerBox (modifier: Modifier = Modifier, shape: RoundedCornerShape = RoundedCornerShape(8.dp))` — A soft sweeping gradient over a shape — used while media is still decoding/loading.
-  - L46 `val transition`
-  - L47 `val translate`
-  - L56 `val base`
-  - L57 `val highlight`
-- L79 `@Composable fun ConnectionStatusBar ()` — Thin live bar reflecting the real WebSocket connection state — follows the
-  - L80 `val state`
-- L126 `private val avatarColors`
-- L135 `private fun avatarInitials (name: String): String`
-  - L136 `val parts`
-- L150 `@Composable fun Avatar ( name: String, size: androidx.compose.ui.unit.Dp, id: String = name, avatarBytes: ByteArray? = null, isVerified: Boolean = false )` — Gradient two-letter initials by default (like Telegram's placeholder
-  - L157 `val color`
-  - L158 `val bitmap`
-- L205 `@Composable
+### app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatCommon.kt (267 سطر)  [package com.securemessenger.app.ui.screens.chat]
+- L55 `internal val chatTimeLocale : java.util.Locale`
+- L64 `@Composable fun ShimmerBox (modifier: Modifier = Modifier, shape: RoundedCornerShape = RoundedCornerShape(8.dp))` — A soft sweeping gradient over a shape — used while media is still decoding/loading.
+  - L65 `val transition`
+  - L66 `val translate`
+  - L75 `val base`
+  - L76 `val highlight`
+- L98 `@Composable fun ConnectionStatusBar ()` — Thin live bar reflecting the real WebSocket connection state — follows the
+  - L99 `val state`
+- L145 `private val avatarColors`
+- L154 `private fun avatarInitials (name: String): String`
+  - L155 `val parts`
+- L169 `@Composable fun Avatar ( name: String, size: androidx.compose.ui.unit.Dp, id: String = name, avatarBytes: ByteArray? = null, isVerified: Boolean = false )` — Gradient two-letter initials by default (like Telegram's placeholder
+  - L176 `val color`
+  - L177 `val bitmap`
+- L224 `@Composable
 internal fun EncryptedBanner ()`
-  - L206 `val mc`
-- L235 `@Composable
+  - L225 `val mc`
+- L254 `@Composable
 internal fun DateSeparator (label: String)`
 
-### app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatListItem.kt (357 سطر) ⚠  [package com.securemessenger.app.ui.screens.chat]
-- L61 `private val timeLocale : java.util.Locale`
-- L66 `private fun formatChatTime (timestamp: Long): String`
-  - L68 `val now`
-  - L69 `val then`
-  - L70 `val sameYear`
-  - L71 `val dayDelta`
-  - L76 `val pattern`
-- L95 `@OptIn(ExperimentalFoundationApi::class)
+### app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatListItem.kt (343 سطر) ⚠  [package com.securemessenger.app.ui.screens.chat]
+- L52 `private fun formatChatTime (timestamp: Long): String`
+  - L54 `val now`
+  - L55 `val then`
+  - L56 `val sameYear`
+  - L57 `val dayDelta`
+  - L62 `val pattern`
+- L81 `@OptIn(ExperimentalFoundationApi::class)
 @Composable fun ChatListItem ( contact: ContactUiModel, onClick: () -> Unit, onTogglePin: () -> Unit = {}, entranceDelayMillis: Int = -1, )` — One conversation, as a pane of glass.
-  - L101 `val palette`
-  - L102 `val haptics`
-  - L103 `val primary`
-  - L104 `var showMenu`
-  - L106 `val interaction`
-  - L107 `val pressScale`
-  - L109 `val entrance`
-  - L117 `val unread`
-  - L118 `val pinned`
-- L257 `@Composable
+  - L87 `val palette`
+  - L88 `val haptics`
+  - L89 `val primary`
+  - L90 `var showMenu`
+  - L92 `val interaction`
+  - L93 `val pressScale`
+  - L95 `val entrance`
+  - L103 `val unread`
+  - L104 `val pinned`
+- L243 `@Composable
 private fun AvatarWithRing (contact: ContactUiModel, unread: Boolean)`
-  - L258 `val palette`
-  - L259 `val primary`
-- L286 `@Composable
+  - L244 `val palette`
+  - L245 `val primary`
+- L272 `@Composable
 private fun UnreadPill (count: Int)`
-  - L287 `val primary`
-  - L288 `val pulse`
-  - L289 `val glow`
-- L316 `@Preview(name =                        , showBackground = true, backgroundColor = 0xFF06080D)
+  - L273 `val primary`
+  - L274 `val pulse`
+  - L275 `val glow`
+- L302 `@Preview(name =                        , showBackground = true, backgroundColor = 0xFF06080D)
 @Composable
 private fun ChatListItemDarkPreview ()`
-- L342 `@Preview(name =                         , showBackground = true, backgroundColor = 0xFFEDF1F8)
+- L328 `@Preview(name =                         , showBackground = true, backgroundColor = 0xFFEDF1F8)
 @Composable
 private fun ChatListItemLightPreview ()`
 
@@ -1537,7 +1539,7 @@ private fun MediaPreviewStrip (tiles: List<androidx.compose.ui.graphics.ImageBit
   - L78 `val then`
   - L79 `fun sameDay (offset: Int): Boolean`
 
-### app/src/main/java/com/securemessenger/app/ui/screens/chat/ConversationScreen.kt (652 سطر) ⚠  [package com.securemessenger.app.ui.screens.chat]
+### app/src/main/java/com/securemessenger/app/ui/screens/chat/ConversationScreen.kt (658 سطر) ⚠  [package com.securemessenger.app.ui.screens.chat]
 - L58 `@OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable fun ConversationScreen ( contactId: String, onBackClick: () -> Unit, onVerificationClick: () -> Unit, onContactInfoClick: () -> Unit = {}, viewModel: ConversationViewModel = viewModel( key = contactId, factory = ConversationViewModelFactory(contactId) ) )`
   - L68 `var messageText`
@@ -1549,28 +1551,29 @@ private fun MediaPreviewStrip (tiles: List<androidx.compose.ui.graphics.ImageBit
   - L74 `val contactVerified`
   - L75 `val isContactTyping`
   - L76 `val establishingSession`
-  - L77 `val listState`
-  - L78 `val mc`
-  - L79 `val context`
-  - L80 `val scope`
-  - L84 `val seenBubbleKeys`
-  - L86 `var highlightedClientId`
-  - L88 `var selectionMode`
-  - L89 `var selectedIds`
-  - L90 `var actionTarget`
-  - L91 `var replyingTo`
-  - L92 `var editingTarget`
-  - L93 `var viewerMedia`
-  - L94 `var searchActive`
-  - L95 `var searchQuery`
-  - L96 `val clipboard`
-  - L97 `val snackbarHostState`
-  - L113 `var showAttachSheet`
-  - L114 `var pendingCameraUri`
-  - L115 `var pendingMedia`
-  - L117 `val attachLauncher`
-  - L133 `val multiPhotoLauncher`
-  - L145 `val cameraLauncher`
+  - L81 `val loadMedia`
+  - L83 `val listState`
+  - L84 `val mc`
+  - L85 `val context`
+  - L86 `val scope`
+  - L90 `val seenBubbleKeys`
+  - L92 `var highlightedClientId`
+  - L94 `var selectionMode`
+  - L95 `var selectedIds`
+  - L96 `var actionTarget`
+  - L97 `var replyingTo`
+  - L98 `var editingTarget`
+  - L99 `var viewerMedia`
+  - L100 `var searchActive`
+  - L101 `var searchQuery`
+  - L102 `val clipboard`
+  - L103 `val snackbarHostState`
+  - L119 `var showAttachSheet`
+  - L120 `var pendingCameraUri`
+  - L121 `var pendingMedia`
+  - L123 `val attachLauncher`
+  - L139 `val multiPhotoLauncher`
+  - L151 `val cameraLauncher`
 
 ### app/src/main/java/com/securemessenger/app/ui/screens/chat/ConversationSheets.kt (155 سطر)  [package com.securemessenger.app.ui.screens.chat]
 - L33 `@OptIn(ExperimentalMaterial3Api::class)
@@ -1592,83 +1595,85 @@ private fun ActionRow (icon: androidx.compose.ui.graphics.vector.ImageVector, la
 - L7 `class ConversationViewModelFactory ( private val contactId: String ) : ViewModelProvider.Factory`
 - L8 `private val contactId : String`
 
-### app/src/main/java/com/securemessenger/app/ui/screens/chat/MediaContent.kt (713 سطر) ⚠  [package com.securemessenger.app.ui.screens.chat]
-- L60 `internal fun decodeSampledBitmap (bytes: ByteArray, maxDimension: Int): android.graphics.Bitmap?`
-- L95 `internal suspend fun decodeGuarded ( context: android.content.Context, bytes: ByteArray, maxDimension: Int ): android.graphics.Bitmap?`
-- L109 `@Composable
-internal fun MediaContent ( media: MediaCodec.LocalMedia, viewModel: ConversationViewModel, isSent: Boolean, onOpenImageViewer: (MediaCodec.LocalMedia) -> Unit )`
-  - L115 `val mc`
-- L126 `@Composable
-private fun ImageContent ( media: MediaCodec.LocalMedia, viewModel: ConversationViewModel, onOpenImageViewer: (MediaCodec.LocalMedia) -> Unit )`
-  - L131 `var bitmap`
-  - L132 `var aspectRatio`
-  - L133 `var failed`
-  - L134 `val context`
-- L185 `@Composable
-private fun VideoContent (media: MediaCodec.LocalMedia, viewModel: ConversationViewModel)`
-  - L186 `var thumbnail`
-  - L187 `var durationMs`
-  - L188 `var bytesCache`
-  - L189 `var showPlayer`
-  - L190 `var failed`
-  - L197 `var revealed`
-  - L198 `var loading`
-- L300 `@Composable
+### app/src/main/java/com/securemessenger/app/ui/screens/chat/MediaContent.kt (726 سطر) ⚠  [package com.securemessenger.app.ui.screens.chat]
+- L59 `internal fun decodeSampledBitmap (bytes: ByteArray, maxDimension: Int): android.graphics.Bitmap?`
+- L94 `internal suspend fun decodeGuarded ( context: android.content.Context, bytes: ByteArray, maxDimension: Int ): android.graphics.Bitmap?`
+- L117 `internal fun interface`
+  - L118 `suspend fun load (media: MediaCodec.LocalMedia)`
+- L122 `@Composable
+internal fun MediaContent ( media: MediaCodec.LocalMedia, loadMedia: MediaLoader, isSent: Boolean, onOpenImageViewer: (MediaCodec.LocalMedia) -> Unit )`
+  - L128 `val mc`
+- L139 `@Composable
+private fun ImageContent ( media: MediaCodec.LocalMedia, loadMedia: MediaLoader, onOpenImageViewer: (MediaCodec.LocalMedia) -> Unit )`
+  - L144 `var bitmap`
+  - L145 `var aspectRatio`
+  - L146 `var failed`
+  - L147 `val context`
+- L198 `@Composable
+private fun VideoContent (media: MediaCodec.LocalMedia, loadMedia: MediaLoader)`
+  - L199 `var thumbnail`
+  - L200 `var durationMs`
+  - L201 `var bytesCache`
+  - L202 `var showPlayer`
+  - L203 `var failed`
+  - L210 `var revealed`
+  - L211 `var loading`
+- L313 `@Composable
 private fun VideoPlayerDialog (bytes: ByteArray, onDismiss: () -> Unit)`
-  - L301 `var mediaPlayer`
-  - L302 `var isPlaying`
-  - L303 `var progress`
-  - L304 `var prepared`
-- L387 `@Composable
-private fun FileContent ( media: MediaCodec.LocalMedia, viewModel: ConversationViewModel, icon: androidx.compose.ui.graphics.vector.ImageVector, isSent: Boolean )`
-  - L393 `val mc`
-  - L394 `val context`
-  - L395 `val scope`
-  - L396 `var opening`
-- L437 `@Composable
-private fun VoiceContent (media: MediaCodec.LocalMedia, viewModel: ConversationViewModel, isSent: Boolean)`
-  - L438 `val mc`
-  - L439 `val scope`
-  - L440 `var isPlaying`
-  - L441 `var isLoading`
-  - L442 `var player`
-  - L443 `var progress`
-  - L444 `var speed`
-  - L465 `fun seekTo (fraction: Float)`
-- L560 `@Composable
+  - L314 `var mediaPlayer`
+  - L315 `var isPlaying`
+  - L316 `var progress`
+  - L317 `var prepared`
+- L400 `@Composable
+private fun FileContent ( media: MediaCodec.LocalMedia, loadMedia: MediaLoader, icon: androidx.compose.ui.graphics.vector.ImageVector, isSent: Boolean )`
+  - L406 `val mc`
+  - L407 `val context`
+  - L408 `val scope`
+  - L409 `var opening`
+- L450 `@Composable
+private fun VoiceContent (media: MediaCodec.LocalMedia, loadMedia: MediaLoader, isSent: Boolean)`
+  - L451 `val mc`
+  - L452 `val scope`
+  - L453 `var isPlaying`
+  - L454 `var isLoading`
+  - L455 `var player`
+  - L456 `var progress`
+  - L457 `var speed`
+  - L478 `fun seekTo (fraction: Float)`
+- L573 `@Composable
 private fun WaveformScrubber ( waveform: List<Float>, progress: Float, tint: Color, enabled: Boolean, onSeek: (Float) -> Unit, modifier: Modifier = Modifier )`
-- L599 `private fun openInExternalApp (context: android.content.Context, bytes: ByteArray, media: MediaCodec.LocalMedia)`
-  - L610 `val dir`
-  - L611 `val file`
-  - L613 `val uri`
-  - L619 `val extension`
-  - L621 `val resolvedType`
-  - L624 `val intent`
-- L636 `internal fun formatElapsed (ms: Long): String`
-  - L637 `val totalSeconds`
-- L644 `@Composable
-internal fun FullScreenImageViewer ( media: MediaCodec.LocalMedia, viewModel: ConversationViewModel, onDismiss: () -> Unit )`
-  - L649 `var bitmap`
-  - L650 `val context`
-  - L661 `val zoomState`
-  - L662 `var dragOffsetY`
-  - L663 `val scrimAlpha`
+- L612 `private fun openInExternalApp (context: android.content.Context, bytes: ByteArray, media: MediaCodec.LocalMedia)`
+  - L623 `val dir`
+  - L624 `val file`
+  - L626 `val uri`
+  - L632 `val extension`
+  - L634 `val resolvedType`
+  - L637 `val intent`
+- L649 `internal fun formatElapsed (ms: Long): String`
+  - L650 `val totalSeconds`
+- L657 `@Composable
+internal fun FullScreenImageViewer ( media: MediaCodec.LocalMedia, loadMedia: MediaLoader, onDismiss: () -> Unit )`
+  - L662 `var bitmap`
+  - L663 `val context`
+  - L674 `val zoomState`
+  - L675 `var dragOffsetY`
+  - L676 `val scrimAlpha`
 
-### app/src/main/java/com/securemessenger/app/ui/screens/chat/MessageBubble.kt (303 سطر) ⚠  [package com.securemessenger.app.ui.screens.chat]
-- L54 `@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+### app/src/main/java/com/securemessenger/app/ui/screens/chat/MessageBubble.kt (302 سطر) ⚠  [package com.securemessenger.app.ui.screens.chat]
+- L53 `@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-internal fun MessageBubble ( message: MessageUiModel, isLastInGroup: Boolean, viewModel: ConversationViewModel, onLongPress: () -> Unit, onSwipeReply: () -> Unit, onOpenImageViewer: (MediaCodec.LocalMedia) -> Unit, seenKeys: MutableSet<String>, isHighlighted: Boolean = false, onJumpToReplyTarget: (String) -> Unit = {}, isSelectionMode: Boolean = false, isSelected: Boolean = false, onToggleSelect: () -> Unit = {} )`
-  - L68 `val mc`
-  - L69 `val isSent`
-  - L70 `val time`
-  - L77 `val tailCorner`
-  - L78 `val shape`
-  - L82 `var swipeProgress`
-  - L87 `val bubbleKey`
-  - L88 `val alreadySeen`
-  - L90 `val visibleState`
-  - L93 `val highlightColor`
-- L285 `@Composable
+internal fun MessageBubble ( message: MessageUiModel, isLastInGroup: Boolean, loadMedia: MediaLoader, onLongPress: () -> Unit, onSwipeReply: () -> Unit, onOpenImageViewer: (MediaCodec.LocalMedia) -> Unit, seenKeys: MutableSet<String>, isHighlighted: Boolean = false, onJumpToReplyTarget: (String) -> Unit = {}, isSelectionMode: Boolean = false, isSelected: Boolean = false, onToggleSelect: () -> Unit = {} )`
+  - L67 `val mc`
+  - L68 `val isSent`
+  - L69 `val time`
+  - L76 `val tailCorner`
+  - L77 `val shape`
+  - L81 `var swipeProgress`
+  - L86 `val bubbleKey`
+  - L87 `val alreadySeen`
+  - L89 `val visibleState`
+  - L92 `val highlightColor`
+- L284 `@Composable
 private fun SelectionCheckmark (isSelected: Boolean, onToggle: () -> Unit)`
 
 ### app/src/main/java/com/securemessenger/app/ui/screens/chat/MessageInput.kt (302 سطر) ⚠  [package com.securemessenger.app.ui.screens.chat]
@@ -2026,7 +2031,7 @@ private fun StatusPill ( icon: androidx.compose.ui.graphics.vector.ImageVector, 
 
 ### app/src/main/java/com/securemessenger/app/ui/viewmodel/ConversationViewModel.kt (514 سطر) ⚠  [package com.securemessenger.app.ui.viewmodel]
 - L24 `data class MessageUiModel ( val id: Long?, val clientId: String?, val text: String, val direction: Int, val timestamp: Long, val isRead: Boolean, val isExpired: Boolean, val media: MediaCodec.LocalMedia? = null, // Social interaction state val reactionMine: String? = null, val reactionTheirs: String? = null, val replyToClientId: String? = null, val replySnippet: String? = null, val isDeleted: Boolean = false, val edited: Boolean = false, // True while the outgoing envelope still sits in the durable outbox // (queued/in-flight, no relay ack yet) — drives the "sending…" clock tick. val isPending: Boolean = false )`
-  يُستخدم في: app/src/main/java/com/securemessenger/app/ui/screens/chat/AlbumBubble.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ConversationRows.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ConversationScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ConversationSheets.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ConversationViewModelFactory.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/MediaContent.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/MessageBubble.kt
+  يُستخدم في: app/src/androidTest/java/com/securemessenger/app/ui/ScreenTourTest.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/AlbumBubble.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ConversationRows.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ConversationScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ConversationSheets.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ConversationViewModelFactory.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/MessageBubble.kt
 - L25 `val id : Long?,`
 - L26 `val clientId : String?,`
 - L27 `val text : String,`
@@ -2043,7 +2048,7 @@ private fun StatusPill ( icon: androidx.compose.ui.graphics.vector.ImageVector, 
 - L39 `val edited : Boolean`
 - L42 `val isPending : Boolean`
 - L46 `@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class) class ConversationViewModel ( private val contactId: String, private val repository: SecureRepository = SecureMessengerApp.instance.repository ) : ViewModel()`
-  يُستخدم في: app/src/main/java/com/securemessenger/app/ui/screens/chat/AlbumBubble.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ConversationRows.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ConversationScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ConversationSheets.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ConversationViewModelFactory.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/MediaContent.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/MessageBubble.kt
+  يُستخدم في: app/src/androidTest/java/com/securemessenger/app/ui/ScreenTourTest.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/AlbumBubble.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ConversationRows.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ConversationScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ConversationSheets.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ConversationViewModelFactory.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/MessageBubble.kt
 - L47 `private val contactId : String,`
 - L48 `private val repository : SecureRepository`
   - L51 `private val _messages`

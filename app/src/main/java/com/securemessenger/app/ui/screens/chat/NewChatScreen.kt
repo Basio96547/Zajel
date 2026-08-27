@@ -221,8 +221,23 @@ fun NewChatScreen(
                     color = mc.glassOnCard
                 )
                 Spacer(modifier = Modifier.height(20.dp))
+                // Conditional, because the flat claim stopped being true.
+                //
+                // This read "لا يوجد دليل مركزي — الإضافة عبر QR فقط"
+                // unconditionally, while the username-search entry further
+                // down this same screen appears whenever DIRECTORY_URL is
+                // compiled in. A build with the directory enabled therefore
+                // denied having a directory and then offered one, on one
+                // screen, a few hundred pixels apart.
+                //
+                // In an app whose entire proposition is that it tells you the
+                // truth about who can reach you, that is not a copy nit.
                 Text(
-                    text = "شارك رمزك مع صديق ليضيفك.\nلا يوجد دليل مركزي — الإضافة عبر QR فقط.",
+                    text = if (BuildConfig.DIRECTORY_URL.isNotBlank()) {
+                        "شارك رمزك مع صديق ليضيفك.\nأو ابحث باسم المستخدم أدناه — لا تبدأ محادثة إلا بموافقة الطرفين."
+                    } else {
+                        "شارك رمزك مع صديق ليضيفك.\nلا يوجد دليل مركزي — الإضافة عبر QR فقط."
+                    },
                     style = MaterialTheme.typography.bodyMedium,
                     color = mc.glassOnCard.copy(alpha = 0.65f),
                     textAlign = TextAlign.Center,
