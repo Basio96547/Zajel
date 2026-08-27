@@ -49,20 +49,6 @@ import kotlinx.coroutines.delay
  * exact date is still there once a conversation is old enough for it to be
  * the useful answer.
  */
-/**
- * Arabic day names, Latin digits.
- *
- * The default locale gives Arabic-Indic digits (٢٠:٠٣) while every count in
- * this screen — unread badges, the header subtitle — is rendered by Kotlin's
- * toString in Latin ones. The screenshot made the mismatch obvious: two
- * numbering systems in the same row. Asking for `nu-latn` keeps "أمس" and
- * "الاثنين" in Arabic while making the digits agree with the badges.
- */
-private val timeLocale: java.util.Locale = java.util.Locale.Builder()
-    .setLocale(java.util.Locale.getDefault())
-    .setUnicodeLocaleKeyword("nu", "latn")
-    .build()
-
 private fun formatChatTime(timestamp: Long): String {
     if (timestamp <= 0L) return ""
     val now = java.util.Calendar.getInstance()
@@ -79,7 +65,7 @@ private fun formatChatTime(timestamp: Long): String {
         dayDelta in 2..6 -> "EEEE"
         else -> "dd/MM"
     }
-    return java.text.SimpleDateFormat(pattern, timeLocale).format(java.util.Date(timestamp))
+    return java.text.SimpleDateFormat(pattern, chatTimeLocale).format(java.util.Date(timestamp))
 }
 
 /**

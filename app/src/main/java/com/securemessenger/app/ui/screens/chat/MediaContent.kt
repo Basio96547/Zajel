@@ -35,7 +35,6 @@ import com.securemessenger.app.media.ByteArrayMediaDataSource
 import com.securemessenger.app.ui.gesture.rememberZoomState
 import com.securemessenger.app.ui.gesture.zoomable
 import com.securemessenger.app.ui.theme.Dims
-import com.securemessenger.app.ui.viewmodel.ConversationViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -105,19 +104,33 @@ internal suspend fun decodeGuarded(
     return withContext(Dispatchers.Default) { decodeSampledBitmap(bytes, maxDimension) }
 }
 
+/**
+ * The one thing the media composables need from a conversation: bytes for a
+ * piece of media, decrypted.
+ *
+ * They used to take the whole ConversationViewModel to reach a single method
+ * on it, which meant MessageBubble, MediaContent, AlbumBubble and the
+ * fullscreen viewer could not be rendered — or tested, or photographed —
+ * without an open database behind them. Narrowing the dependency to what is
+ * actually used costs one interface and buys back all four.
+ */
+internal fun interface MediaLoader {
+    suspend fun load(media: MediaCodec.LocalMedia): ByteArray?
+}
+
 @Composable
 internal fun MediaContent(
     media: MediaCodec.LocalMedia,
-    viewModel: ConversationViewModel,
+    loadMedia: MediaLoader,
     isSent: Boolean,
     onOpenImageViewer: (MediaCodec.LocalMedia) -> Unit
 ) {
     val mc = com.securemessenger.app.ui.theme.LocalMessengerColors.current
     when (media.mediaType) {
-        MediaCodec.TYPE_IMAGE -> ImageContent(media, viewModel, onOpenImageViewer)
-        MediaCodec.TYPE_VIDEO -> VideoContent(media, viewModel)
-        MediaCodec.TYPE_AUDIO -> VoiceContent(media, viewModel, isSent)
-        MediaCodec.TYPE_FILE -> FileContent(media, viewModel, Icons.Default.InsertDriveFile, isSent)
+        MediaCodec.TYPE_IMAGE -> ImageContent(media, loadMedia, onOpenImageViewer)
+        MediaCodec.TYPE_VIDEO -> VideoContent(media, loadMedia)
+        MediaCodec.TYPE_AUDIO -> VoiceContent(media, loadMedia, isSent)
+        MediaCodec.TYPE_FILE -> FileContent(media, loadMedia, Icons.Default.InsertDriveFile, isSent)
         else -> Text(media.fileName, color = if (isSent) mc.onSent else mc.onReceived)
     }
 }
@@ -125,7 +138,7 @@ internal fun MediaContent(
 @Composable
 private fun ImageContent(
     media: MediaCodec.LocalMedia,
-    viewModel: ConversationViewModel,
+    loadMedia: MediaLoader,
     onOpenImageViewer: (MediaCodec.LocalMedia) -> Unit
 ) {
     var bitmap by remember(media.ref) { mutableStateOf<android.graphics.Bitmap?>(null) }
@@ -134,7 +147,7 @@ private fun ImageContent(
     val context = androidx.compose.ui.platform.LocalContext.current
 
     LaunchedEffect(media.ref) {
-        val bytes = viewModel.loadMediaBytes(media)
+        val bytes = loadMedia.load(media)
         if (bytes == null) {
             failed = true
             return@LaunchedEffect
@@ -182,7 +195,7 @@ private fun ImageContent(
 // ---------- video content ----------
 
 @Composable
-private fun VideoContent(media: MediaCodec.LocalMedia, viewModel: ConversationViewModel) {
+private fun VideoContent(media: MediaCodec.LocalMedia, loadMedia: MediaLoader) {
     var thumbnail by remember(media.ref) { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
     var durationMs by remember(media.ref) { mutableStateOf(0L) }
     var bytesCache by remember(media.ref) { mutableStateOf<ByteArray?>(null) }
@@ -200,7 +213,7 @@ private fun VideoContent(media: MediaCodec.LocalMedia, viewModel: ConversationVi
     LaunchedEffect(media.ref, revealed) {
         if (!revealed) return@LaunchedEffect
         loading = true
-        val bytes = viewModel.loadMediaBytes(media)
+        val bytes = loadMedia.load(media)
         if (bytes == null) {
             failed = true
             loading = false
@@ -386,7 +399,7 @@ private fun VideoPlayerDialog(bytes: ByteArray, onDismiss: () -> Unit) {
 @Composable
 private fun FileContent(
     media: MediaCodec.LocalMedia,
-    viewModel: ConversationViewModel,
+    loadMedia: MediaLoader,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     isSent: Boolean
 ) {
@@ -401,7 +414,7 @@ private fun FileContent(
             .clickable(enabled = !opening) {
                 opening = true
                 scope.launch {
-                    val bytes = viewModel.loadMediaBytes(media)
+                    val bytes = loadMedia.load(media)
                     opening = false
                     if (bytes != null) openInExternalApp(context, bytes, media)
                 }
@@ -434,7 +447,7 @@ private fun FileContent(
 }
 
 @Composable
-private fun VoiceContent(media: MediaCodec.LocalMedia, viewModel: ConversationViewModel, isSent: Boolean) {
+private fun VoiceContent(media: MediaCodec.LocalMedia, loadMedia: MediaLoader, isSent: Boolean) {
     val mc = com.securemessenger.app.ui.theme.LocalMessengerColors.current
     val scope = rememberCoroutineScope()
     var isPlaying by remember { mutableStateOf(false) }
@@ -489,7 +502,7 @@ private fun VoiceContent(media: MediaCodec.LocalMedia, viewModel: ConversationVi
                 }
                 isLoading = true
                 scope.launch {
-                    val bytes = viewModel.loadMediaBytes(media)
+                    val bytes = loadMedia.load(media)
                     isLoading = false
                     if (bytes == null) return@launch
                     val mp = MediaPlayer().apply {
@@ -643,13 +656,13 @@ internal fun formatElapsed(ms: Long): String {
 @Composable
 internal fun FullScreenImageViewer(
     media: MediaCodec.LocalMedia,
-    viewModel: ConversationViewModel,
+    loadMedia: MediaLoader,
     onDismiss: () -> Unit
 ) {
     var bitmap by remember(media.ref) { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
     val context = androidx.compose.ui.platform.LocalContext.current
     LaunchedEffect(media.ref) {
-        val bytes = viewModel.loadMediaBytes(media)
+        val bytes = loadMedia.load(media)
         // Sandboxed and bounded, same as every other image surface here. The
         // bound alone stops a decompression bomb — a small file declaring an
         // enormous pixel size, which would otherwise force a multi-gigabyte

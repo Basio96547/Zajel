@@ -39,7 +39,6 @@ import com.securemessenger.core.crypto.MediaCodec
 import com.securemessenger.app.ui.gesture.swipeToTrigger
 import com.securemessenger.app.ui.theme.Dims
 import com.securemessenger.app.ui.theme.LocalMessengerColors
-import com.securemessenger.app.ui.viewmodel.ConversationViewModel
 import com.securemessenger.app.ui.viewmodel.MessageUiModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -54,7 +53,7 @@ import java.util.Locale
 internal fun MessageBubble(
     message: MessageUiModel,
     isLastInGroup: Boolean,
-    viewModel: ConversationViewModel,
+    loadMedia: MediaLoader,
     onLongPress: () -> Unit,
     onSwipeReply: () -> Unit,
     onOpenImageViewer: (MediaCodec.LocalMedia) -> Unit,
@@ -68,7 +67,7 @@ internal fun MessageBubble(
     val mc = LocalMessengerColors.current
     val isSent = message.direction == 1
     val time = remember(message.timestamp) {
-        SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(message.timestamp))
+        SimpleDateFormat("HH:mm", chatTimeLocale).format(Date(message.timestamp))
     }
     // The little corner "tail" only draws on the last bubble of a consecutive
     // run from the same sender — every other bubble in the group is fully
@@ -193,7 +192,7 @@ internal fun MessageBubble(
                         color = MaterialTheme.colorScheme.error
                     )
                     message.media != null -> Column {
-                        MediaContent(message.media, viewModel, isSent, onOpenImageViewer)
+                        MediaContent(message.media, loadMedia, isSent, onOpenImageViewer)
                         val caption = message.media.caption
                         if (!caption.isNullOrBlank()) {
                             Spacer(Modifier.height(4.dp))

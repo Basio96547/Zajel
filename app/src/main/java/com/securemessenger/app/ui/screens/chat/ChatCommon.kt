@@ -38,6 +38,25 @@ import com.securemessenger.app.ui.theme.LocalMessengerColors
 
 /** Small building blocks shared across every chat screen (not just the conversation itself). */
 
+/**
+ * Arabic words, Latin digits — for every clock and date in the chat UI.
+ *
+ * This lives here because it was fixed in one place and not the others, and
+ * the result was visible the moment the conversation was first photographed:
+ * the chat list read "20:59" while the bubbles beside it read "٠٠:١٧". The
+ * default locale gives Arabic-Indic digits, every count in the app is
+ * rendered by Kotlin's toString in Latin ones, and a messenger that switches
+ * numbering systems between two screens looks broken rather than localised.
+ *
+ * Asking for `nu-latn` keeps day and month names Arabic and changes only the
+ * digits. Any new formatter in these screens should use this, not
+ * Locale.getDefault().
+ */
+internal val chatTimeLocale: java.util.Locale = java.util.Locale.Builder()
+    .setLocale(java.util.Locale.getDefault())
+    .setUnicodeLocaleKeyword("nu", "latn")
+    .build()
+
 // ---------- shimmer loading placeholder ----------
 
 /** A soft sweeping gradient over a shape — used while media is still decoding/loading. */

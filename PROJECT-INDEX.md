@@ -5,7 +5,7 @@
 ابحث هنا أولاً بـ Grep قبل فتح أي ملف مصدر كامل. سطر `يُستخدم في:` تحت أي class/object/interface = تطابق استيراد FQN فعلي، أفضل-جهد وليس مضموناً 100%.
 ⚠ بجانب اسم ملف = يتجاوز 300 سطر.
 
-**130** ملف مفحوص، **2412** تعريفاً.
+**130** ملف مفحوص، **2413** تعريفاً.
 
 
 ## app/
@@ -191,18 +191,19 @@ data class OldContact ( @PrimaryKey val id: String, val publicKey: ByteArray, va
   - L171 `@Test fun everyDestinationTheBottomBarUsedToOwnIsStillReachable ()`
   - L209 `@Test fun thePendingRequestsBannerIsAbsentWhenThereAreNone ()`
 
-### app/src/androidTest/java/com/securemessenger/app/ui/ScreenTourTest.kt (96 سطر)  [package com.securemessenger.app.ui]
-- L41 `@RunWith(AndroidJUnit4::class) class ScreenTourTest` — A walk through the app, one screen per test.
-  - L44 `val compose`
-  - L46 `@Test fun tourCalculator ()`
-  - L50 `@Test fun tourSetup ()`
-  - L54 `@Test fun tourSettings ()`
-  - L61 `@Test fun tourProfile ()`
-  - L65 `@Test fun tourNewChat ()`
-  - L69 `@Test fun tourUsernameSearch ()`
-  - L73 `@Test fun tourKeyVerification ()`
-  - L77 `@Test fun tourConnectionRequests ()`
-  - L81 `private fun shoot (name: String, content: @Composable () -> Unit)`
+### app/src/androidTest/java/com/securemessenger/app/ui/ScreenTourTest.kt (121 سطر)  [package com.securemessenger.app.ui]
+- L42 `@RunWith(AndroidJUnit4::class) class ScreenTourTest` — A walk through the app, one screen per test.
+  - L45 `val compose`
+  - L47 `@Test fun tourCalculator ()`
+  - L51 `@Test fun tourSetup ()`
+  - L55 `@Test fun tourSettings ()`
+  - L62 `@Test fun tourProfile ()`
+  - L66 `@Test fun tourNewChat ()`
+  - L70 `@Test fun tourUsernameSearch ()`
+  - L74 `@Test fun tourKeyVerification ()`
+  - L78 `@Test fun tourConnectionRequests ()`
+  - L82 `@Test fun tourContactDetail ()`
+  - L106 `private fun shoot (name: String, content: @Composable () -> Unit)`
 
 ### app/src/androidTest/java/com/securemessenger/app/ui/screens/chat/QrImageTest.kt (189 سطر)  [package com.securemessenger.app.ui.screens.chat]
 - L20 `class QrImageTest` — Covers pairing by picture rather than by camera: the code has to survive
@@ -1478,7 +1479,7 @@ internal fun MediaGridTile ( message: EncryptedMessage, repository: com.secureme
   - L40 `val context`
   - L56 `val bmp`
 
-### app/src/main/java/com/securemessenger/app/ui/screens/chat/ContactDetailScreen.kt (539 سطر) ⚠  [package com.securemessenger.app.ui.screens.chat]
+### app/src/main/java/com/securemessenger/app/ui/screens/chat/ContactDetailScreen.kt (569 سطر) ⚠  [package com.securemessenger.app.ui.screens.chat]
 - L55 `@OptIn(ExperimentalMaterial3Api::class)
 @Composable fun ContactDetailScreen ( contactId: String, onBackClick: () -> Unit, onVerifyClick: () -> Unit )` — Contact info screen: avatar (tap to set a local photo), nickname, mute,
   - L60 `val repository`
@@ -1496,26 +1497,26 @@ internal fun MediaGridTile ( message: EncryptedMessage, repository: com.secureme
   - L73 `var fullscreenImage`
   - L74 `var transport`
   - L78 `suspend fun reload ()`
-  - L110 `val avatarPicker`
-  - L123 `val shownName`
-  - L124 `val isMuted`
-  - L125 `val isBlocked`
-  - L126 `val isVerified`
-  - L131 `val contactKeyHex`
-  - L398 `val shownImage`
-- L425 `@Composable
+  - L124 `val avatarPicker`
+  - L137 `val shownName`
+  - L138 `val isMuted`
+  - L139 `val isBlocked`
+  - L140 `val isVerified`
+  - L145 `val contactKeyHex`
+  - L428 `val shownImage`
+- L455 `@Composable
 private fun ConnectivityCard ( status: com.securemessenger.app.network.TransportStatus?, onEditAddress: () -> Unit )`
-  - L429 `val mc`
-  - L430 `val tint`
-- L476 `@Composable
+  - L459 `val mc`
+  - L460 `val tint`
+- L506 `@Composable
 private fun QuickAction (icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, onClick: () -> Unit)`
-  - L477 `val mc`
-- L490 `@Composable
+  - L507 `val mc`
+- L520 `@Composable
 private fun SecurityNumberCard (keyHex: String?, onClick: () -> Unit)`
-  - L491 `val mc`
-- L521 `@Composable
+  - L521 `val mc`
+- L551 `@Composable
 private fun MediaPreviewStrip (tiles: List<androidx.compose.ui.graphics.ImageBitmap>)`
-  - L522 `val gradients`
+  - L552 `val gradients`
 
 ### app/src/main/java/com/securemessenger/app/ui/screens/chat/ConversationRows.kt (90 سطر)  [package com.securemessenger.app.ui.screens.chat]
 - L11 `internal sealed class ChatRow (val key: String)`

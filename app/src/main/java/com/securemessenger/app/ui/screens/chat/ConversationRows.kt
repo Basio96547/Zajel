@@ -71,7 +71,7 @@ internal fun buildRows(messages: List<MessageUiModel>): List<ChatRow> {
 }
 
 private fun dayKey(ts: Long): String =
-    SimpleDateFormat("yyyyMMdd", Locale.getDefault()).format(Date(ts))
+    SimpleDateFormat("yyyyMMdd", chatTimeLocale).format(Date(ts))
 
 private fun dayLabel(ts: Long): String {
     val now = Calendar.getInstance()
@@ -84,6 +84,6 @@ private fun dayLabel(ts: Long): String {
     return when {
         sameDay(0) -> "اليوم"
         sameDay(-1) -> "أمس"
-        else -> SimpleDateFormat("d MMMM yyyy", Locale.getDefault()).format(Date(ts))
+        else -> SimpleDateFormat("d MMMM yyyy", chatTimeLocale).format(Date(ts))
     }
 }

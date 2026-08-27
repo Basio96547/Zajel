@@ -20,7 +20,6 @@ import androidx.compose.ui.unit.dp
 import com.securemessenger.core.crypto.MediaCodec
 import com.securemessenger.app.ui.theme.Dims
 import com.securemessenger.app.ui.theme.LocalMessengerColors
-import com.securemessenger.app.ui.viewmodel.ConversationViewModel
 import com.securemessenger.app.ui.viewmodel.MessageUiModel
 
 // ---------- mosaic photo album ----------
@@ -29,7 +28,7 @@ import com.securemessenger.app.ui.viewmodel.MessageUiModel
 @Composable
 internal fun AlbumBubble(
     images: List<MessageUiModel>,
-    viewModel: ConversationViewModel,
+    loadMedia: MediaLoader,
     onOpenImageViewer: (MediaCodec.LocalMedia) -> Unit
 ) {
     val mc = LocalMessengerColors.current
@@ -61,7 +60,7 @@ internal fun AlbumBubble(
                     msg.media?.let { media ->
                         AlbumThumbnail(
                             media = media,
-                            viewModel = viewModel,
+                            loadMedia = loadMedia,
                             onClick = { onOpenImageViewer(media) }
                         )
                     }
@@ -78,11 +77,11 @@ internal fun AlbumBubble(
 }
 
 @Composable
-private fun AlbumThumbnail(media: MediaCodec.LocalMedia, viewModel: ConversationViewModel, onClick: () -> Unit) {
+private fun AlbumThumbnail(media: MediaCodec.LocalMedia, loadMedia: MediaLoader, onClick: () -> Unit) {
     var bitmap by remember(media.ref) { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
     val context = androidx.compose.ui.platform.LocalContext.current
     LaunchedEffect(media.ref) {
-        val bytes = viewModel.loadMediaBytes(media)
+        val bytes = loadMedia.load(media)
         // Album thumbnails render as soon as the bubble appears, with no tap —
         // another zero-click decode of someone else's bytes, so it goes through
         // the sandbox like the single-image bubble does.

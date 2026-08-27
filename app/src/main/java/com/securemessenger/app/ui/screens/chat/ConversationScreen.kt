@@ -74,6 +74,12 @@ fun ConversationScreen(
     val contactVerified by viewModel.contactVerified.collectAsState()
     val isContactTyping by viewModel.isContactTyping.collectAsState()
     val establishingSession by viewModel.establishingSession.collectAsState()
+    // One stable adapter, not a fresh lambda per recomposition — the media
+
+    // composables key remembered work on it.
+
+    val loadMedia = remember(viewModel) { MediaLoader { viewModel.loadMediaBytes(it) } }
+
     val listState = rememberLazyListState()
     val mc = LocalMessengerColors.current
     val context = LocalContext.current
@@ -407,7 +413,7 @@ fun ConversationScreen(
                                 is ChatRow.Msg -> MessageBubble(
                                     message = row.message,
                                     isLastInGroup = row.isLastInGroup,
-                                    viewModel = viewModel,
+                                    loadMedia = loadMedia,
                                     onLongPress = { if (!row.message.isDeleted) actionTarget = row.message },
                                     onSwipeReply = { if (!row.message.isDeleted) replyingTo = row.message },
                                     onOpenImageViewer = { viewerMedia = it },
@@ -435,7 +441,7 @@ fun ConversationScreen(
                                 )
                                 is ChatRow.Album -> AlbumBubble(
                                     images = row.images,
-                                    viewModel = viewModel,
+                                    loadMedia = loadMedia,
                                     onOpenImageViewer = { viewerMedia = it }
                                 )
                             }
@@ -606,7 +612,7 @@ fun ConversationScreen(
         }
 
         viewerMedia?.let { media ->
-            FullScreenImageViewer(media = media, viewModel = viewModel, onDismiss = { viewerMedia = null })
+            FullScreenImageViewer(media = media, loadMedia = loadMedia, onDismiss = { viewerMedia = null })
         }
 
         if (showAttachSheet) {
