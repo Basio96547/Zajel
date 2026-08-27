@@ -1200,7 +1200,7 @@ data class OutgoingConnectionRequest ( @PrimaryKey val recipientIdentityPublicKe
 - L146 `@Composable
 private fun LaunchedEffectPressState (source: MutableInteractionSource, onPressed: (Boolean) -> Unit)`
 
-### app/src/main/java/com/securemessenger/app/ui/liquid/LiquidGlass.kt (341 سطر) ⚠  [package com.securemessenger.app.ui.liquid]
+### app/src/main/java/com/securemessenger/app/ui/liquid/LiquidGlass.kt (370 سطر) ⚠  [package com.securemessenger.app.ui.liquid]
 - L95 `@Immutable
 data class LiquidPalette ( /** The page floor the aurora is painted onto. */ val floor: Color, /** Three drifting light sources. Order is back-to-front. */ val blobs: List<Color>, val surface: Color, val surfaceRaised: Color, /** Top-edge highlight painted over a surface's fill. */ val sheen: Color, val edgeHigh: Color, val edgeLow: Color, val onSurface: Color, val muted: Color, val shadow: Color, )`
 - L97 `val floor : Color,` — The page floor the aurora is painted onto.
@@ -1226,13 +1226,13 @@ private fun rememberLiquidPalette (dark: Boolean): LiquidPalette`
   - L220 `val a`
   - L225 `val b`
   - L230 `val c`
-- L259 `private fun DrawScope (color: Color, center: Offset, radius: Float)`
-- L278 `fun Modifier ( shape: Shape = RoundedCornerShape(22.dp), raised: Boolean = false, elevation: Dp = 12.dp, ): Modifier` — One pane of glass: shadow underneath, translucent fill, sheen down from the
-  - L283 `val palette`
-- L309 `fun Modifier (color: Color, radius: Dp = 18.dp, alpha: Float = 0.45f): Modifier` — A soft coloured halo cast *outside* a shape — used for focus and for unread counts.
-  - L310 `val spread`
-- L327 `@Composable fun rememberPressScale ( source: MutableInteractionSource, pressedScale: Float = 0.972f ): State<Float>` — Press feedback as a spring rather than a ripple. Glass does not ripple; it
-  - L331 `val pressed`
+- L267 `private fun DrawScope (color: Color, center: Offset, radius: Float)`
+- L292 `fun Modifier ( shape: Shape = RoundedCornerShape(22.dp), raised: Boolean = false, elevation: Dp = 12.dp, ): Modifier` — One pane of glass: shadow underneath, translucent fill, sheen down from the
+  - L297 `val palette`
+- L338 `fun Modifier (color: Color, radius: Dp = 18.dp, alpha: Float = 0.45f): Modifier` — A soft coloured halo cast *outside* a shape — used for focus and for unread counts.
+  - L339 `val spread`
+- L356 `@Composable fun rememberPressScale ( source: MutableInteractionSource, pressedScale: Float = 0.972f ): State<Float>` — Press feedback as a spring rather than a ripple. Glass does not ripple; it
+  - L360 `val pressed`
 
 ### app/src/main/java/com/securemessenger/app/ui/navigation/AppNavigation.kt (499 سطر) ⚠  [package com.securemessenger.app.ui.navigation]
 - L45 `sealed class Screen (val route: String)`
