@@ -99,11 +99,25 @@ fun ContactDetailScreen(
         }
     }
 
+    // Guarded, like ProfileScreen's and KeyVerificationScreen's reads: every
+    // call in here goes to a repository that throws while its database is
+    // closed, and an exception inside a LaunchedEffect is not a state a
+    // composable recovers from. This is the seventh place in the app with
+    // that shape; all of them were found by rendering screens rather than by
+    // reading them.
+    //
+    // The screen already handles knowing nothing — `contact` stays null and
+    // it renders its empty shell — so failing quietly here degrades to a
+    // state the screen was already built for.
     LaunchedEffect(contactId) {
-        reload()
-        val sessionId = repository.getCurrentSessionId(contactId) ?: return@LaunchedEffect
-        repository.getMessages(sessionId).collect { list ->
-            mediaMessages = list.filter { it.type != MediaCodec.TYPE_TEXT && !it.isDeleted }
+        try {
+            reload()
+            val sessionId = repository.getCurrentSessionId(contactId) ?: return@LaunchedEffect
+            repository.getMessages(sessionId).collect { list ->
+                mediaMessages = list.filter { it.type != MediaCodec.TYPE_TEXT && !it.isDeleted }
+            }
+        } catch (e: Exception) {
+            mediaMessages = emptyList()
         }
     }
 
@@ -263,7 +277,23 @@ fun ContactDetailScreen(
                 Spacer(Modifier.height(Dims.s12))
 
                 if (mediaMessages.isEmpty()) {
-                    MediaPreviewStrip(tiles = emptyList())
+                    // Words, not three blank tiles.
+                    //
+                    // This used to render MediaPreviewStrip(emptyList()) — an
+                    // empty state that looks exactly like a loaded one that
+                    // failed. Photographing the screen showed the result: the
+                    // count above says "0" and three grey rectangles sit
+                    // underneath it, and a reader cannot tell "there is no
+                    // shared media" from "the images did not load".
+                    Text(
+                        text = "لا وسائط مشتركة بعد",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = mc.glassOnCard.copy(alpha = 0.5f),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = Dims.s16),
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    )
                 } else {
                     LazyVerticalGrid(
                         columns = GridCells.Fixed(3),

@@ -1756,7 +1756,7 @@ private fun LoadingScreenDarkPreview ()`
 @Composable
 private fun LoadingScreenLightPreview ()`
 
-### app/src/main/java/com/securemessenger/app/ui/screens/settings/ProfileScreen.kt (264 سطر)  [package com.securemessenger.app.ui.screens.settings]
+### app/src/main/java/com/securemessenger/app/ui/screens/settings/ProfileScreen.kt (282 سطر)  [package com.securemessenger.app.ui.screens.settings]
 - L46 `@OptIn(ExperimentalMaterial3Api::class)
 @Composable fun ProfileScreen ( onBackClick: () -> Unit, onVerifyClick: () -> Unit, onShowQrClick: () -> Unit = {} )` — My own profile: photo, display name (local-only — never synced to
   - L51 `val repository`
@@ -1768,7 +1768,7 @@ private fun LoadingScreenLightPreview ()`
   - L58 `var username`
   - L59 `var fingerprint`
   - L60 `var showNameDialog`
-  - L70 `val avatarPicker`
+  - L88 `val avatarPicker`
 
 ### app/src/main/java/com/securemessenger/app/ui/screens/settings/SettingsComponents.kt (152 سطر)  [package com.securemessenger.app.ui.screens.settings]
 - L23 `@Composable

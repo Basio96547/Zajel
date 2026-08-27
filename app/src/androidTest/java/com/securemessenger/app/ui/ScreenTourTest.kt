@@ -10,6 +10,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.securemessenger.app.ui.screens.calculator.CalculatorScreen
 import com.securemessenger.app.ui.screens.chat.ConnectionRequestsScreen
+import com.securemessenger.app.ui.screens.chat.ContactDetailScreen
 import com.securemessenger.app.ui.screens.chat.NewChatScreen
 import com.securemessenger.app.ui.screens.chat.UsernameSearchScreen
 import com.securemessenger.app.ui.screens.settings.ProfileScreen
@@ -77,6 +78,30 @@ class ScreenTourTest {
     @Test fun tourConnectionRequests() = shoot("tour-requests") {
         ConnectionRequestsScreen(onBackClick = {}, onAccepted = {})
     }
+
+    @Test fun tourContactDetail() = shoot("tour-contact-detail") {
+        // A contact id that resolves to nothing, on purpose: this renders the
+        // screen's empty shell, which is what it must survive showing anyway.
+        // Before its reads were guarded it did not survive it — it threw.
+        ContactDetailScreen(contactId = "no-such-contact", onBackClick = {}, onVerifyClick = {})
+    }
+
+    // NOT HERE: the conversation.
+    //
+    // ConversationScreen takes nine flows and eleven actions from a view
+    // model, and MessageBubble itself takes the view model too — so even
+    // photographing the bubbles alone needs one, and a ConversationViewModel
+    // needs an open repository. Getting there is either a real database on
+    // the device or splitting the screen's state out the way ChatListScreen's
+    // was.
+    //
+    // The split is the right change eventually, but not for a screenshot: it
+    // rewires edit, react, and both kinds of delete, and a slip between
+    // "delete for me" and "delete for everyone" is precisely what a photo
+    // cannot catch — with no paired contact on this device to test the real
+    // behaviour against either. So the most-used screen in the app remains
+    // the one screen nobody has looked at, and saying so is better than a
+    // capture that fakes its way around the problem.
 
     private fun shoot(name: String, content: @Composable () -> Unit) {
         compose.setContent { MessengerTheme(darkTheme = true) { content() } }
