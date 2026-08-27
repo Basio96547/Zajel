@@ -165,14 +165,18 @@ data class OldContact ( @PrimaryKey val id: String, val publicKey: ByteArray, va
   - L149 `@Test fun testCleartextTrafficIntentionallyAllowedForLocalP2P ()` — Cleartext IS intentionally allowed — there is no external server at
   - L165 `@Test fun testSecureRandomGeneration ()`
 
-### app/src/androidTest/java/com/securemessenger/app/ui/HomeScreenshotTest.kt (109 سطر)  [package com.securemessenger.app.ui]
-- L36 `@RunWith(AndroidJUnit4::class) class HomeScreenshotTest` — Photographs the home screen so a human can judge it.
-  - L39 `val compose`
-  - L41 `private val sample`
-  - L70 `@Test fun captureHomeDark ()`
-  - L73 `@Test fun captureHomeLight ()`
-  - L76 `@Test fun captureHomeEmpty ()`
-  - L78 `private fun capture (name: String, dark: Boolean, contacts: List<ContactUiModel>)`
+### app/src/androidTest/java/com/securemessenger/app/ui/HomeScreenshotTest.kt (143 سطر)  [package com.securemessenger.app.ui]
+- L39 `@RunWith(AndroidJUnit4::class) class HomeScreenshotTest` — Photographs the home screen so a human can judge it.
+  - L42 `val compose`
+  - L44 `private val sample`
+  - L73 `@Test fun captureHomeDark ()`
+  - L76 `@Test fun captureHomeLight ()`
+  - L79 `@Test fun captureHomeEmpty ()`
+  - L92 `@Test fun captureUntouchedLoadingScreen ()` — Two screens this redesign never opened.
+  - L96 `@Test fun captureUntouchedStealthScreen ()`
+  - L103 `private fun captureContent (name: String, dark: Boolean, content: @Composable () -> Unit)`
+  - L109 `private fun writeRootTo (name: String)`
+  - L122 `private fun capture (name: String, dark: Boolean, contacts: List<ContactUiModel>)`
 
 ### app/src/androidTest/java/com/securemessenger/app/ui/LiquidHomeRenderTest.kt (229 سطر)  [package com.securemessenger.app.ui]
 - L51 `@RunWith(AndroidJUnit4::class) class LiquidHomeRenderTest` — The redesigned home screen, rendered on a real device.
@@ -1148,24 +1152,22 @@ data class OutgoingConnectionRequest ( @PrimaryKey val recipientIdentityPublicKe
 - L3 `private val USERNAME_LIKE`
 - L10 `fun formatContactName (raw: String): String` — A stored contact name is either a claimed @username or (when we never
 
-### app/src/main/java/com/securemessenger/app/ui/GlassComponents.kt (229 سطر)  [package com.securemessenger.app.ui]
-- L40 `fun Modifier (colors: List<Color>): Modifier` — The diagonal pastel-gradient page backdrop every glass screen sits on.
-- L49 `fun Modifier` — The radial backdrop reserved for onboarding/security moments (Setup, Loading, Stealth Mode).
-- L64 `fun Modifier (radius: Dp = 16.dp, strong: Boolean = false): Modifier` — The single reusable "glass card" surface — a translucent rounded panel
-  - L65 `val mc`
-- L84 `@Composable fun GlassTopBar ( modifier: Modifier = Modifier, onBack: (() -> Unit)? = null, navigationIcon: (@Composable () -> Unit)? = null, actions: (@Composable RowScope.() -> Unit)? = null, title: @Composable RowScope.() -> Unit )` — The single top bar used by every screen — a floating frosted pill matching
-  - L91 `val mc`
-- L116 `@Composable fun GlassTopBar ( title: String, modifier: Modifier = Modifier, onBack: (() -> Unit)? = null, actions: (@Composable RowScope.() -> Unit)? = null )` — Plain-text convenience overload of [GlassTopBar].
-  - L122 `val mc`
-- L136 `data class GlassNavItem ( val label: String, val icon: ImageVector, val selectedIcon: ImageVector = icon, /** e.g. pending connection-request count on "جهات الاتصال" — 0 shows no badge at all. */ val badgeCount: Int = 0 )`
+### app/src/main/java/com/securemessenger/app/ui/GlassComponents.kt (240 سطر)  [package com.securemessenger.app.ui]
+- L52 `fun Modifier (colors: List<Color>): Modifier` — The page backdrop every glass screen sits on — now the drifting aurora the
+- L61 `fun Modifier` — The backdrop for onboarding and security moments (Setup, Loading, Stealth
+- L71 `fun Modifier (radius: Dp = 16.dp, strong: Boolean = false): Modifier` — The single reusable "glass card" surface — a translucent rounded panel
+- L96 `@Composable fun GlassTopBar ( modifier: Modifier = Modifier, onBack: (() -> Unit)? = null, navigationIcon: (@Composable () -> Unit)? = null, actions: (@Composable RowScope.() -> Unit)? = null, title: @Composable RowScope.() -> Unit )` — The single top bar used by every screen — a floating frosted pill matching
+  - L103 `val mc`
+- L128 `@Composable fun GlassTopBar ( title: String, modifier: Modifier = Modifier, onBack: (() -> Unit)? = null, actions: (@Composable RowScope.() -> Unit)? = null )` — Plain-text convenience overload of [GlassTopBar].
+  - L134 `val mc`
+- L148 `data class GlassNavItem ( val label: String, val icon: ImageVector, /** e.g. pending connection-request count on "جهات الاتصال" — 0 shows no badge at all. */ val badgeCount: Int = 0 )`
   يُستخدم في: app/src/main/java/com/securemessenger/app/ui/screens/settings/SettingsScreen.kt
-- L137 `val label : String,`
-- L138 `val icon : ImageVector,`
-- L139 `val selectedIcon : ImageVector`
-- L141 `val badgeCount : Int` — e.g. pending connection-request count on "جهات الاتصال" — 0 shows no badge at all.
-- L152 `@OptIn(ExperimentalMaterial3Api::class)
+- L149 `val label : String,`
+- L150 `val icon : ImageVector,`
+- L152 `val badgeCount : Int` — e.g. pending connection-request count on "جهات الاتصال" — 0 shows no badge at all.
+- L163 `@OptIn(ExperimentalMaterial3Api::class)
 @Composable fun GlassBottomNavBar ( items: List<GlassNavItem>, selectedIndex: Int, onSelect: (Int) -> Unit, modifier: Modifier = Modifier )` — Floating frosted-pill bottom navigation bar — Telegram-style, glassy, with
-  - L158 `val mc`
+  - L169 `val mc`
 
 ### app/src/main/java/com/securemessenger/app/ui/MainActivity.kt (112 سطر)  [package com.securemessenger.app.ui]
 - L28 `class MainActivity : FragmentActivity()` — MainActivity - Entry point for the app UI.
@@ -1198,7 +1200,7 @@ data class OutgoingConnectionRequest ( @PrimaryKey val recipientIdentityPublicKe
 - L146 `@Composable
 private fun LaunchedEffectPressState (source: MutableInteractionSource, onPressed: (Boolean) -> Unit)`
 
-### app/src/main/java/com/securemessenger/app/ui/liquid/LiquidGlass.kt (323 سطر) ⚠  [package com.securemessenger.app.ui.liquid]
+### app/src/main/java/com/securemessenger/app/ui/liquid/LiquidGlass.kt (341 سطر) ⚠  [package com.securemessenger.app.ui.liquid]
 - L95 `@Immutable
 data class LiquidPalette ( /** The page floor the aurora is painted onto. */ val floor: Color, /** Three drifting light sources. Order is back-to-front. */ val blobs: List<Color>, val surface: Color, val surfaceRaised: Color, /** Top-edge highlight painted over a surface's fill. */ val sheen: Color, val edgeHigh: Color, val edgeLow: Color, val onSurface: Color, val muted: Color, val shadow: Color, )`
 - L97 `val floor : Color,` — The page floor the aurora is painted onto.
@@ -1218,18 +1220,19 @@ private fun rememberLiquidPalette (dark: Boolean): LiquidPalette`
   - L124 `val secondary`
 - L179 `@Composable fun LiquidTheme ( dark: Boolean = MaterialTheme.colorScheme.background.luminance() < 0.5f, content: @Composable () -> Unit )` — Follows the Material scheme actually in force, not the system setting.
 - L198 `@Composable fun AuroraBackdrop (modifier: Modifier = Modifier, parallaxPx: () -> Float = { 0f })` — The drifting backdrop.
-  - L199 `val palette`
-  - L200 `val drift`
-  - L201 `val a`
-  - L206 `val b`
-  - L211 `val c`
-- L240 `private fun DrawScope (color: Color, center: Offset, radius: Float)`
-- L259 `fun Modifier ( shape: Shape = RoundedCornerShape(22.dp), raised: Boolean = false, elevation: Dp = 12.dp, fill: Color? = null, ): Modifier` — One pane of glass: shadow underneath, translucent fill, sheen down from the
-  - L265 `val palette`
-- L291 `fun Modifier (color: Color, radius: Dp = 18.dp, alpha: Float = 0.45f): Modifier` — A soft coloured halo cast *outside* a shape — used for focus and for unread counts.
-  - L292 `val spread`
-- L309 `@Composable fun rememberPressScale ( source: MutableInteractionSource, pressedScale: Float = 0.972f ): State<Float>` — Press feedback as a spring rather than a ripple. Glass does not ripple; it
-  - L313 `val pressed`
+- L214 `fun Modifier ( floor: Color? = null, parallaxPx: () -> Float = { 0f } ): Modifier` — The same backdrop as a modifier, which is what lets every screen in the app
+  - L218 `val palette`
+  - L219 `val drift`
+  - L220 `val a`
+  - L225 `val b`
+  - L230 `val c`
+- L259 `private fun DrawScope (color: Color, center: Offset, radius: Float)`
+- L278 `fun Modifier ( shape: Shape = RoundedCornerShape(22.dp), raised: Boolean = false, elevation: Dp = 12.dp, ): Modifier` — One pane of glass: shadow underneath, translucent fill, sheen down from the
+  - L283 `val palette`
+- L309 `fun Modifier (color: Color, radius: Dp = 18.dp, alpha: Float = 0.45f): Modifier` — A soft coloured halo cast *outside* a shape — used for focus and for unread counts.
+  - L310 `val spread`
+- L327 `@Composable fun rememberPressScale ( source: MutableInteractionSource, pressedScale: Float = 0.972f ): State<Float>` — Press feedback as a spring rather than a ripple. Glass does not ripple; it
+  - L331 `val pressed`
 
 ### app/src/main/java/com/securemessenger/app/ui/navigation/AppNavigation.kt (499 سطر) ⚠  [package com.securemessenger.app.ui.navigation]
 - L45 `sealed class Screen (val route: String)`
@@ -1928,51 +1931,48 @@ private fun StatusPill ( icon: androidx.compose.ui.graphics.vector.ImageVector, 
   - L24 `val pink`
   - L25 `val purple`
 
-### app/src/main/java/com/securemessenger/app/ui/theme/Theme.kt (175 سطر)  [package com.securemessenger.app.ui.theme]
-- L24 `object Dims`
+### app/src/main/java/com/securemessenger/app/ui/theme/Theme.kt (172 سطر)  [package com.securemessenger.app.ui.theme]
+- L25 `object Dims`
   يُستخدم في: app/src/main/java/com/securemessenger/app/ui/screens/chat/AlbumBubble.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatCommon.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ComposeStrips.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ContactDetailScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ConversationScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ConversationSheets.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/MediaContent.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/MessageBubble.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/MessageInput.kt, app/src/main/java/com/securemessenger/app/ui/screens/settings/ProfileScreen.kt
-  - L25 `val s2`
-  - L26 `val s4`
-  - L27 `val s6`
-  - L28 `val s8`
-  - L29 `val s12`
-  - L30 `val s16`
-  - L31 `val s24`
-  - L33 `val avatar`
-  - L34 `val avatarSmall`
-  - L35 `val avatarContactDetail`
-  - L36 `val avatarProfile`
-  - L37 `val bubbleRadius`
-  - L38 `val bubbleTail`
-  - L39 `val bubbleMaxWidth`
-- L43 `data class MessengerColors ( val sentBubble: Color, val receivedBubble: Color, val onSent: Color, val onReceived: Color, val sentMeta: Color, val receivedMeta: Color, val readTick: Color, val online: Color, // Thin, low-alpha separators between rows (settings sections, composer // top edge, chat-list rows). val divider: Color, // Stronger, near-solid border used specifically at screen-level header // and footer edges (conversation top bar / input bar). val headerBorder: Color, // Page backdrops: two colors each. In dark mode both stops are the same // flat color (mockups render most dark screens as flat, not gradient); // in light mode they are a genuine soft two-stop diagonal gradient. val listGradient: List<Color>, val chatGradient: List<Color>, // Radial backdrop reserved for onboarding/security moments (Setup, // Loading, Stealth Mode). val onboardingGradient: List<Color>, val glassCard: Color, val glassCardStrong: Color, val glassBorder: Color, val glassOnCard: Color, )`
+  - L26 `val s2`
+  - L27 `val s4`
+  - L28 `val s6`
+  - L29 `val s8`
+  - L30 `val s12`
+  - L31 `val s16`
+  - L32 `val s24`
+  - L33 `val avatarSmall`
+  - L34 `val avatarContactDetail`
+  - L35 `val avatarProfile`
+  - L36 `val bubbleRadius`
+  - L37 `val bubbleTail`
+  - L38 `val bubbleMaxWidth`
+- L42 `data class MessengerColors ( val sentBubble: Color, val receivedBubble: Color, val onSent: Color, val onReceived: Color, val sentMeta: Color, val receivedMeta: Color, val readTick: Color, // Thin, low-alpha separators between rows (settings sections, composer // top edge, chat-list rows). val divider: Color, // Stronger, near-solid border used specifically at screen-level header // and footer edges (conversation top bar / input bar). val headerBorder: Color, // Page backdrops: two colors each. In dark mode both stops are the same // flat color (mockups render most dark screens as flat, not gradient); // in light mode they are a genuine soft two-stop diagonal gradient. val listGradient: List<Color>, val chatGradient: List<Color>, // Radial backdrop reserved for onboarding/security moments (Setup, // Loading, Stealth Mode). val onboardingGradient: List<Color>, val glassCard: Color, val glassCardStrong: Color, val glassOnCard: Color, )`
   يُستخدم في: app/src/main/java/com/securemessenger/app/ui/screens/chat/AlbumBubble.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatCommon.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ComposeStrips.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ContactDetailScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ConversationScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ConversationSheets.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/MediaContent.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/MessageBubble.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/MessageInput.kt, app/src/main/java/com/securemessenger/app/ui/screens/settings/ProfileScreen.kt
-- L44 `val sentBubble : Color,`
-- L45 `val receivedBubble : Color,`
-- L46 `val onSent : Color,`
-- L47 `val onReceived : Color,`
-- L48 `val sentMeta : Color,`
-- L49 `val receivedMeta : Color,`
-- L50 `val readTick : Color,`
-- L51 `val online : Color,`
-- L54 `val divider : Color,`
-- L57 `val headerBorder : Color,`
-- L61 `val listGradient : List<Color>,`
-- L62 `val chatGradient : List<Color>,`
-- L65 `val onboardingGradient : List<Color>,`
-- L66 `val glassCard : Color,`
-- L67 `val glassCardStrong : Color,`
-- L68 `val glassBorder : Color,`
-- L69 `val glassOnCard : Color,`
-- L72 `val LocalMessengerColors`
-- L89 `private val DarkColors`
-- L104 `private val LightColors`
-- L119 `private val DarkMessenger`
-- L134 `private val LightMessenger`
-- L151 `val ConcreteShapes`
-- L160 `@Composable fun MessengerTheme ( darkTheme: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit )`
-  - L164 `val colorScheme`
-  - L165 `val messenger`
+- L43 `val sentBubble : Color,`
+- L44 `val receivedBubble : Color,`
+- L45 `val onSent : Color,`
+- L46 `val onReceived : Color,`
+- L47 `val sentMeta : Color,`
+- L48 `val receivedMeta : Color,`
+- L49 `val readTick : Color,`
+- L52 `val divider : Color,`
+- L55 `val headerBorder : Color,`
+- L59 `val listGradient : List<Color>,`
+- L60 `val chatGradient : List<Color>,`
+- L63 `val onboardingGradient : List<Color>,`
+- L64 `val glassCard : Color,`
+- L65 `val glassCardStrong : Color,`
+- L66 `val glassOnCard : Color,`
+- L69 `val LocalMessengerColors`
+- L86 `private val DarkColors`
+- L101 `private val LightColors`
+- L116 `private val DarkMessenger`
+- L131 `private val LightMessenger`
+- L148 `val ConcreteShapes`
+- L157 `@Composable fun MessengerTheme ( darkTheme: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit )`
+  - L161 `val colorScheme`
+  - L162 `val messenger`
 
 ### app/src/main/java/com/securemessenger/app/ui/theme/Type.kt (120 سطر)  [package com.securemessenger.app.ui.theme]
 - L13 `val Typography` — Typography for Material Design 3.

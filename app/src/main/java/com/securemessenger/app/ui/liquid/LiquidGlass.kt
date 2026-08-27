@@ -256,10 +256,24 @@ fun Modifier.auroraBackground(
     }
 }
 
+/**
+ * Five stops, not two, for the same reason the sheen has five.
+ *
+ * A straight `[colour, transparent]` radial falls off linearly and then stops
+ * at the radius, and that corner in the slope shows up as a faint ring in the
+ * backdrop. Decaying through intermediate stops approximates the soft
+ * shoulder real light has, and leaves no edge for the eye to find.
+ */
 private fun DrawScope.blob(color: Color, center: Offset, radius: Float) {
     drawCircle(
         brush = Brush.radialGradient(
-            colors = listOf(color, color.copy(alpha = 0f)),
+            colors = listOf(
+                color,
+                color.copy(alpha = color.alpha * 0.62f),
+                color.copy(alpha = color.alpha * 0.30f),
+                color.copy(alpha = color.alpha * 0.10f),
+                color.copy(alpha = 0f)
+            ),
             center = center,
             radius = radius
         ),
@@ -291,11 +305,26 @@ fun Modifier.liquidSurface(
         )
         .clip(shape)
         .background(if (raised) palette.surfaceRaised else palette.surface)
+        // Eased all the way to the bottom edge, and that is the whole point.
+        //
+        // This used to be `0f to sheen, 0.55f to Transparent, 1f to
+        // Transparent`: a ramp that stopped dead at 55% and went flat. The
+        // colour values either side of that point are almost identical — a
+        // pixel scan reads 29, 29, 29 across it — but the *slope* jumps from
+        // steady to zero in one step, and human vision exaggerates exactly
+        // that. It appears as a hard line across every card, a Mach band:
+        // an edge the eye adds where the data has none.
+        //
+        // These stops decay smoothly and reach zero at the bottom edge
+        // itself, so there is no point inside the shape where the slope
+        // changes abruptly and nothing for the eye to sharpen.
         .background(
             Brush.verticalGradient(
-                0.0f to palette.sheen,
-                0.55f to Color.Transparent,
-                1.0f to Color.Transparent
+                0.00f to palette.sheen,
+                0.18f to palette.sheen.copy(alpha = palette.sheen.alpha * 0.55f),
+                0.40f to palette.sheen.copy(alpha = palette.sheen.alpha * 0.22f),
+                0.68f to palette.sheen.copy(alpha = palette.sheen.alpha * 0.06f),
+                1.00f to Color.Transparent
             )
         )
         .border(
