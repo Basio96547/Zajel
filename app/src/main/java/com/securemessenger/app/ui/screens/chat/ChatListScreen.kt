@@ -42,6 +42,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.securemessenger.app.SecureMessengerApp
+import com.securemessenger.app.network.ConnectionState
 import com.securemessenger.app.ui.liquid.AuroraBackdrop
 import com.securemessenger.app.ui.liquid.LiquidNavBar
 import com.securemessenger.app.ui.liquid.LiquidNavItem
@@ -229,7 +231,7 @@ internal fun ChatListContent(
                         onValueChange = { searchQuery = it },
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
                     )
-                    ConnectionStatusBar()
+                    LiquidConnectionStrip()
                     Spacer(Modifier.height(8.dp))
                 }
             }
@@ -251,14 +253,19 @@ internal fun ChatListContent(
                     .navigationBarsPadding()
             )
 
-            NewChatButton(
-                collapsed = collapse > 0.35f,
-                onClick = onNewChatClick,
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .navigationBarsPadding()
-                    .padding(end = 18.dp, bottom = 92.dp)
-            )
+            // Not when the list is empty: the empty state already offers this
+            // exact action in the middle of the screen, and the screenshot
+            // showed both buttons on screen at once, worded identically.
+            if (contacts.isNotEmpty()) {
+                NewChatButton(
+                    collapsed = collapse > 0.35f,
+                    onClick = onNewChatClick,
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .navigationBarsPadding()
+                        .padding(end = 18.dp, bottom = 92.dp)
+                )
+            }
         }
     }
 }
@@ -284,7 +291,7 @@ private fun HeaderTitle(collapse: Float, conversationCount: Int) {
             // context is what you stop needing once you are reading.
             if (collapse < 0.98f) {
                 Text(
-                    text = if (conversationCount > 0) "$conversationCount محادثة مشفّرة" else "مشفّرة من طرف إلى طرف",
+                    text = conversationSubtitle(conversationCount),
                     style = MaterialTheme.typography.labelMedium,
                     color = palette.muted,
                     modifier = Modifier.graphicsLayer {
@@ -296,6 +303,22 @@ private fun HeaderTitle(collapse: Float, conversationCount: Int) {
         }
         LockChip()
     }
+}
+
+/**
+ * Arabic counts the noun, not just the number.
+ *
+ * The first version said "5 محادثة مشفّرة", which is simply wrong: 3–10 take
+ * the plural, 2 takes the dual, and only 11 and up return to the singular.
+ * A count that reads as broken grammar undermines a screen whose whole job is
+ * to look trustworthy.
+ */
+private fun conversationSubtitle(count: Int): String = when {
+    count <= 0 -> "مشفّرة من طرف إلى طرف"
+    count == 1 -> "محادثة واحدة مشفّرة"
+    count == 2 -> "محادثتان مشفّرتان"
+    count <= 10 -> "$count محادثات مشفّرة"
+    else -> "$count محادثة مشفّرة"
 }
 
 /** A standing reminder of the one property this whole app exists for. */
@@ -318,6 +341,71 @@ private fun LockChip() {
         )
         Spacer(Modifier.width(5.dp))
         Text("مشفّر", style = MaterialTheme.typography.labelSmall, color = primary, fontWeight = FontWeight.Medium)
+    }
+}
+
+/**
+ * The connection state, in this screen's own material.
+ *
+ * The shared [ConnectionStatusBar] draws an opaque, full-bleed Material
+ * surface — right for the screens that use it, and a flat slab laid across a
+ * design made of floating glass. The screenshot made that impossible to
+ * defend. Same information, same wording, inset and frosted like everything
+ * else here; the shared one stays exactly as it is for its own callers.
+ */
+@Composable
+private fun LiquidConnectionStrip() {
+    val palette = LocalLiquid.current
+    val state by SecureMessengerApp.instance.connectionState.collectAsState()
+
+    AnimatedVisibility(visible = state !is ConnectionState.Connected, enter = fadeIn(), exit = fadeOut()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 4.dp)
+                .liquidSurface(shape = RoundedCornerShape(14.dp), elevation = 4.dp)
+                .padding(horizontal = 13.dp, vertical = 9.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            when (state) {
+                is ConnectionState.Connecting -> {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(13.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(Modifier.width(9.dp))
+                    Text("جارٍ الاتصال…", style = MaterialTheme.typography.labelMedium, color = palette.muted)
+                }
+                is ConnectionState.Error, is ConnectionState.Disconnected -> {
+                    Icon(
+                        Icons.Default.CloudOff,
+                        contentDescription = null,
+                        modifier = Modifier.size(13.dp),
+                        tint = MaterialTheme.colorScheme.error
+                    )
+                    Spacer(Modifier.width(9.dp))
+                    Text(
+                        "غير متصل — سيُعاد المحاولة تلقائياً",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = palette.muted,
+                        modifier = Modifier.weight(1f),
+                        maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                    )
+                    Text(
+                        "إعادة المحاولة",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.clickableNoRipple {
+                            SecureMessengerApp.instance.messagingClient?.retryNow()
+                        }
+                    )
+                }
+                else -> {}
+            }
+        }
     }
 }
 

@@ -49,6 +49,20 @@ import kotlinx.coroutines.delay
  * exact date is still there once a conversation is old enough for it to be
  * the useful answer.
  */
+/**
+ * Arabic day names, Latin digits.
+ *
+ * The default locale gives Arabic-Indic digits (٢٠:٠٣) while every count in
+ * this screen — unread badges, the header subtitle — is rendered by Kotlin's
+ * toString in Latin ones. The screenshot made the mismatch obvious: two
+ * numbering systems in the same row. Asking for `nu-latn` keeps "أمس" and
+ * "الاثنين" in Arabic while making the digits agree with the badges.
+ */
+private val timeLocale: java.util.Locale = java.util.Locale.Builder()
+    .setLocale(java.util.Locale.getDefault())
+    .setUnicodeLocaleKeyword("nu", "latn")
+    .build()
+
 private fun formatChatTime(timestamp: Long): String {
     if (timestamp <= 0L) return ""
     val now = java.util.Calendar.getInstance()
@@ -65,7 +79,7 @@ private fun formatChatTime(timestamp: Long): String {
         dayDelta in 2..6 -> "EEEE"
         else -> "dd/MM"
     }
-    return java.text.SimpleDateFormat(pattern, java.util.Locale.getDefault()).format(java.util.Date(timestamp))
+    return java.text.SimpleDateFormat(pattern, timeLocale).format(java.util.Date(timestamp))
 }
 
 /**
@@ -139,25 +153,36 @@ fun ChatListItem(
 
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = contact.displayName,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = if (unread) FontWeight.Bold else FontWeight.Medium,
-                        color = palette.onSurface,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f, fill = false)
-                    )
-                    if (contact.isVerified) {
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Icon(
-                            imageVector = Icons.Default.Verified,
-                            contentDescription = "متحقق",
-                            modifier = Modifier.size(15.dp),
-                            tint = primary
+                    // Name and badge share one weighted cell. They used to sit
+                    // beside a second `Modifier.weight(1f)` spacer, and two
+                    // weights split the free space evenly — so a name was
+                    // clipped at roughly half the row no matter how much room
+                    // was actually free. "مجموعة العمل" came back from the
+                    // device as "مجموعة الع…" with a third of the row empty.
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = contact.displayName,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = if (unread) FontWeight.Bold else FontWeight.Medium,
+                            color = palette.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false)
                         )
+                        if (contact.isVerified) {
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Icon(
+                                imageVector = Icons.Default.Verified,
+                                contentDescription = "متحقق",
+                                modifier = Modifier.size(15.dp),
+                                tint = primary
+                            )
+                        }
                     }
-                    Spacer(modifier = Modifier.weight(1f))
+                    Spacer(modifier = Modifier.width(8.dp))
                     if (pinned) {
                         Icon(
                             imageVector = Icons.Default.PushPin,

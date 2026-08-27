@@ -15,7 +15,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -51,6 +50,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.graphicsLayer
@@ -119,7 +119,7 @@ val LocalLiquid = compositionLocalOf<LiquidPalette> {
  * theme the rest of the app uses.
  */
 @Composable
-fun rememberLiquidPalette(dark: Boolean = isSystemInDarkTheme()): LiquidPalette {
+private fun rememberLiquidPalette(dark: Boolean): LiquidPalette {
     val primary = MaterialTheme.colorScheme.primary
     val secondary = MaterialTheme.colorScheme.secondary
     return remember(dark, primary, secondary) {
@@ -161,8 +161,25 @@ fun rememberLiquidPalette(dark: Boolean = isSystemInDarkTheme()): LiquidPalette 
     }
 }
 
+/**
+ * Follows the Material scheme actually in force, not the system setting.
+ *
+ * The first version defaulted to `isSystemInDarkTheme()`, which is the same
+ * answer only as long as nothing overrides the theme. The moment anything
+ * does — a preview, a screenshot test, a future in-app theme switch — the
+ * glass layer kept the system's answer while Material components used the
+ * overridden one, and the two disagreed on screen. It was visible as a
+ * full-width white slab (the connection bar, a Material surface) sitting in
+ * the middle of an otherwise dark screen.
+ *
+ * Reading the background's luminance instead means this layer cannot disagree
+ * with the scheme it is drawn on top of, whatever decided that scheme.
+ */
 @Composable
-fun LiquidTheme(dark: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {
+fun LiquidTheme(
+    dark: Boolean = MaterialTheme.colorScheme.background.luminance() < 0.5f,
+    content: @Composable () -> Unit
+) {
     CompositionLocalProvider(LocalLiquid provides rememberLiquidPalette(dark), content = content)
 }
 
