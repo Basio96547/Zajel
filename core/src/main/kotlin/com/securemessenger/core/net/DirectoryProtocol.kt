@@ -176,6 +176,15 @@ object DirectoryProtocol {
      * [nonce] is fresh per call so a captured proof can't be replayed to
      * drain a mailbox a second time; [timestampMillis] bounds how long a
      * proof stays valid even before the nonce is checked.
+     *
+     * **Where that guarantee actually lives:** not here. Signing a fresh
+     * nonce is necessary but does nothing on its own — a signature is a pure
+     * function of bytes and verifies forever, so replay is only refused
+     * because the server records each nonce it honours and rejects a repeat
+     * (`directory/src/index.ts`, table `intro_fetch_nonces`). This sentence
+     * described an intention rather than a behaviour until that landed; the
+     * test that would have caught it is
+     * `directory/test/directory.spec.ts`'s "refuses a replayed proof".
      */
     fun introFetchSigningPayload(nonce: ByteArray, timestampMillis: Long): ByteArray =
         "sm-directory-intro-fetch|v1|".toByteArray(Charsets.UTF_8) + nonce + longToBigEndianBytes(timestampMillis)

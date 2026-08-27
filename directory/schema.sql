@@ -38,3 +38,25 @@ CREATE TABLE IF NOT EXISTS introductions (
 
 CREATE INDEX IF NOT EXISTS idx_introductions_mailbox ON introductions(mailbox);
 CREATE INDEX IF NOT EXISTS idx_introductions_exp ON introductions(exp);
+
+-- Spent introduction-fetch proofs.
+--
+-- `/introductions/fetch` is authorized by a live Ed25519 signature over
+-- (nonce, timestamp), and DirectoryProtocol.introFetchSigningPayload's doc
+-- in :core promises that a captured proof "can't be replayed to drain a
+-- mailbox a second time". A signature alone cannot keep that promise: it is
+-- a pure function of bytes, and anyone holding a copy can send them again.
+-- Only the server refusing a nonce it has already honoured makes it true, so
+-- one is recorded here the moment its proof verifies, and a repeat is
+-- refused.
+--
+-- Rows live exactly as long as the proof they belong to could still pass the
+-- handler's timestamp check (exp = timestamp + FETCH_TIMESTAMP_TOLERANCE_MS);
+-- past that instant the timestamp check refuses the replay unaided and the
+-- row is dead weight, swept by the same cron that sweeps introductions.
+CREATE TABLE IF NOT EXISTS intro_fetch_nonces (
+  nonce TEXT PRIMARY KEY,   -- hex, exactly as supplied; only ever compared, never decoded
+  exp   INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_intro_fetch_nonces_exp ON intro_fetch_nonces(exp);

@@ -1,6 +1,6 @@
 # خريطة المشروع — SecureMessenger
 
-**آخر تحقّق:** 2026-07-31
+**آخر تحقّق شامل:** 2026-07-31 · **تحقّق جزئي:** 2026-08-27 — §8 وحدها (جرد ملفات الاختبار، ونتائج `directory` و`relay` و`:desktop:test` مُشغَّلة فعلاً في ذلك اليوم). ما عداها من أرقام هذه الوثيقة — الأحجام والتعدادات ومخرجات البناء — يبقى بتاريخ 2026-07-31 ولم يُعَد قياسه، وقد تقادم بعضه بعد إضافة الدليل.
 **المنهجية:** كل رقم وكل ادّعاء هنا قِيس أو قُرئ من الملف الفعلي في هذا التاريخ. ما لم أتحقّق منه في هذه الجولة مُعلَّم صراحةً بـ«غير مُعاد التحقّق» بدل تمريره كأنه حاضر. الأرقام المقيسة تستثني `build/` و`node_modules/` و`.gradle/` و`.kotlin/` ما لم يُذكر خلاف ذلك.
 
 **علاقة هذا الملف بغيره:** `SECURITY_AUDIT.md` هو المرجع للأمن، وهذا الملف للبنية والجرد. عند التعارض بينهما في مسألة أمنية، `SECURITY_AUDIT.md` هو الأحدث والأدقّ.
@@ -184,10 +184,15 @@ relayUrl=https://sm-blind-mailbox.basil0552106933.workers.dev
 
 | الموقع | ملفات | المحتوى |
 |---|---|---|
-| `app/src/androidTest` | 9 | `SignalProtocolTest` · `RatchetRoundtripTest` · `PqKemTest` · `MetadataPrivacyTest` · `AckAuthenticationTest` · `RelayRoundtripTest` · `CryptoSecurityTests` · `SecurityConfigurationTests` · `QrImageTest` |
+| `app/src/androidTest` | 13 | `SignalProtocolTest` · `RatchetRoundtripTest` · `PqKemTest` · `MetadataPrivacyTest` · `AckAuthenticationTest` · `RelayRoundtripTest` · `IntroductionRoundtripTest` · `SecureDatabaseMigrationTest` · `MediaSandboxTest` · `WhereDoesMediaParsingHappenTest` · `CryptoSecurityTests` · `SecurityConfigurationTests` · `QrImageTest` |
+| `app/src/test` | 1 | `MediaSandboxGeometryTest` (JVM) |
 | `hisn/src/androidTest` | 3 | `AuditLogicTest` · `VerifyImportTest` · `NotificationTest` |
-| `desktop/src/test` | 1 | `LoopbackMessagingTest` |
+| `desktop/src/test` | 3 | `LoopbackMessagingTest` · `ScopeReuseTest` · `DirectoryProtocolTest` |
+| `directory/test` | 1 | `directory.spec.ts` — الـWorker داخل workerd على D1 محلية (Vitest + Miniflare) |
+| `relay/test` | 1 | `relay.spec.ts` — الصندوق الأعمى بكائناته الدائمة وتخزينها الحقيقي |
 | سكربتات مساعدة | 2 | `security_test.py` · `memory_test.py` (تُشغَّل يدوياً، ليست جزءاً من البناء) |
+
+**الخدمتان كانتا حتى 2026-08-27 المكوّنَين الوحيدين بلا اختبار من أي نوع** رغم أن `relay/` منشور ويحمل حركة فعلية. الاختبار من جهاز (`RelayRoundtripTest`) يُثبت أن هاتفاً يُكمل دورة كاملة — وهو سؤال آخر غير: هل يرفض الخادم ما تقول تعليقاته إنه يرفضه. لذلك المجموعتان الجديدتان تختبران الرفض أساساً لا المسار السعيد.
 
 **لماذا لا توجد اختبارات وحدة JVM في `:app`:** كل اختبار فيه يمسّ libsodium، ومكتبته الأصلية لا تُحمَّل خارج تشغيل على جهاز — فكلها في `androidTest` عمداً.
 
@@ -196,6 +201,10 @@ relayUrl=https://sm-blind-mailbox.basil0552106933.workers.dev
 ```bash
 gradlew :desktop:test                      # لا يحتاج جهازاً
 gradlew :hisn:connectedDebugAndroidTest    # يحتاج جهازاً/محاكياً
+
+# الخدمتان — بلا جهاز، بلا نشر، بلا حساب Cloudflare
+cd relay && npm test
+cd directory && npm test
 
 # :app — استثنِ الاختبار المُتلِف على أي جهاز فيه بيانات حقيقية
 gradlew :app:connectedDebugAndroidTest "-Pandroid.testInstrumentationRunnerArguments.notClass=com.securemessenger.app.network.AckAuthenticationTest"
@@ -207,10 +216,19 @@ gradlew :app:connectedDebugAndroidTest "-Pandroid.testInstrumentationRunnerArgum
 
 | المجموعة | النتيجة | حالة التحقّق |
 |---|---|---|
-| `:desktop:test` | **3/3** | ✅ شُغِّلت فعلاً 2026-07-31، عبر مهمة Gradle القياسية بعد النقل |
+| `directory` (`npm test`) | **20/20** | ✅ شُغِّلت فعلاً 2026-08-27 — داخل workerd على D1 محلية، بلا نشر |
+| `relay` (`npm test`) | **15/15** | ✅ شُغِّلت فعلاً 2026-08-27 — كائنات دائمة حقيقية، بلا نشر |
+| `:desktop:test` | **15/15** | ✅ شُغِّلت فعلاً 2026-08-27 — `DirectoryProtocolTest` ١٠ · `LoopbackMessagingTest` ٤ · `ScopeReuseTest` ١. كانت 3/3 في 2026-07-31 قبل أن يُضاف الدليل |
 | `:app:testDebugUnitTest` (JVM، بلا جهاز) | **8/8** | ✅ شُغِّلت فعلاً 2026-07-31 |
 | `:app:connectedDebugAndroidTest` | **50/50** على SM-S938B / Android 16 | ✅ شُغِّلت فعلاً 2026-07-31 **بعد** حارس قناة العودة وإصلاح رمز الاقتران. باستثناء `AckAuthenticationTest` |
 | `:hisn:connectedDebugAndroidTest` | **24/24** على SM-S938B / Android 16 | ✅ شُغِّلت فعلاً 2026-07-31 — وكانت **23/24** حتى أُصلح اختبار يفترض ملكية سجلّ تدقيق فارغ (فحص حقيقي يسجّل مدخلة عند تثبيت الاختبار نفسه) |
+
+### ماذا وجدت مجموعتا الخدمتين أول مرة شُغِّلتا (2026-08-27)
+
+عيبان في `directory/`، كلاهما فجوة بين ما توثّقه الشيفرة وما تفعله — وهذا بالضبط نوع ما لا يظهر في اختبار من جهاز يمشي في المسار السعيد:
+
+1. **إثبات القراءة كان قابلاً لإعادة التشغيل.** توثيق `DirectoryProtocol.introFetchSigningPayload` يَعِد بأن «إثباتاً ملتقَطاً لا يمكن إعادة تشغيله لتفريغ صندوق مرة ثانية». التوقيع وحده لا يستطيع الوفاء بذلك: هو دالة صرفة على البايتات ويتحقّق أبداً، والخادم كان يفحص شكل الـnonce ولا يسجّله. فمن التقط إثباتاً كان يعيد إرساله خلال نافذة الدقيقة ويأخذ ما وصل الصندوق بعد التفريغ الأول. الآن يُسجَّل الـnonce لحظة نجاح التوقيع ويُرفض تكراره. **مُتحقَّق بشاهد سالب:** بتعطيل السطر يعود الاختبار 200 بدل 400 ويسلّم المقدّمة الجديدة — أي أن الاختبار يمسك العيب فعلاً، لا يمرّ بالصدفة.
+2. **لا شيء كان يكنس المقدّمات المنتهية.** `INTRO_TTL_MS` ٣٠ يوماً كان مفروضاً **عند القراءة فقط**: صفٌّ لشخص لا يفتح التطبيق ثانيةً يبقى في قاعدة المُشغِّل إلى الأبد، مخفيّاً عن العملاء ومقروءاً تماماً لمن يقرأ القاعدة. `relay/` يكنس بمنبّه لكل كائن دائم؛ D1 بلا منبّه، فأُضيفت مهمة `cron` كل ساعة تحذف المنتهي من المقدّمات ومن الـnonces معاً. الفهرس `idx_introductions_exp` كان موجوداً في المخطّط أصلاً — كنّاسٌ كان مقصوداً ولم يُكتب.
 
 **ما يُعَدّ بالضبط، لأن الأرقام تُخلَط بسهولة:** كل عدد أعلاه هو **طرق اختبار (`@Test`) نفّذها المُشغِّل**، لا تأكيدات ولا أصناف. تفكيك الـ47:
 

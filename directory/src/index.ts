@@ -131,6 +131,29 @@ export default {
 
 		return reject(404);
 	},
+
+	/**
+	 * Sweep whatever has outlived its own expiry. relay/ does this with a
+	 * Durable Object alarm; D1 has no alarms, so the cron trigger in
+	 * wrangler.jsonc is this service's equivalent — the schedule differs, the
+	 * guarantee does not.
+	 *
+	 * It is not an optimization. Both read paths already refuse expired rows,
+	 * so without this the data would simply be invisible to clients while
+	 * staying perfectly readable to anyone who can read the database: an
+	 * introduction addressed to someone who never opens the app again would
+	 * sit in the operator's D1 permanently, naming a recipient mailbox and
+	 * the minute it was deposited. relay/'s alarm exists so that "an
+	 * abandoned mailbox leaves no residue to subpoena later" is true there;
+	 * INTRO_TTL_MS is an empty promise here until something enforces it.
+	 */
+	async scheduled(_controller: ScheduledController, env: Env): Promise<void> {
+		const now = Date.now();
+		await env.DB.batch([
+			env.DB.prepare("DELETE FROM introductions WHERE exp <= ?").bind(now),
+			env.DB.prepare("DELETE FROM intro_fetch_nonces WHERE exp <= ?").bind(now),
+		]);
+	},
 } satisfies ExportedHandler<Env>;
 
 /**
@@ -263,6 +286,25 @@ async function handleIntroFetch(request: Request, env: Env, now: number): Promis
 
 	const payload = introFetchSigningPayload(nonceBytes, timestamp);
 	if (!verifyDetached(payload, sigBytes, signingBytes)) return reject(400);
+
+	// Spend the nonce, and only now that the signature has already passed —
+	// an unverified caller must not be able to burn nonces it guessed.
+	//
+	// This insert is what actually makes the proof one-shot, and without it
+	// the nonce would be decoration: a signature is replayable bytes, so
+	// until its timestamp went stale anyone who captured one could send it
+	// again and take whatever arrived in the mailbox in between. First
+	// insert wins; a repeat hits the primary key and is refused with the
+	// same bare 400 as every other failure on this path.
+	try {
+		await env.DB.prepare("INSERT INTO intro_fetch_nonces (nonce, exp) VALUES (?, ?)")
+			.bind(nonce, timestamp + FETCH_TIMESTAMP_TOLERANCE_MS)
+			.run();
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error);
+		if (message.includes("UNIQUE constraint failed")) return reject(400);
+		throw error;
+	}
 
 	const mailbox = introMailboxId(fromHex(identityPublicKey)!);
 

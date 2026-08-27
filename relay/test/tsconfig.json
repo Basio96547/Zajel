@@ -1,0 +1,9 @@
+{
+  // Same split as directory/: the root tsconfig covers what deploys, this one
+  // adds the tests and the `cloudflare:test` types they need.
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "types": ["@cloudflare/workers-types", "@cloudflare/vitest-pool-workers/types"]
+  },
+  "include": ["./**/*.ts", "../src/**/*.ts"]
+}

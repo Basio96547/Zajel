@@ -17,6 +17,15 @@
 			"database_id": "REPLACE_WITH_D1_DATABASE_ID"
 		}
 	],
+	// Hourly, matching the cadence of relay/'s per-shard alarm. This is the
+	// only way this service can enforce its own TTLs: D1 has no alarm, so
+	// nothing else would ever delete an introduction that its recipient never
+	// came back to collect (see the `scheduled` handler for why leaving it
+	// unenforced is a retention problem, not a housekeeping one). Minute 17
+	// rather than 0 only to stay off the top-of-hour crowd.
+	"triggers": {
+		"crons": ["17 * * * *"]
+	},
 	// Per-IP, not per-account — this service has no accounts. Tighter on claim
 	// (a write, and the one place squatting/hammering matters) than on the
 	// three read/deposit paths, which share one limiter since none of them is
