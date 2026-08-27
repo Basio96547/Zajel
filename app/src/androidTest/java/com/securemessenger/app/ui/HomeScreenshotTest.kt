@@ -87,7 +87,8 @@ class HomeScreenshotTest {
                     onTogglePin = {},
                     onSettingsClick = {},
                     onNewChatClick = {},
-                    onProfileClick = {}
+                    onProfileClick = {},
+                    onConnectionRequestsClick = {}
                 )
             }
         }

@@ -342,7 +342,12 @@ fun AppNavigation() {
                     },
                     onSettingsClick = { navController.navigate(Screen.Settings.route) },
                     onNewChatClick = { navController.navigate(Screen.NewChat.route) },
-                    onProfileClick = { navController.navigate(Screen.Profile.route) }
+                    onProfileClick = { navController.navigate(Screen.Profile.route) },
+                    // Straight to the requests, not via NewChat. The home
+                    // screen's pending-request count used to sit on a control
+                    // that opened NewChat, one level away from the thing it
+                    // was counting.
+                    onConnectionRequestsClick = { navController.navigate(Screen.ConnectionRequests.route) }
                 )
             }
         }

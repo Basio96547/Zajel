@@ -5,7 +5,7 @@
 ابحث هنا أولاً بـ Grep قبل فتح أي ملف مصدر كامل. سطر `يُستخدم في:` تحت أي class/object/interface = تطابق استيراد FQN فعلي، أفضل-جهد وليس مضموناً 100%.
 ⚠ بجانب اسم ملف = يتجاوز 300 سطر.
 
-**129** ملف مفحوص، **2403** تعريفاً.
+**129** ملف مفحوص، **2408** تعريفاً.
 
 
 ## app/
@@ -199,7 +199,7 @@ data class OldContact ( @PrimaryKey val id: String, val publicKey: ByteArray, va
 
 ### app/src/main/java/com/securemessenger/app/SecureMessengerApp.kt (313 سطر) ⚠  [package com.securemessenger.app]
 - L27 `class SecureMessengerApp : Application()`
-  يُستخدم في: app/src/main/java/com/securemessenger/app/service/MessengerService.kt, app/src/main/java/com/securemessenger/app/ui/navigation/AppNavigation.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatCommon.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ContactDetailScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/NewChatScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/UsernameSearchScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/settings/ProfileScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/settings/SettingsScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/setup/SetupScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/verification/KeyVerificationScreen.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ChatListViewModel.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ConnectionRequestsViewModel.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ConversationViewModel.kt
+  يُستخدم في: app/src/main/java/com/securemessenger/app/service/MessengerService.kt, app/src/main/java/com/securemessenger/app/ui/navigation/AppNavigation.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatCommon.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatListScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ContactDetailScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/NewChatScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/UsernameSearchScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/settings/ProfileScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/settings/SettingsScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/setup/SetupScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/verification/KeyVerificationScreen.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ChatListViewModel.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ConnectionRequestsViewModel.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ConversationViewModel.kt
   - L29 `val applicationScope`
   - L31 `val repository`
   - L38 `private val _messagingClientFlow`
@@ -793,7 +793,7 @@ data class OutgoingConnectionRequest ( @PrimaryKey val recipientIdentityPublicKe
 - L89 `private const val INTRO_POLL_MIN_MS`
 - L90 `private const val INTRO_POLL_MAX_MS`
 - L104 `class SecureMessagingClient ( context: Context, private val repository: SecureRepository, private val userId: String )` — SecureMessagingClient — fully peer-to-peer. There is no external server of
-  يُستخدم في: app/src/main/java/com/securemessenger/app/SecureMessengerApp.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatCommon.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/UsernameSearchScreen.kt
+  يُستخدم في: app/src/main/java/com/securemessenger/app/SecureMessengerApp.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatCommon.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatListScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/UsernameSearchScreen.kt
 - L106 `private val repository : SecureRepository,`
 - L107 `private val userId : String`
   - L109 `private val appContext`
@@ -904,7 +904,7 @@ data class OutgoingConnectionRequest ( @PrimaryKey val recipientIdentityPublicKe
   - L2042 `private suspend fun getOneTimePreKeys (): List<SignalProtocol.PreKeyPair>`
   - L2051 `private suspend fun getContactIdentityKey (contactId: String): ByteArray?`
 - L2060 `data class TransportStatus ( /** A direct socket to them is open right now. */ val isConnected: Boolean, /** Their discovery token is currently visible on this network (mDNS worked). */ val isDiscovered: Boolean, /** "host:port" we can dial even when mDNS finds nothing, or null if we've never had one. */ val rememberedAddress: String?, /** Relaying is on and we hold an outbound pair secret for them — so off-LAN delivery is possible. */ val hasRelayPath: Boolean )`
-  يُستخدم في: app/src/main/java/com/securemessenger/app/SecureMessengerApp.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatCommon.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/UsernameSearchScreen.kt
+  يُستخدم في: app/src/main/java/com/securemessenger/app/SecureMessengerApp.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatCommon.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatListScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/UsernameSearchScreen.kt
 - L2062 `val isConnected : Boolean,` — A direct socket to them is open right now.
 - L2064 `val isDiscovered : Boolean,` — Their discovery token is currently visible on this network (mDNS worked).
 - L2066 `val rememberedAddress : String?,` — "host:port" we can dial even when mDNS finds nothing, or null if we've never had one.
@@ -912,20 +912,20 @@ data class OutgoingConnectionRequest ( @PrimaryKey val recipientIdentityPublicKe
   - L2071 `val hasNoRouteAtAll : Boolean` — True when there is no way at all to get a message to them; the outbox will queue forever.
   - L2075 `fun describe (): String` — A short Arabic description of the current situation, suitable for showing directly.
 - L2086 `sealed class ConnectionState`
-  يُستخدم في: app/src/main/java/com/securemessenger/app/SecureMessengerApp.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatCommon.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/UsernameSearchScreen.kt
+  يُستخدم في: app/src/main/java/com/securemessenger/app/SecureMessengerApp.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatCommon.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatListScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/UsernameSearchScreen.kt
   - L2087 `object Connecting`
   - L2088 `object Connected`
   - L2089 `object Disconnected`
   - L2090 `data class Error (val message: String) : ConnectionState()`
 - L2093 `data class MessageReceived ( val senderId: String, val plaintext: ByteArray, val senderIdentityKey: ByteArray? = null, val ttlSeconds: Int? = null, val messageId: String? = null )`
-  يُستخدم في: app/src/main/java/com/securemessenger/app/SecureMessengerApp.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatCommon.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/UsernameSearchScreen.kt
+  يُستخدم في: app/src/main/java/com/securemessenger/app/SecureMessengerApp.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatCommon.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatListScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/UsernameSearchScreen.kt
 - L2094 `val senderId : String,`
 - L2095 `val plaintext : ByteArray,`
 - L2096 `val senderIdentityKey : ByteArray?`
 - L2097 `val ttlSeconds : Int?`
 - L2098 `val messageId : String?`
 - L2101 `data class PrekeyBundle ( val identityKey: ByteArray, val signedPreKey: ByteArray, val signingPublicKey: ByteArray? = null, val oneTimePreKey: ByteArray?, val oneTimePreKeyId: Int? = null, val mlkemPublicKey: ByteArray? = null )`
-  يُستخدم في: app/src/main/java/com/securemessenger/app/SecureMessengerApp.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatCommon.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/UsernameSearchScreen.kt
+  يُستخدم في: app/src/main/java/com/securemessenger/app/SecureMessengerApp.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatCommon.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatListScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/UsernameSearchScreen.kt
 - L2102 `val identityKey : ByteArray,`
 - L2103 `val signedPreKey : ByteArray,`
 - L2104 `val signingPublicKey : ByteArray?`
@@ -1197,7 +1197,7 @@ data class OutgoingConnectionRequest ( @PrimaryKey val recipientIdentityPublicKe
 - L146 `@Composable
 private fun LaunchedEffectPressState (source: MutableInteractionSource, onPressed: (Boolean) -> Unit)`
 
-### app/src/main/java/com/securemessenger/app/ui/liquid/LiquidGlass.kt (415 سطر) ⚠  [package com.securemessenger.app.ui.liquid]
+### app/src/main/java/com/securemessenger/app/ui/liquid/LiquidGlass.kt (432 سطر) ⚠  [package com.securemessenger.app.ui.liquid]
 - L95 `@Immutable
 data class LiquidPalette ( /** The page floor the aurora is painted onto. */ val floor: Color, /** Three drifting light sources. Order is back-to-front. */ val blobs: List<Color>, val surface: Color, val surfaceRaised: Color, /** Top-edge highlight painted over a surface's fill. */ val sheen: Color, val edgeHigh: Color, val edgeLow: Color, val onSurface: Color, val muted: Color, val shadow: Color, )`
   يُستخدم في: app/src/androidTest/java/com/securemessenger/app/ui/LiquidHomeRenderTest.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatListScreen.kt
@@ -1212,31 +1212,32 @@ data class LiquidPalette ( /** The page floor the aurora is painted onto. */ val
 - L107 `val muted : Color,`
 - L108 `val shadow : Color,`
 - L111 `val LocalLiquid`
-- L122 `@Composable fun rememberLiquidPalette (dark: Boolean = isSystemInDarkTheme()): LiquidPalette` — Derives the palette from the app's own Material scheme rather than
+- L122 `@Composable
+private fun rememberLiquidPalette (dark: Boolean): LiquidPalette`
   - L123 `val primary`
   - L124 `val secondary`
-- L165 `@Composable fun LiquidTheme (dark: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit)`
-- L181 `@Composable fun AuroraBackdrop (modifier: Modifier = Modifier, parallaxPx: () -> Float = { 0f })` — The drifting backdrop.
-  - L182 `val palette`
-  - L183 `val drift`
-  - L184 `val a`
-  - L189 `val b`
-  - L194 `val c`
-- L223 `private fun DrawScope (color: Color, center: Offset, radius: Float)`
-- L242 `fun Modifier ( shape: Shape = RoundedCornerShape(22.dp), raised: Boolean = false, elevation: Dp = 12.dp, fill: Color? = null, ): Modifier` — One pane of glass: shadow underneath, translucent fill, sheen down from the
-  - L248 `val palette`
-- L274 `fun Modifier (color: Color, radius: Dp = 18.dp, alpha: Float = 0.45f): Modifier` — A soft coloured halo cast *outside* a shape — used for focus and for unread counts.
-  - L275 `val spread`
-- L292 `@Composable fun rememberPressScale ( source: MutableInteractionSource, pressedScale: Float = 0.972f ): State<Float>` — Press feedback as a spring rather than a ripple. Glass does not ripple; it
-  - L296 `val pressed`
-- L307 `data class LiquidNavItem ( val label: String, val icon: ImageVector, /** 0 shows no badge at all. */ val badgeCount: Int = 0, )`
+- L179 `@Composable fun LiquidTheme ( dark: Boolean = MaterialTheme.colorScheme.background.luminance() < 0.5f, content: @Composable () -> Unit )` — Follows the Material scheme actually in force, not the system setting.
+- L198 `@Composable fun AuroraBackdrop (modifier: Modifier = Modifier, parallaxPx: () -> Float = { 0f })` — The drifting backdrop.
+  - L199 `val palette`
+  - L200 `val drift`
+  - L201 `val a`
+  - L206 `val b`
+  - L211 `val c`
+- L240 `private fun DrawScope (color: Color, center: Offset, radius: Float)`
+- L259 `fun Modifier ( shape: Shape = RoundedCornerShape(22.dp), raised: Boolean = false, elevation: Dp = 12.dp, fill: Color? = null, ): Modifier` — One pane of glass: shadow underneath, translucent fill, sheen down from the
+  - L265 `val palette`
+- L291 `fun Modifier (color: Color, radius: Dp = 18.dp, alpha: Float = 0.45f): Modifier` — A soft coloured halo cast *outside* a shape — used for focus and for unread counts.
+  - L292 `val spread`
+- L309 `@Composable fun rememberPressScale ( source: MutableInteractionSource, pressedScale: Float = 0.972f ): State<Float>` — Press feedback as a spring rather than a ripple. Glass does not ripple; it
+  - L313 `val pressed`
+- L324 `data class LiquidNavItem ( val label: String, val icon: ImageVector, /** 0 shows no badge at all. */ val badgeCount: Int = 0, )`
   يُستخدم في: app/src/androidTest/java/com/securemessenger/app/ui/LiquidHomeRenderTest.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatListScreen.kt
-- L308 `val label : String,`
-- L309 `val icon : ImageVector,`
-- L311 `val badgeCount : Int` — 0 shows no badge at all.
-- L325 `@Composable fun LiquidNavBar ( items: List<LiquidNavItem>, selectedIndex: Int, onSelect: (Int) -> Unit, modifier: Modifier = Modifier, )` — The floating navigation pill.
-  - L331 `val palette`
-  - L332 `val primary`
+- L325 `val label : String,`
+- L326 `val icon : ImageVector,`
+- L328 `val badgeCount : Int` — 0 shows no badge at all.
+- L342 `@Composable fun LiquidNavBar ( items: List<LiquidNavItem>, selectedIndex: Int, onSelect: (Int) -> Unit, modifier: Modifier = Modifier, )` — The floating navigation pill.
+  - L348 `val palette`
+  - L349 `val primary`
 
 ### app/src/main/java/com/securemessenger/app/ui/navigation/AppNavigation.kt (494 سطر) ⚠  [package com.securemessenger.app.ui.navigation]
 - L45 `sealed class Screen (val route: String)`
@@ -1366,78 +1367,84 @@ internal fun EncryptedBanner ()`
 - L235 `@Composable
 internal fun DateSeparator (label: String)`
 
-### app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatListItem.kt (332 سطر) ⚠  [package com.securemessenger.app.ui.screens.chat]
-- L52 `private fun formatChatTime (timestamp: Long): String`
-  - L54 `val now`
-  - L55 `val then`
-  - L56 `val sameYear`
-  - L57 `val dayDelta`
-  - L62 `val pattern`
-- L81 `@OptIn(ExperimentalFoundationApi::class)
+### app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatListItem.kt (357 سطر) ⚠  [package com.securemessenger.app.ui.screens.chat]
+- L61 `private val timeLocale : java.util.Locale`
+- L66 `private fun formatChatTime (timestamp: Long): String`
+  - L68 `val now`
+  - L69 `val then`
+  - L70 `val sameYear`
+  - L71 `val dayDelta`
+  - L76 `val pattern`
+- L95 `@OptIn(ExperimentalFoundationApi::class)
 @Composable fun ChatListItem ( contact: ContactUiModel, onClick: () -> Unit, onTogglePin: () -> Unit = {}, entranceDelayMillis: Int = -1, )` — One conversation, as a pane of glass.
-  - L87 `val palette`
-  - L88 `val haptics`
-  - L89 `val primary`
-  - L90 `var showMenu`
-  - L92 `val interaction`
-  - L93 `val pressScale`
-  - L95 `val entrance`
-  - L103 `val unread`
-  - L104 `val pinned`
-- L232 `@Composable
+  - L101 `val palette`
+  - L102 `val haptics`
+  - L103 `val primary`
+  - L104 `var showMenu`
+  - L106 `val interaction`
+  - L107 `val pressScale`
+  - L109 `val entrance`
+  - L117 `val unread`
+  - L118 `val pinned`
+- L257 `@Composable
 private fun AvatarWithRing (contact: ContactUiModel, unread: Boolean)`
-  - L233 `val palette`
-  - L234 `val primary`
-- L261 `@Composable
+  - L258 `val palette`
+  - L259 `val primary`
+- L286 `@Composable
 private fun UnreadPill (count: Int)`
-  - L262 `val primary`
-  - L263 `val pulse`
-  - L264 `val glow`
-- L291 `@Preview(name =                        , showBackground = true, backgroundColor = 0xFF06080D)
+  - L287 `val primary`
+  - L288 `val pulse`
+  - L289 `val glow`
+- L316 `@Preview(name =                        , showBackground = true, backgroundColor = 0xFF06080D)
 @Composable
 private fun ChatListItemDarkPreview ()`
-- L317 `@Preview(name =                         , showBackground = true, backgroundColor = 0xFFEDF1F8)
+- L342 `@Preview(name =                         , showBackground = true, backgroundColor = 0xFFEDF1F8)
 @Composable
 private fun ChatListItemLightPreview ()`
 
-### app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatListScreen.kt (563 سطر) ⚠  [package com.securemessenger.app.ui.screens.chat]
-- L72 `@Composable fun ChatListScreen ( onConversationClick: (String) -> Unit, onSettingsClick: () -> Unit, onNewChatClick: () -> Unit, onProfileClick: () -> Unit = {}, viewModel: ChatListViewModel = viewModel(), connectionRequestsViewModel: ConnectionRequestsViewModel = viewModel() )` — The home screen, rebuilt on the liquid-glass layer in
-  - L80 `val contacts`
-  - L81 `val isLoading`
-  - L82 `val incomingRequests`
-- L108 `@OptIn(ExperimentalFoundationApi::class)
+### app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatListScreen.kt (651 سطر) ⚠  [package com.securemessenger.app.ui.screens.chat]
+- L74 `@Composable fun ChatListScreen ( onConversationClick: (String) -> Unit, onSettingsClick: () -> Unit, onNewChatClick: () -> Unit, onProfileClick: () -> Unit = {}, viewModel: ChatListViewModel = viewModel(), connectionRequestsViewModel: ConnectionRequestsViewModel = viewModel() )` — The home screen, rebuilt on the liquid-glass layer in
+  - L82 `val contacts`
+  - L83 `val isLoading`
+  - L84 `val incomingRequests`
+- L110 `@OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun ChatListContent ( contacts: List<ContactUiModel>, isLoading: Boolean, pendingRequestCount: Int, onConversationClick: (String) -> Unit, onTogglePin: (String) -> Unit, onSettingsClick: () -> Unit, onNewChatClick: () -> Unit, onProfileClick: () -> Unit, modifier: Modifier = Modifier )`
-- L268 `@Composable
+- L275 `@Composable
 private fun HeaderTitle (collapse: Float, conversationCount: Int)`
-  - L269 `val palette`
-- L303 `@Composable
-private fun LockChip ()`
-  - L304 `val primary`
+  - L276 `val palette`
+- L316 `private fun conversationSubtitle (count: Int): String`
 - L326 `@Composable
+private fun LockChip ()`
+  - L327 `val primary`
+- L357 `@Composable
+private fun LiquidConnectionStrip ()`
+  - L358 `val palette`
+  - L359 `val state`
+- L414 `@Composable
 private fun SearchField ( value: String, onValueChange: (String) -> Unit, modifier: Modifier = Modifier )`
-  - L331 `val palette`
-  - L332 `val primary`
-  - L333 `val interaction`
-  - L334 `val focused`
-- L388 `@Composable
+  - L419 `val palette`
+  - L420 `val primary`
+  - L421 `val interaction`
+  - L422 `val focused`
+- L476 `@Composable
 private fun NewChatButton (collapsed: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier)`
-  - L389 `val primary`
-- L420 `@Composable
+  - L477 `val primary`
+- L508 `@Composable
 private fun EmptyState (onNewChatClick: () -> Unit, topPadding: androidx.compose.ui.unit.Dp)`
-  - L421 `val palette`
-  - L422 `val primary`
-  - L423 `val breath`
-  - L424 `val scale`
-- L488 `@Composable
+  - L509 `val palette`
+  - L510 `val primary`
+  - L511 `val breath`
+  - L512 `val scale`
+- L576 `@Composable
 private fun NoResults (query: String, topPadding: androidx.compose.ui.unit.Dp)`
-  - L489 `val palette`
-- L515 `@Composable
+  - L577 `val palette`
+- L603 `@Composable
 private fun LoadingList (topPadding: androidx.compose.ui.unit.Dp)`
-- L528 `@Composable
+- L616 `@Composable
 private fun ChatListItemSkeleton ()`
-- L551 `private fun Modifier (onClick: () -> Unit): Modifier`
-  - L552 `val interaction`
+- L639 `private fun Modifier (onClick: () -> Unit): Modifier`
+  - L640 `val interaction`
 
 ### app/src/main/java/com/securemessenger/app/ui/screens/chat/ComposeStrips.kt (126 سطر)  [package com.securemessenger.app.ui.screens.chat]
 - L28 `@Composable

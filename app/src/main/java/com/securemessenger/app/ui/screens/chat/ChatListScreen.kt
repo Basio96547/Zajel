@@ -45,8 +45,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.securemessenger.app.SecureMessengerApp
 import com.securemessenger.app.network.ConnectionState
 import com.securemessenger.app.ui.liquid.AuroraBackdrop
-import com.securemessenger.app.ui.liquid.LiquidNavBar
-import com.securemessenger.app.ui.liquid.LiquidNavItem
 import com.securemessenger.app.ui.liquid.LiquidTheme
 import com.securemessenger.app.ui.liquid.LocalLiquid
 import com.securemessenger.app.ui.liquid.liquidGlow
@@ -76,6 +74,7 @@ fun ChatListScreen(
     onSettingsClick: () -> Unit,
     onNewChatClick: () -> Unit,
     onProfileClick: () -> Unit = {},
+    onConnectionRequestsClick: () -> Unit = {},
     viewModel: ChatListViewModel = viewModel(),
     connectionRequestsViewModel: ConnectionRequestsViewModel = viewModel()
 ) {
@@ -91,7 +90,8 @@ fun ChatListScreen(
         onTogglePin = viewModel::togglePin,
         onSettingsClick = onSettingsClick,
         onNewChatClick = onNewChatClick,
-        onProfileClick = onProfileClick
+        onProfileClick = onProfileClick,
+        onConnectionRequestsClick = onConnectionRequestsClick
     )
 }
 
@@ -116,6 +116,7 @@ internal fun ChatListContent(
     onSettingsClick: () -> Unit,
     onNewChatClick: () -> Unit,
     onProfileClick: () -> Unit,
+    onConnectionRequestsClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     LiquidTheme {
@@ -148,18 +149,6 @@ internal fun ChatListContent(
 
         var headerHeightPx by remember { mutableIntStateOf(0) }
         val headerHeight = with(density) { headerHeightPx.toDp() }
-
-        // "جهات الاتصال" doubles as the entry point to pending connection
-        // requests found via username search — badged so a waiting request is
-        // never silently missed.
-        val navItems = remember(pendingRequestCount) {
-            listOf(
-                LiquidNavItem("المحادثات", Icons.Default.ChatBubble),
-                LiquidNavItem("جهات الاتصال", Icons.Default.Group, badgeCount = pendingRequestCount),
-                LiquidNavItem("الإعدادات", Icons.Default.Settings),
-                LiquidNavItem("ملفي", Icons.Default.Person)
-            )
-        }
 
         Box(modifier = modifier.fillMaxSize()) {
             AuroraBackdrop(
@@ -225,37 +214,40 @@ internal fun ChatListContent(
                         )
                 )
                 Column(modifier = Modifier.statusBarsPadding()) {
-                    HeaderTitle(collapse = collapse, conversationCount = contacts.size)
+                    HeaderTitle(
+                        collapse = collapse,
+                        conversationCount = contacts.size,
+                        onSettingsClick = onSettingsClick,
+                        onProfileClick = onProfileClick
+                    )
                     SearchField(
                         value = searchQuery,
                         onValueChange = { searchQuery = it },
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
                     )
                     LiquidConnectionStrip()
+                    PendingRequestsBanner(
+                        count = pendingRequestCount,
+                        onClick = onConnectionRequestsClick
+                    )
                     Spacer(Modifier.height(8.dp))
                 }
             }
 
-            // ---- plane 4: floating controls ----
-            LiquidNavBar(
-                items = navItems,
-                selectedIndex = 0,
-                onSelect = { index ->
-                    when (index) {
-                        1 -> onNewChatClick()
-                        2 -> onSettingsClick()
-                        3 -> onProfileClick()
-                    }
-                },
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(horizontal = 14.dp, vertical = 10.dp)
-                    .navigationBarsPadding()
-            )
-
-            // Not when the list is empty: the empty state already offers this
-            // exact action in the middle of the screen, and the screenshot
-            // showed both buttons on screen at once, worded identically.
+            // ---- plane 4: the one floating control ----
+            //
+            // The bottom bar is gone. Three of its four entries navigated away
+            // to screens with their own back stacks, so the sliding indicator
+            // promised tab-switching it never delivered — `selectedIndex` was
+            // pinned at 0 and the indicator never once moved. Worse, its
+            // "جهات الاتصال" entry called onNewChatClick, the exact
+            // destination the floating button already owned: one screen, two
+            // controls, two different names, same corner.
+            //
+            // Settings and profile are now icons in the header, pending
+            // requests have their own banner that links to the screen the
+            // badge was actually counting, and this is the only floating
+            // thing left.
             if (contacts.isNotEmpty()) {
                 NewChatButton(
                     collapsed = collapse > 0.35f,
@@ -263,7 +255,7 @@ internal fun ChatListContent(
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
                         .navigationBarsPadding()
-                        .padding(end = 18.dp, bottom = 92.dp)
+                        .padding(end = 18.dp, bottom = 24.dp)
                 )
             }
         }
@@ -272,12 +264,18 @@ internal fun ChatListContent(
 
 /** Large at rest, condensed once the list moves under it — one title, two sizes, animated between. */
 @Composable
-private fun HeaderTitle(collapse: Float, conversationCount: Int) {
+private fun HeaderTitle(
+    collapse: Float,
+    conversationCount: Int,
+    onSettingsClick: () -> Unit,
+    onProfileClick: () -> Unit
+) {
     val palette = LocalLiquid.current
+    val primary = MaterialTheme.colorScheme.primary
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = 20.dp, end = 20.dp, top = 14.dp - (6 * collapse).dp, bottom = 2.dp),
+            .padding(start = 14.dp, end = 20.dp, top = 14.dp - (6 * collapse).dp, bottom = 2.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(modifier = Modifier.weight(1f)) {
@@ -289,19 +287,38 @@ private fun HeaderTitle(collapse: Float, conversationCount: Int) {
             )
             // The subtitle is the first thing to go — it is context, and
             // context is what you stop needing once you are reading.
+            //
+            // It also absorbed the old "مشفّر" chip, which sat beside a line
+            // already ending in the word مشفّرة: a badge repeating the
+            // sentence next to it. The lock is now a glyph on the sentence
+            // itself, and the space that freed is where the two icons
+            // opposite are standing.
             if (collapse < 0.98f) {
-                Text(
-                    text = conversationSubtitle(conversationCount),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = palette.muted,
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.graphicsLayer {
                         alpha = 1f - collapse
                         translationY = -collapse * 6.dp.toPx()
                     }
-                )
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Lock,
+                        contentDescription = null,
+                        modifier = Modifier.size(11.dp),
+                        tint = primary
+                    )
+                    Spacer(Modifier.width(5.dp))
+                    Text(
+                        text = conversationSubtitle(conversationCount),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = palette.muted
+                    )
+                }
             }
         }
-        LockChip()
+        HeaderAction(Icons.Default.Person, "ملفي", onProfileClick)
+        Spacer(Modifier.width(2.dp))
+        HeaderAction(Icons.Default.Settings, "الإعدادات", onSettingsClick)
     }
 }
 
@@ -321,27 +338,81 @@ private fun conversationSubtitle(count: Int): String = when {
     else -> "$count محادثة مشفّرة"
 }
 
-/** A standing reminder of the one property this whole app exists for. */
+/** A header icon with a real 44dp touch target, whatever the glyph inside measures. */
 @Composable
-private fun LockChip() {
-    val primary = MaterialTheme.colorScheme.primary
-    Row(
+private fun HeaderAction(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    onClick: () -> Unit
+) {
+    val palette = LocalLiquid.current
+    Box(
         modifier = Modifier
-            .clip(RoundedCornerShape(14.dp))
-            .background(primary.copy(alpha = 0.14f))
-            .border(1.dp, primary.copy(alpha = 0.25f), RoundedCornerShape(14.dp))
-            .padding(horizontal = 10.dp, vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .size(44.dp)
+            .clip(CircleShape)
+            .clickableNoRipple(onClick),
+        contentAlignment = Alignment.Center
     ) {
         Icon(
-            imageVector = Icons.Default.Lock,
-            contentDescription = null,
-            modifier = Modifier.size(13.dp),
-            tint = primary
+            imageVector = icon,
+            contentDescription = label,
+            modifier = Modifier.size(21.dp),
+            tint = palette.onSurface.copy(alpha = 0.75f)
         )
-        Spacer(Modifier.width(5.dp))
-        Text("مشفّر", style = MaterialTheme.typography.labelSmall, color = primary, fontWeight = FontWeight.Medium)
     }
+}
+
+/**
+ * Pending introductions, somewhere the count can actually be acted on.
+ *
+ * It used to be a red dot on the bar entry that opened the *new chat* screen
+ * — one level away from the requests it was counting, and silent about what
+ * it meant. A banner that names the thing, goes straight to it, and vanishes
+ * entirely at zero says more and costs nothing when there is nothing to say.
+ */
+@Composable
+private fun PendingRequestsBanner(count: Int, onClick: () -> Unit) {
+    val primary = MaterialTheme.colorScheme.primary
+    AnimatedVisibility(visible = count > 0, enter = fadeIn(), exit = fadeOut()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 4.dp)
+                .liquidSurface(shape = RoundedCornerShape(14.dp), raised = true, elevation = 8.dp)
+                .clickableNoRipple(onClick)
+                .padding(horizontal = 13.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Default.MarkEmailUnread,
+                contentDescription = null,
+                modifier = Modifier.size(16.dp),
+                tint = primary
+            )
+            Spacer(Modifier.width(9.dp))
+            Text(
+                text = pendingRequestsLabel(count),
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Medium,
+                color = primary,
+                modifier = Modifier.weight(1f)
+            )
+            Icon(
+                imageVector = Icons.Default.ChevronLeft,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp),
+                tint = primary.copy(alpha = 0.7f)
+            )
+        }
+    }
+}
+
+/** Same counting rules as [conversationSubtitle] — Arabic does not take a bare number and a singular noun. */
+private fun pendingRequestsLabel(count: Int): String = when {
+    count == 1 -> "طلب تواصل واحد بانتظارك"
+    count == 2 -> "طلبا تواصل بانتظارك"
+    count <= 10 -> "$count طلبات تواصل بانتظارك"
+    else -> "$count طلب تواصل بانتظارك"
 }
 
 /**

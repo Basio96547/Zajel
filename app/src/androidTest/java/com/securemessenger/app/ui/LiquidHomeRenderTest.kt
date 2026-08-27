@@ -3,25 +3,24 @@ package com.securemessenger.app.ui
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ChatBubble
-import androidx.compose.material.icons.filled.Group
 import androidx.compose.material3.Text
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onFirst
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.securemessenger.app.ui.liquid.AuroraBackdrop
-import com.securemessenger.app.ui.liquid.LiquidNavBar
-import com.securemessenger.app.ui.liquid.LiquidNavItem
 import com.securemessenger.app.ui.liquid.LiquidTheme
 import com.securemessenger.app.ui.liquid.liquidGlow
 import com.securemessenger.app.ui.liquid.liquidSurface
+import com.securemessenger.app.ui.screens.chat.ChatListContent
 import com.securemessenger.app.ui.screens.chat.ChatListItem
 import com.securemessenger.app.ui.theme.MessengerTheme
 import com.securemessenger.app.ui.viewmodel.ContactUiModel
@@ -169,29 +168,61 @@ class LiquidHomeRenderTest {
     }
 
     @Test
-    fun theNavBarRendersEveryTabAndReportsSelection() {
-        var selected = -1
+    fun everyDestinationTheBottomBarUsedToOwnIsStillReachable() {
+        // The bottom bar is gone: three of its four entries navigated away
+        // rather than switching tabs, and one of those duplicated the
+        // floating button exactly. Its destinations did not go with it, and
+        // this is the test that says so — settings and profile moved into the
+        // header, pending requests got a banner that opens the screen the
+        // badge was actually counting.
+        var opened: String? = null
         compose.setContent {
             MessengerTheme(darkTheme = true) {
-                LiquidTheme(dark = true) {
-                    LiquidNavBar(
-                        items = listOf(
-                            LiquidNavItem("المحادثات", Icons.Default.ChatBubble),
-                            LiquidNavItem("جهات الاتصال", Icons.Default.Group, badgeCount = 2)
-                        ),
-                        selectedIndex = 0,
-                        onSelect = { selected = it }
-                    )
-                }
+                ChatListContent(
+                    contacts = listOf(unreadContact),
+                    isLoading = false,
+                    pendingRequestCount = 2,
+                    onConversationClick = {},
+                    onTogglePin = {},
+                    onSettingsClick = { opened = "settings" },
+                    onNewChatClick = { opened = "newChat" },
+                    onProfileClick = { opened = "profile" },
+                    onConnectionRequestsClick = { opened = "requests" }
+                )
             }
         }
 
-        compose.onNodeWithText("المحادثات").assertIsDisplayed()
-        compose.onNodeWithText("جهات الاتصال").assertIsDisplayed()
-
-        compose.onNodeWithText("جهات الاتصال").performClick()
+        compose.onNodeWithContentDescription("الإعدادات").performClick()
         compose.waitForIdle()
+        assertTrue("settings icon opened $opened", opened == "settings")
 
-        assertTrue("nav bar reported $selected instead of tab 1", selected == 1)
+        compose.onNodeWithContentDescription("ملفي").performClick()
+        compose.waitForIdle()
+        assertTrue("profile icon opened $opened", opened == "profile")
+
+        compose.onNodeWithText("طلبا تواصل بانتظارك").performClick()
+        compose.waitForIdle()
+        assertTrue("requests banner opened $opened", opened == "requests")
+    }
+
+    @Test
+    fun thePendingRequestsBannerIsAbsentWhenThereAreNone() {
+        compose.setContent {
+            MessengerTheme(darkTheme = true) {
+                ChatListContent(
+                    contacts = listOf(unreadContact),
+                    isLoading = false,
+                    pendingRequestCount = 0,
+                    onConversationClick = {},
+                    onTogglePin = {},
+                    onSettingsClick = {},
+                    onNewChatClick = {},
+                    onProfileClick = {},
+                    onConnectionRequestsClick = {}
+                )
+            }
+        }
+
+        compose.onAllNodesWithText("بانتظارك", substring = true).assertCountEquals(0)
     }
 }
