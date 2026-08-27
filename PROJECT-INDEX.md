@@ -5,7 +5,7 @@
 ابحث هنا أولاً بـ Grep قبل فتح أي ملف مصدر كامل. سطر `يُستخدم في:` تحت أي class/object/interface = تطابق استيراد FQN فعلي، أفضل-جهد وليس مضموناً 100%.
 ⚠ بجانب اسم ملف = يتجاوز 300 سطر.
 
-**128** ملف مفحوص، **2392** تعريفاً.
+**129** ملف مفحوص، **2403** تعريفاً.
 
 
 ## app/
@@ -164,6 +164,15 @@ data class OldContact ( @PrimaryKey val id: String, val publicKey: ByteArray, va
   - L127 `@Test fun testBackupDisabled ()`
   - L149 `@Test fun testCleartextTrafficIntentionallyAllowedForLocalP2P ()` — Cleartext IS intentionally allowed — there is no external server at
   - L165 `@Test fun testSecureRandomGeneration ()`
+
+### app/src/androidTest/java/com/securemessenger/app/ui/HomeScreenshotTest.kt (108 سطر)  [package com.securemessenger.app.ui]
+- L36 `@RunWith(AndroidJUnit4::class) class HomeScreenshotTest` — Photographs the home screen so a human can judge it.
+  - L39 `val compose`
+  - L41 `private val sample`
+  - L70 `@Test fun captureHomeDark ()`
+  - L73 `@Test fun captureHomeLight ()`
+  - L76 `@Test fun captureHomeEmpty ()`
+  - L78 `private fun capture (name: String, dark: Boolean, contacts: List<ContactUiModel>)`
 
 ### app/src/androidTest/java/com/securemessenger/app/ui/LiquidHomeRenderTest.kt (198 سطر)  [package com.securemessenger.app.ui]
 - L52 `@RunWith(AndroidJUnit4::class) class LiquidHomeRenderTest` — The redesigned home screen, rendered on a real device.
@@ -1391,39 +1400,44 @@ private fun ChatListItemDarkPreview ()`
 @Composable
 private fun ChatListItemLightPreview ()`
 
-### app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatListScreen.kt (530 سطر) ⚠  [package com.securemessenger.app.ui.screens.chat]
-- L73 `@OptIn(ExperimentalFoundationApi::class)
-@Composable fun ChatListScreen ( onConversationClick: (String) -> Unit, onSettingsClick: () -> Unit, onNewChatClick: () -> Unit, onProfileClick: () -> Unit = {}, viewModel: ChatListViewModel = viewModel(), connectionRequestsViewModel: ConnectionRequestsViewModel = viewModel() )` — The home screen, rebuilt on the liquid-glass layer in
-- L235 `@Composable
+### app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatListScreen.kt (563 سطر) ⚠  [package com.securemessenger.app.ui.screens.chat]
+- L72 `@Composable fun ChatListScreen ( onConversationClick: (String) -> Unit, onSettingsClick: () -> Unit, onNewChatClick: () -> Unit, onProfileClick: () -> Unit = {}, viewModel: ChatListViewModel = viewModel(), connectionRequestsViewModel: ConnectionRequestsViewModel = viewModel() )` — The home screen, rebuilt on the liquid-glass layer in
+  - L80 `val contacts`
+  - L81 `val isLoading`
+  - L82 `val incomingRequests`
+- L108 `@OptIn(ExperimentalFoundationApi::class)
+@Composable
+internal fun ChatListContent ( contacts: List<ContactUiModel>, isLoading: Boolean, pendingRequestCount: Int, onConversationClick: (String) -> Unit, onTogglePin: (String) -> Unit, onSettingsClick: () -> Unit, onNewChatClick: () -> Unit, onProfileClick: () -> Unit, modifier: Modifier = Modifier )`
+- L268 `@Composable
 private fun HeaderTitle (collapse: Float, conversationCount: Int)`
-  - L236 `val palette`
-- L270 `@Composable
+  - L269 `val palette`
+- L303 `@Composable
 private fun LockChip ()`
-  - L271 `val primary`
-- L293 `@Composable
+  - L304 `val primary`
+- L326 `@Composable
 private fun SearchField ( value: String, onValueChange: (String) -> Unit, modifier: Modifier = Modifier )`
-  - L298 `val palette`
-  - L299 `val primary`
-  - L300 `val interaction`
-  - L301 `val focused`
-- L355 `@Composable
+  - L331 `val palette`
+  - L332 `val primary`
+  - L333 `val interaction`
+  - L334 `val focused`
+- L388 `@Composable
 private fun NewChatButton (collapsed: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier)`
-  - L356 `val primary`
-- L387 `@Composable
-private fun EmptyState (onNewChatClick: () -> Unit, topPadding: androidx.compose.ui.unit.Dp)`
-  - L388 `val palette`
   - L389 `val primary`
-  - L390 `val breath`
-  - L391 `val scale`
-- L455 `@Composable
+- L420 `@Composable
+private fun EmptyState (onNewChatClick: () -> Unit, topPadding: androidx.compose.ui.unit.Dp)`
+  - L421 `val palette`
+  - L422 `val primary`
+  - L423 `val breath`
+  - L424 `val scale`
+- L488 `@Composable
 private fun NoResults (query: String, topPadding: androidx.compose.ui.unit.Dp)`
-  - L456 `val palette`
-- L482 `@Composable
+  - L489 `val palette`
+- L515 `@Composable
 private fun LoadingList (topPadding: androidx.compose.ui.unit.Dp)`
-- L495 `@Composable
+- L528 `@Composable
 private fun ChatListItemSkeleton ()`
-- L518 `private fun Modifier (onClick: () -> Unit): Modifier`
-  - L519 `val interaction`
+- L551 `private fun Modifier (onClick: () -> Unit): Modifier`
+  - L552 `val interaction`
 
 ### app/src/main/java/com/securemessenger/app/ui/screens/chat/ComposeStrips.kt (126 سطر)  [package com.securemessenger.app.ui.screens.chat]
 - L28 `@Composable
@@ -1961,7 +1975,7 @@ private fun StatusPill ( icon: androidx.compose.ui.graphics.vector.ImageVector, 
 
 ### app/src/main/java/com/securemessenger/app/ui/viewmodel/ChatListViewModel.kt (120 سطر)  [package com.securemessenger.app.ui.viewmodel]
 - L19 `data class ContactUiModel ( val id: String, val displayName: String, val isVerified: Boolean, val lastMessage: String, val lastTimestamp: Long, val unreadCount: Int, val avatarBytes: ByteArray? = null, val lastIsMine: Boolean = false, val lastIsRead: Boolean = false, val lastIsSelfDestruct: Boolean = false, val pinnedAt: Long? = null )`
-  يُستخدم في: app/src/androidTest/java/com/securemessenger/app/ui/LiquidHomeRenderTest.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatListItem.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatListScreen.kt
+  يُستخدم في: app/src/androidTest/java/com/securemessenger/app/ui/HomeScreenshotTest.kt, app/src/androidTest/java/com/securemessenger/app/ui/LiquidHomeRenderTest.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatListItem.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatListScreen.kt
 - L20 `val id : String,`
 - L21 `val displayName : String,`
 - L22 `val isVerified : Boolean,`
@@ -1974,7 +1988,7 @@ private fun StatusPill ( icon: androidx.compose.ui.graphics.vector.ImageVector, 
 - L29 `val lastIsSelfDestruct : Boolean`
 - L30 `val pinnedAt : Long?`
 - L33 `class ChatListViewModel ( private val repository: SecureRepository = SecureMessengerApp.instance.repository ) : ViewModel()`
-  يُستخدم في: app/src/androidTest/java/com/securemessenger/app/ui/LiquidHomeRenderTest.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatListItem.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatListScreen.kt
+  يُستخدم في: app/src/androidTest/java/com/securemessenger/app/ui/HomeScreenshotTest.kt, app/src/androidTest/java/com/securemessenger/app/ui/LiquidHomeRenderTest.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatListItem.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatListScreen.kt
 - L34 `private val repository : SecureRepository`
   - L37 `private val _isLoading`
   - L39 `val isLoading : StateFlow<Boolean>` — True only until the first contacts/messages snapshot arrives — drives the list-skeleton.

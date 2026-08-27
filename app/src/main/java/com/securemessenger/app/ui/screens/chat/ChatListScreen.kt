@@ -68,7 +68,6 @@ import com.securemessenger.app.ui.viewmodel.ContactUiModel
  * frosts over as content slides beneath it, and the navigation and action
  * controls floating highest with the deepest shadows.
  */
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ChatListScreen(
     onConversationClick: (String) -> Unit,
@@ -78,13 +77,47 @@ fun ChatListScreen(
     viewModel: ChatListViewModel = viewModel(),
     connectionRequestsViewModel: ConnectionRequestsViewModel = viewModel()
 ) {
-    LiquidTheme {
-        val palette = LocalLiquid.current
-        val density = LocalDensity.current
+    val contacts by viewModel.contacts.collectAsState()
+    val isLoading by viewModel.isLoading.collectAsState()
+    val incomingRequests by connectionRequestsViewModel.incomingRequests.collectAsState()
 
-        val contacts by viewModel.contacts.collectAsState()
-        val isLoading by viewModel.isLoading.collectAsState()
-        val incomingRequests by connectionRequestsViewModel.incomingRequests.collectAsState()
+    ChatListContent(
+        contacts = contacts,
+        isLoading = isLoading,
+        pendingRequestCount = incomingRequests.size,
+        onConversationClick = onConversationClick,
+        onTogglePin = viewModel::togglePin,
+        onSettingsClick = onSettingsClick,
+        onNewChatClick = onNewChatClick,
+        onProfileClick = onProfileClick
+    )
+}
+
+/**
+ * The screen itself, given plain data instead of view models.
+ *
+ * Split out for a concrete reason rather than tidiness: with the view models
+ * wired in, this screen could only ever be rendered by a device that had
+ * finished setup and unlocked its database, which made it impossible to
+ * photograph, preview, or test against a populated list. Taking a
+ * `List<ContactUiModel>` makes all three trivial and costs the caller four
+ * lines.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+internal fun ChatListContent(
+    contacts: List<ContactUiModel>,
+    isLoading: Boolean,
+    pendingRequestCount: Int,
+    onConversationClick: (String) -> Unit,
+    onTogglePin: (String) -> Unit,
+    onSettingsClick: () -> Unit,
+    onNewChatClick: () -> Unit,
+    onProfileClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    LiquidTheme {
+        val density = LocalDensity.current
 
         var searchQuery by remember { mutableStateOf("") }
         val visibleContacts = remember(contacts, searchQuery) {
@@ -117,16 +150,16 @@ fun ChatListScreen(
         // "جهات الاتصال" doubles as the entry point to pending connection
         // requests found via username search — badged so a waiting request is
         // never silently missed.
-        val navItems = remember(incomingRequests.size) {
+        val navItems = remember(pendingRequestCount) {
             listOf(
                 LiquidNavItem("المحادثات", Icons.Default.ChatBubble),
-                LiquidNavItem("جهات الاتصال", Icons.Default.Group, badgeCount = incomingRequests.size),
+                LiquidNavItem("جهات الاتصال", Icons.Default.Group, badgeCount = pendingRequestCount),
                 LiquidNavItem("الإعدادات", Icons.Default.Settings),
                 LiquidNavItem("ملفي", Icons.Default.Person)
             )
         }
 
-        Box(modifier = Modifier.fillMaxSize()) {
+        Box(modifier = modifier.fillMaxSize()) {
             AuroraBackdrop(
                 parallaxPx = {
                     // Approximate, and that is fine: this drives a parallax
@@ -162,7 +195,7 @@ fun ChatListScreen(
                             ChatListItem(
                                 contact = contact,
                                 onClick = { onConversationClick(contact.id) },
-                                onTogglePin = { viewModel.togglePin(contact.id) },
+                                onTogglePin = { onTogglePin(contact.id) },
                                 entranceDelayMillis = delay
                             )
                         }
