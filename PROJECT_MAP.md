@@ -219,6 +219,7 @@ gradlew :app:connectedDebugAndroidTest "-Pandroid.testInstrumentationRunnerArgum
 | `directory` (`npm test`) | **20/20** | ✅ شُغِّلت فعلاً 2026-08-27 — داخل workerd على D1 محلية، بلا نشر |
 | `relay` (`npm test`) | **15/15** | ✅ شُغِّلت فعلاً 2026-08-27 — كائنات دائمة حقيقية، بلا نشر |
 | `:desktop:test` | **15/15** | ✅ شُغِّلت فعلاً 2026-08-27 — `DirectoryProtocolTest` ١٠ · `LoopbackMessagingTest` ٤ · `ScopeReuseTest` ١. كانت 3/3 في 2026-07-31 قبل أن يُضاف الدليل |
+| اختبارات `:app` على الجهاز | **65/65** على SM-G991Q / Android 15 | ✅ شُغِّلت فعلاً 2026-08-27 عبر `am instrument` لا عبر مهمة Gradle (التي تُزيل التثبيت — انظر تحذير README). باستثناء `AckAuthenticationTest`. أمسكت هذه الجولة **ثلاثة عيوب** في `e24cdc1` لم يرها التصريف: انهيار WorkManager في العملية المعزولة، واختبار ترحيل يطلب مسار 10→11 من قاعدة صارت 12، وحارس عملية يطابق بـ`endsWith` اسماً يُلحق النظامُ به صنف الخدمة |
 | `:app:testDebugUnitTest` (JVM، بلا جهاز) | **8/8** | ✅ شُغِّلت فعلاً 2026-07-31 |
 | `:app:connectedDebugAndroidTest` | **50/50** على SM-S938B / Android 16 | ✅ شُغِّلت فعلاً 2026-07-31 **بعد** حارس قناة العودة وإصلاح رمز الاقتران. باستثناء `AckAuthenticationTest` |
 | `:hisn:connectedDebugAndroidTest` | **24/24** على SM-S938B / Android 16 | ✅ شُغِّلت فعلاً 2026-07-31 — وكانت **23/24** حتى أُصلح اختبار يفترض ملكية سجلّ تدقيق فارغ (فحص حقيقي يسجّل مدخلة عند تثبيت الاختبار نفسه) |

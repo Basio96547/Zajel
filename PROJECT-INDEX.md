@@ -5,7 +5,7 @@
 ابحث هنا أولاً بـ Grep قبل فتح أي ملف مصدر كامل. سطر `يُستخدم في:` تحت أي class/object/interface = تطابق استيراد FQN فعلي، أفضل-جهد وليس مضموناً 100%.
 ⚠ بجانب اسم ملف = يتجاوز 300 سطر.
 
-**126** ملف مفحوص، **2319** تعريفاً.
+**128** ملف مفحوص، **2392** تعريفاً.
 
 
 ## app/
@@ -40,7 +40,7 @@
   - L16 `@Test fun x3dh_initiatorAndResponderDeriveSameRootKey ()`
   - L44 `@Test fun signalProtocol_encryptDecryptRoundtrip ()`
 
-### app/src/androidTest/java/com/securemessenger/app/data/local/SecureDatabaseMigrationTest.kt (239 سطر)  [package com.securemessenger.app.data.local]
+### app/src/androidTest/java/com/securemessenger/app/data/local/SecureDatabaseMigrationTest.kt (247 سطر)  [package com.securemessenger.app.data.local]
 - L36 `@Entity(tableName =           )
 data class OldContact ( @PrimaryKey val id: String, val publicKey: ByteArray, val signingPublicKey: ByteArray? = null, val displayNameEncrypted: ByteArray, val avatarHash: String? = null, val isVerified: Boolean = false, val verificationData: ByteArray? = null, val addedAt: Long = System.currentTimeMillis(), val lastSeenAt: Long? = null, val isBlocked: Boolean = false, val avatarEncrypted: ByteArray? = null, val nicknameEncrypted: ByteArray? = null, val isMuted: Boolean = false, val relaySendSecretEncrypted: ByteArray? = null, val relayRecvSecretEncrypted: ByteArray? = null )`
 - L37 `@PrimaryKey val id : String,`
@@ -66,8 +66,8 @@ data class OldContact ( @PrimaryKey val id: String, val publicKey: ByteArray, va
 - L94 `class SecureDatabaseMigrationTest` — Proves MIGRATION_10_11 (contacts.pinnedAt) preserves an existing contact
   - L96 `private val passphrase`
   - L99 `@Test fun migration10to11_preservesExistingContactAndDefaultsPinnedAtToNull ()`
-  - L162 `abstract class V11SchemaDatabase : RoomDatabase()`
-  - L173 `@Test fun migration11to12_preservesExistingContactAndCreatesConnectionRequestTables ()` — Proves MIGRATION_11_12 (the two connection-request tables) preserves
+  - L170 `abstract class V11SchemaDatabase : RoomDatabase()`
+  - L181 `@Test fun migration11to12_preservesExistingContactAndCreatesConnectionRequestTables ()` — Proves MIGRATION_11_12 (the two connection-request tables) preserves
 
 ### app/src/androidTest/java/com/securemessenger/app/media/MediaSandboxTest.kt (167 سطر)  [package com.securemessenger.app.media]
 - L31 `@RunWith(AndroidJUnit4::class) class MediaSandboxTest` — The tests ADR-0001 said could not be written without a device.
@@ -165,6 +165,18 @@ data class OldContact ( @PrimaryKey val id: String, val publicKey: ByteArray, va
   - L149 `@Test fun testCleartextTrafficIntentionallyAllowedForLocalP2P ()` — Cleartext IS intentionally allowed — there is no external server at
   - L165 `@Test fun testSecureRandomGeneration ()`
 
+### app/src/androidTest/java/com/securemessenger/app/ui/LiquidHomeRenderTest.kt (198 سطر)  [package com.securemessenger.app.ui]
+- L52 `@RunWith(AndroidJUnit4::class) class LiquidHomeRenderTest` — The redesigned home screen, rendered on a real device.
+  - L55 `val compose`
+  - L57 `private val unreadContact`
+  - L66 `private val pinnedContact`
+  - L79 `@Test fun chatRowRendersItsNamePreviewAndUnreadCount_inDark ()`
+  - L94 `@Test fun chatRowRenders_inLight ()`
+  - L108 `@Test fun aRowStillReportsTheClickTheScreenExistsToDeliver ()`
+  - L128 `@Test fun theEntranceAnimationLeavesTheRowVisible ()`
+  - L145 `@Test fun theAuroraAndItsSurfacesDrawWithoutFailing ()`
+  - L172 `@Test fun theNavBarRendersEveryTabAndReportsSelection ()`
+
 ### app/src/androidTest/java/com/securemessenger/app/ui/screens/chat/QrImageTest.kt (189 سطر)  [package com.securemessenger.app.ui.screens.chat]
 - L20 `class QrImageTest` — Covers pairing by picture rather than by camera: the code has to survive
   - L22 `private fun samplePayload (withSecret: Boolean = true, asciiName: Boolean = false): String`
@@ -176,22 +188,23 @@ data class OldContact ( @PrimaryKey val id: String, val publicKey: ByteArray, va
   - L163 `@Test fun localOnlyShareDropsTheRelaySecretAndKeepsTheRest ()`
   - L182 `@Test fun aPictureWithNoCodeInItReturnsNull ()`
 
-### app/src/main/java/com/securemessenger/app/SecureMessengerApp.kt (249 سطر)  [package com.securemessenger.app]
-- L25 `class SecureMessengerApp : Application()`
+### app/src/main/java/com/securemessenger/app/SecureMessengerApp.kt (313 سطر) ⚠  [package com.securemessenger.app]
+- L27 `class SecureMessengerApp : Application()`
   يُستخدم في: app/src/main/java/com/securemessenger/app/service/MessengerService.kt, app/src/main/java/com/securemessenger/app/ui/navigation/AppNavigation.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatCommon.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ContactDetailScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/NewChatScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/UsernameSearchScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/settings/ProfileScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/settings/SettingsScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/setup/SetupScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/verification/KeyVerificationScreen.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ChatListViewModel.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ConnectionRequestsViewModel.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ConversationViewModel.kt
-  - L27 `val applicationScope`
-  - L29 `val repository`
-  - L36 `private val _messagingClientFlow`
-  - L37 `val messagingClientFlow : StateFlow<SecureMessagingClient?>`
-  - L39 `var messagingClient : SecureMessagingClient?`
-  - L49 `@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class) val connectionState : StateFlow<ConnectionState>`
-  - L54 `suspend fun awaitMessagingClient (timeoutMs: Long = 10_000): SecureMessagingClient?`
-  - L57 `private var incomingJob : Job?`
-  - L59 `suspend fun initializeMessagingClient ()`
-  - L153 `private suspend fun announceArrival (senderId: String, previewText: String?)`
-  - L174 `fun stopMessagingClient ()` — Stops this device's own local relay + network discovery entirely — the
-  - L188 `override fun onCreate ()`
-  - L238 `override fun attachBaseContext (base: Context)`
+  - L29 `val applicationScope`
+  - L31 `val repository`
+  - L38 `private val _messagingClientFlow`
+  - L39 `val messagingClientFlow : StateFlow<SecureMessagingClient?>`
+  - L41 `var messagingClient : SecureMessagingClient?`
+  - L51 `@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class) val connectionState : StateFlow<ConnectionState>`
+  - L56 `suspend fun awaitMessagingClient (timeoutMs: Long = 10_000): SecureMessagingClient?`
+  - L59 `private var incomingJob : Job?`
+  - L61 `suspend fun initializeMessagingClient ()`
+  - L155 `private suspend fun announceArrival (senderId: String, previewText: String?)`
+  - L176 `fun stopMessagingClient ()` — Stops this device's own local relay + network discovery entirely — the
+  - L190 `override fun onCreate ()`
+  - L264 `override fun attachBaseContext (base: Context)`
+  - L278 `private fun isMediaSandboxProcess (): Boolean`
 
 ### app/src/main/java/com/securemessenger/app/crypto/AndroidKeyStoreManager.kt (135 سطر)  [package com.securemessenger.app.crypto]
 - L16 `object AndroidKeyStoreManager` — AndroidKeyStoreManager - manages keys stored in Android's secure keystore.
@@ -1135,7 +1148,7 @@ data class OutgoingConnectionRequest ( @PrimaryKey val recipientIdentityPublicKe
 - L116 `@Composable fun GlassTopBar ( title: String, modifier: Modifier = Modifier, onBack: (() -> Unit)? = null, actions: (@Composable RowScope.() -> Unit)? = null )` — Plain-text convenience overload of [GlassTopBar].
   - L122 `val mc`
 - L136 `data class GlassNavItem ( val label: String, val icon: ImageVector, val selectedIcon: ImageVector = icon, /** e.g. pending connection-request count on "جهات الاتصال" — 0 shows no badge at all. */ val badgeCount: Int = 0 )`
-  يُستخدم في: app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatListScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/settings/SettingsScreen.kt
+  يُستخدم في: app/src/main/java/com/securemessenger/app/ui/screens/settings/SettingsScreen.kt
 - L137 `val label : String,`
 - L138 `val icon : ImageVector,`
 - L139 `val selectedIcon : ImageVector`
@@ -1174,6 +1187,47 @@ data class OutgoingConnectionRequest ( @PrimaryKey val recipientIdentityPublicKe
   - L137 `val scale`
 - L146 `@Composable
 private fun LaunchedEffectPressState (source: MutableInteractionSource, onPressed: (Boolean) -> Unit)`
+
+### app/src/main/java/com/securemessenger/app/ui/liquid/LiquidGlass.kt (415 سطر) ⚠  [package com.securemessenger.app.ui.liquid]
+- L95 `@Immutable
+data class LiquidPalette ( /** The page floor the aurora is painted onto. */ val floor: Color, /** Three drifting light sources. Order is back-to-front. */ val blobs: List<Color>, val surface: Color, val surfaceRaised: Color, /** Top-edge highlight painted over a surface's fill. */ val sheen: Color, val edgeHigh: Color, val edgeLow: Color, val onSurface: Color, val muted: Color, val shadow: Color, )`
+  يُستخدم في: app/src/androidTest/java/com/securemessenger/app/ui/LiquidHomeRenderTest.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatListScreen.kt
+- L97 `val floor : Color,` — The page floor the aurora is painted onto.
+- L99 `val blobs : List<Color>,` — Three drifting light sources. Order is back-to-front.
+- L100 `val surface : Color,`
+- L101 `val surfaceRaised : Color,`
+- L103 `val sheen : Color,` — Top-edge highlight painted over a surface's fill.
+- L104 `val edgeHigh : Color,`
+- L105 `val edgeLow : Color,`
+- L106 `val onSurface : Color,`
+- L107 `val muted : Color,`
+- L108 `val shadow : Color,`
+- L111 `val LocalLiquid`
+- L122 `@Composable fun rememberLiquidPalette (dark: Boolean = isSystemInDarkTheme()): LiquidPalette` — Derives the palette from the app's own Material scheme rather than
+  - L123 `val primary`
+  - L124 `val secondary`
+- L165 `@Composable fun LiquidTheme (dark: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit)`
+- L181 `@Composable fun AuroraBackdrop (modifier: Modifier = Modifier, parallaxPx: () -> Float = { 0f })` — The drifting backdrop.
+  - L182 `val palette`
+  - L183 `val drift`
+  - L184 `val a`
+  - L189 `val b`
+  - L194 `val c`
+- L223 `private fun DrawScope (color: Color, center: Offset, radius: Float)`
+- L242 `fun Modifier ( shape: Shape = RoundedCornerShape(22.dp), raised: Boolean = false, elevation: Dp = 12.dp, fill: Color? = null, ): Modifier` — One pane of glass: shadow underneath, translucent fill, sheen down from the
+  - L248 `val palette`
+- L274 `fun Modifier (color: Color, radius: Dp = 18.dp, alpha: Float = 0.45f): Modifier` — A soft coloured halo cast *outside* a shape — used for focus and for unread counts.
+  - L275 `val spread`
+- L292 `@Composable fun rememberPressScale ( source: MutableInteractionSource, pressedScale: Float = 0.972f ): State<Float>` — Press feedback as a spring rather than a ripple. Glass does not ripple; it
+  - L296 `val pressed`
+- L307 `data class LiquidNavItem ( val label: String, val icon: ImageVector, /** 0 shows no badge at all. */ val badgeCount: Int = 0, )`
+  يُستخدم في: app/src/androidTest/java/com/securemessenger/app/ui/LiquidHomeRenderTest.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatListScreen.kt
+- L308 `val label : String,`
+- L309 `val icon : ImageVector,`
+- L311 `val badgeCount : Int` — 0 shows no badge at all.
+- L325 `@Composable fun LiquidNavBar ( items: List<LiquidNavItem>, selectedIndex: Int, onSelect: (Int) -> Unit, modifier: Modifier = Modifier, )` — The floating navigation pill.
+  - L331 `val palette`
+  - L332 `val primary`
 
 ### app/src/main/java/com/securemessenger/app/ui/navigation/AppNavigation.kt (494 سطر) ⚠  [package com.securemessenger.app.ui.navigation]
 - L45 `sealed class Screen (val route: String)`
@@ -1303,39 +1357,73 @@ internal fun EncryptedBanner ()`
 - L235 `@Composable
 internal fun DateSeparator (label: String)`
 
-### app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatListItem.kt (206 سطر)  [package com.securemessenger.app.ui.screens.chat]
-- L27 `private fun formatChatTime (timestamp: Long): String`
-  - L29 `val now`
-  - L30 `val then`
-  - L31 `val sameDay`
-  - L33 `val pattern`
-- L39 `@OptIn(ExperimentalFoundationApi::class)
-@Composable fun ChatListItem ( contact: ContactUiModel, onClick: () -> Unit, onTogglePin: () -> Unit = {} )`
-  - L44 `val mc`
-  - L45 `var showMenu`
-- L169 `@Preview(name =                        , showBackground = true)
+### app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatListItem.kt (332 سطر) ⚠  [package com.securemessenger.app.ui.screens.chat]
+- L52 `private fun formatChatTime (timestamp: Long): String`
+  - L54 `val now`
+  - L55 `val then`
+  - L56 `val sameYear`
+  - L57 `val dayDelta`
+  - L62 `val pattern`
+- L81 `@OptIn(ExperimentalFoundationApi::class)
+@Composable fun ChatListItem ( contact: ContactUiModel, onClick: () -> Unit, onTogglePin: () -> Unit = {}, entranceDelayMillis: Int = -1, )` — One conversation, as a pane of glass.
+  - L87 `val palette`
+  - L88 `val haptics`
+  - L89 `val primary`
+  - L90 `var showMenu`
+  - L92 `val interaction`
+  - L93 `val pressScale`
+  - L95 `val entrance`
+  - L103 `val unread`
+  - L104 `val pinned`
+- L232 `@Composable
+private fun AvatarWithRing (contact: ContactUiModel, unread: Boolean)`
+  - L233 `val palette`
+  - L234 `val primary`
+- L261 `@Composable
+private fun UnreadPill (count: Int)`
+  - L262 `val primary`
+  - L263 `val pulse`
+  - L264 `val glow`
+- L291 `@Preview(name =                        , showBackground = true, backgroundColor = 0xFF06080D)
 @Composable
 private fun ChatListItemDarkPreview ()`
-- L193 `@Preview(name =                         , showBackground = true)
+- L317 `@Preview(name =                         , showBackground = true, backgroundColor = 0xFFEDF1F8)
 @Composable
 private fun ChatListItemLightPreview ()`
 
-### app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatListScreen.kt (258 سطر)  [package com.securemessenger.app.ui.screens.chat]
-- L37 `@OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
-@Composable fun ChatListScreen ( onConversationClick: (String) -> Unit, onSettingsClick: () -> Unit, onNewChatClick: () -> Unit, onProfileClick: () -> Unit = {}, viewModel: ChatListViewModel = viewModel(), connectionRequestsViewModel: ConnectionRequestsViewModel = viewModel() )`
-  - L45 `val contacts`
-  - L46 `val isLoading`
-  - L47 `val incomingRequests`
-  - L48 `val mc`
-  - L50 `var searchQuery`
-  - L51 `val visibleContacts`
-  - L60 `val navItems`
-- L201 `@Composable
-private fun SearchRow ( value: String, onValueChange: (String) -> Unit, textColor: androidx.compose.ui.graphics.Color )`
-  - L206 `val mc`
-- L236 `@Composable
+### app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatListScreen.kt (530 سطر) ⚠  [package com.securemessenger.app.ui.screens.chat]
+- L73 `@OptIn(ExperimentalFoundationApi::class)
+@Composable fun ChatListScreen ( onConversationClick: (String) -> Unit, onSettingsClick: () -> Unit, onNewChatClick: () -> Unit, onProfileClick: () -> Unit = {}, viewModel: ChatListViewModel = viewModel(), connectionRequestsViewModel: ConnectionRequestsViewModel = viewModel() )` — The home screen, rebuilt on the liquid-glass layer in
+- L235 `@Composable
+private fun HeaderTitle (collapse: Float, conversationCount: Int)`
+  - L236 `val palette`
+- L270 `@Composable
+private fun LockChip ()`
+  - L271 `val primary`
+- L293 `@Composable
+private fun SearchField ( value: String, onValueChange: (String) -> Unit, modifier: Modifier = Modifier )`
+  - L298 `val palette`
+  - L299 `val primary`
+  - L300 `val interaction`
+  - L301 `val focused`
+- L355 `@Composable
+private fun NewChatButton (collapsed: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier)`
+  - L356 `val primary`
+- L387 `@Composable
+private fun EmptyState (onNewChatClick: () -> Unit, topPadding: androidx.compose.ui.unit.Dp)`
+  - L388 `val palette`
+  - L389 `val primary`
+  - L390 `val breath`
+  - L391 `val scale`
+- L455 `@Composable
+private fun NoResults (query: String, topPadding: androidx.compose.ui.unit.Dp)`
+  - L456 `val palette`
+- L482 `@Composable
+private fun LoadingList (topPadding: androidx.compose.ui.unit.Dp)`
+- L495 `@Composable
 private fun ChatListItemSkeleton ()`
-  - L237 `val mc`
+- L518 `private fun Modifier (onClick: () -> Unit): Modifier`
+  - L519 `val interaction`
 
 ### app/src/main/java/com/securemessenger/app/ui/screens/chat/ComposeStrips.kt (126 سطر)  [package com.securemessenger.app.ui.screens.chat]
 - L28 `@Composable
@@ -1814,7 +1902,7 @@ private fun StatusPill ( icon: androidx.compose.ui.graphics.vector.ImageVector, 
 - L15 `val SemanticAmber`
 - L16 `val SemanticPink`
 - L19 `object SemanticColors` — Named accessors for the semantic palette above — used wherever a screen needs a specific accent by meaning rather than by hex.
-  يُستخدم في: app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatListItem.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatListScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ContactDetailScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/loading/LoadingScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/settings/ProfileScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/settings/SettingsScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/settings/StealthModeScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/setup/SetupSteps.kt, app/src/main/java/com/securemessenger/app/ui/screens/verification/KeyVerificationScreen.kt
+  يُستخدم في: app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatListItem.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ContactDetailScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/loading/LoadingScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/settings/ProfileScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/settings/SettingsScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/settings/StealthModeScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/setup/SetupSteps.kt, app/src/main/java/com/securemessenger/app/ui/screens/verification/KeyVerificationScreen.kt
   - L20 `val red`
   - L21 `val green`
   - L22 `val orange`
@@ -1873,7 +1961,7 @@ private fun StatusPill ( icon: androidx.compose.ui.graphics.vector.ImageVector, 
 
 ### app/src/main/java/com/securemessenger/app/ui/viewmodel/ChatListViewModel.kt (120 سطر)  [package com.securemessenger.app.ui.viewmodel]
 - L19 `data class ContactUiModel ( val id: String, val displayName: String, val isVerified: Boolean, val lastMessage: String, val lastTimestamp: Long, val unreadCount: Int, val avatarBytes: ByteArray? = null, val lastIsMine: Boolean = false, val lastIsRead: Boolean = false, val lastIsSelfDestruct: Boolean = false, val pinnedAt: Long? = null )`
-  يُستخدم في: app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatListItem.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatListScreen.kt
+  يُستخدم في: app/src/androidTest/java/com/securemessenger/app/ui/LiquidHomeRenderTest.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatListItem.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatListScreen.kt
 - L20 `val id : String,`
 - L21 `val displayName : String,`
 - L22 `val isVerified : Boolean,`
@@ -1886,7 +1974,7 @@ private fun StatusPill ( icon: androidx.compose.ui.graphics.vector.ImageVector, 
 - L29 `val lastIsSelfDestruct : Boolean`
 - L30 `val pinnedAt : Long?`
 - L33 `class ChatListViewModel ( private val repository: SecureRepository = SecureMessengerApp.instance.repository ) : ViewModel()`
-  يُستخدم في: app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatListItem.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatListScreen.kt
+  يُستخدم في: app/src/androidTest/java/com/securemessenger/app/ui/LiquidHomeRenderTest.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatListItem.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatListScreen.kt
 - L34 `private val repository : SecureRepository`
   - L37 `private val _isLoading`
   - L39 `val isLoading : StateFlow<Boolean>` — True only until the first contacts/messages snapshot arrives — drives the list-skeleton.
@@ -2204,7 +2292,7 @@ private fun StatusPill ( icon: androidx.compose.ui.graphics.vector.ImageVector, 
   - L494 `var initiatorEphemeralPublicKey : ByteArray?`
   - L495 `var skippedMessageKeys : Map<String, ByteArray>`
 
-### core/src/main/kotlin/com/securemessenger/core/net/DirectoryProtocol.kt (190 سطر)  [package com.securemessenger.core.net]
+### core/src/main/kotlin/com/securemessenger/core/net/DirectoryProtocol.kt (199 سطر)  [package com.securemessenger.core.net]
 - L20 `object DirectoryProtocol` — Everything specific to the optional username-directory path: claiming a
   يُستخدم في: app/src/androidTest/java/com/securemessenger/app/network/IntroductionRoundtripTest.kt, app/src/main/java/com/securemessenger/app/network/DirectoryClient.kt
   - L36 `fun claimSigningPayload ( username: String, identityPublicKey: ByteArray, signingPublicKey: ByteArray, timestampMillis: Long ): ByteArray` — The exact bytes a username claim is signed over. The directory
@@ -2221,8 +2309,8 @@ private fun StatusPill ( icon: androidx.compose.ui.graphics.vector.ImageVector, 
   - L101 `fun buildSelfIntroduction ( senderUserId: String, senderUsername: String, senderIdentityPublicKey: ByteArray, senderSigningPublicKey: ByteArray, addresseeIdentityPublicKey: ByteArray, pairSecret: ByteArray, directAddress: String?, timestampMillis: Long, sign: (ByteArray) -> ByteArray ): JSONObject` — Builds and signs a [SelfIntroduction] payload, ready to pass as `inner`
   - L128 `fun parseSelfIntroduction (json: JSONObject): SelfIntroduction?` — Structural parse only — never trust a [SelfIntroduction] this returns until [verifySelfIntroduction] passes.
   - L160 `fun verifySelfIntroduction ( intro: SelfIntroduction, ourIdentityPublicKey: ByteArray, trustedSigningPublicKey: ByteArray, nowMillis: Long = System.currentTimeMillis(), toleranceMillis: Long = 10 * 60 * 1000 ): Boolean` — Verify a parsed [SelfIntroduction] was actually signed by the holder
-  - L180 `fun introFetchSigningPayload (nonce: ByteArray, timestampMillis: Long): ByteArray` — The exact bytes an `/introductions/fetch` proof is signed over —
-  - L184 `private fun longToBigEndianBytes (value: Long): ByteArray`
+  - L189 `fun introFetchSigningPayload (nonce: ByteArray, timestampMillis: Long): ByteArray` — The exact bytes an `/introductions/fetch` proof is signed over —
+  - L193 `private fun longToBigEndianBytes (value: Long): ByteArray`
 
 ### core/src/main/kotlin/com/securemessenger/core/net/Envelopes.kt (236 سطر)  [package com.securemessenger.core.net]
 - L42 `object Envelopes` — The on-the-wire frame format, in one place.

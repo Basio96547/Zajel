@@ -193,11 +193,26 @@ gradlew :app:connectedDebugAndroidTest "-Pandroid.testInstrumentationRunnerArgum
 | `directory` (`npm test`) | **20/20** — بلا جهاز وبلا نشر | 2026-08-27 |
 | `relay` (`npm test`) | **15/15** — بلا جهاز وبلا نشر | 2026-08-27 |
 | `:desktop:test` | **15/15** — `DirectoryProtocolTest` ١٠، `LoopbackMessagingTest` ٤، `ScopeReuseTest` ١ | 2026-08-27 |
-| `:app:connectedDebugAndroidTest` (باستثناء المُتلِف) | **50/50** على SM-S938B / Android 16 | 2026-07-31 |
+| اختبارات `:app` على الجهاز (باستثناء المُتلِف) | **65/65** على SM-G991Q / Android 15 — منها `MediaSandboxTest` ٤ و`LiquidHomeRenderTest` ٦؛ و`IntroductionRoundtripTest` متخطَّى (`assumeTrue`) لغياب دليل منشور | 2026-08-27 |
 | `:app:testDebugUnitTest` (JVM، بلا جهاز) | **8/8** | 2026-07-31 |
 | `:hisn:connectedDebugAndroidTest` | **24/24** على SM-S938B / Android 16 | 2026-07-31 |
 
-صفوف 2026-07-31 **لم يُعَد تشغيلها** في جولة 2026-08-27؛ ما تحقّق منها في تلك الجولة هو التصريف وحده (`:app:compileDebugKotlin` و`:app:compileDebugAndroidTestKotlin`). الرقم الذي لم يُشغَّل يبقى بتاريخه، لا يُرقّى بالصمت.
+صفوف 2026-07-31 **لم يُعَد تشغيلها** في جولة 2026-08-27. الرقم الذي لم يُشغَّل يبقى بتاريخه، لا يُرقّى بالصمت.
+
+> ### 🚨 أخطر من `AckAuthenticationTest`: مهمة Gradle نفسها تُزيل التثبيت
+>
+> `gradlew :app:connectedDebugAndroidTest` **يزيل تثبيت التطبيق بعد انتهاء التشغيل**، واستثناء الاختبار المُتلِف لا يمنع ذلك. وإزالة التثبيت تمسح كل شيء: قاعدة SQLCipher، المفاتيح، الاقتران. هذا وقع فعلاً على جهاز فيه بيانات حقيقية في 2026-08-27، والتحذير أعلاه عن `AckAuthenticationTest` وحده أعطى إحساساً زائفاً بأن الاستثناء يكفي.
+>
+> **الصيغة التي لا تمسّ البيانات** — تشغّل نفس الاختبارات عبر المُشغِّل مباشرة، بلا إزالة تثبيت:
+>
+> ```
+> gradlew :app:assembleDebug :app:assembleDebugAndroidTest
+> adb install -r app/build/outputs/apk/debug/app-debug.apk
+> adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+> adb shell am instrument -w -e notClass com.securemessenger.app.network.AckAuthenticationTest com.securemessenger.app.test/androidx.test.runner.AndroidJUnitRunner
+> ```
+>
+> رقم الـ**65/65** أعلاه من هذه الصيغة. استعمل مهمة Gradle على محاكٍ أو جهاز اختبار فقط.
 
 **لا تقتبس رقم «27/27»** الذي قد تجده في وثائق أقدم: المجموعة **50** اختباراً، وكانت بين استخراج `:core` و2026-07-31 **لا تُصرَّف أصلاً** (ملفات اختبار في حزمة `com.securemessenger.app.crypto` تستدعي أصنافاً انتقلت إلى `:core` بلا `import`، فلم يُكسَر سطر ظاهر يلفت النظر). التفصيل في [`PROJECT_MAP.md` §8](PROJECT_MAP.md).
 
