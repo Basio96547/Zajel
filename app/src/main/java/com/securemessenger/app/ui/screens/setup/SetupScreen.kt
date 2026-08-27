@@ -55,6 +55,13 @@ fun SetupScreen(
                     .padding(paddingValues)
                     .padding(horizontal = 26.dp)
                     .verticalScroll(scrollState),
+                // Centred, because a setup step is short and the screen is
+                // tall: the photographed result had every element in the top
+                // third and roughly half the display empty beneath the button.
+                // With verticalScroll the column is still at least the height
+                // of the viewport, so this centres short steps and does
+                // nothing at all to a step long enough to scroll.
+                verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Spacer(modifier = Modifier.height(22.dp))

@@ -430,9 +430,6 @@ fun AppNavigation() {
                         }
                     },
                     onProfileClick = { navController.navigate(Screen.Profile.route) },
-                    onNavChats = navToChats,
-                    onNavContacts = navToContacts,
-                    onNavProfile = navToProfile
                 )
             }
         }

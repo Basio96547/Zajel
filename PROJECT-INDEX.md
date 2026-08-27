@@ -5,7 +5,7 @@
 ابحث هنا أولاً بـ Grep قبل فتح أي ملف مصدر كامل. سطر `يُستخدم في:` تحت أي class/object/interface = تطابق استيراد FQN فعلي، أفضل-جهد وليس مضموناً 100%.
 ⚠ بجانب اسم ملف = يتجاوز 300 سطر.
 
-**129** ملف مفحوص، **2406** تعريفاً.
+**130** ملف مفحوص، **2417** تعريفاً.
 
 
 ## app/
@@ -190,6 +190,19 @@ data class OldContact ( @PrimaryKey val id: String, val publicKey: ByteArray, va
   - L144 `@Test fun theAuroraAndItsSurfacesDrawWithoutFailing ()`
   - L171 `@Test fun everyDestinationTheBottomBarUsedToOwnIsStillReachable ()`
   - L209 `@Test fun thePendingRequestsBannerIsAbsentWhenThereAreNone ()`
+
+### app/src/androidTest/java/com/securemessenger/app/ui/ScreenTourTest.kt (96 سطر)  [package com.securemessenger.app.ui]
+- L41 `@RunWith(AndroidJUnit4::class) class ScreenTourTest` — A walk through the app, one screen per test.
+  - L44 `val compose`
+  - L46 `@Test fun tourCalculator ()`
+  - L50 `@Test fun tourSetup ()`
+  - L54 `@Test fun tourSettings ()`
+  - L61 `@Test fun tourProfile ()`
+  - L65 `@Test fun tourNewChat ()`
+  - L69 `@Test fun tourUsernameSearch ()`
+  - L73 `@Test fun tourKeyVerification ()`
+  - L77 `@Test fun tourConnectionRequests ()`
+  - L81 `private fun shoot (name: String, content: @Composable () -> Unit)`
 
 ### app/src/androidTest/java/com/securemessenger/app/ui/screens/chat/QrImageTest.kt (189 سطر)  [package com.securemessenger.app.ui.screens.chat]
 - L20 `class QrImageTest` — Covers pairing by picture rather than by camera: the code has to survive

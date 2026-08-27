@@ -69,11 +69,22 @@ fun KeyVerificationScreen(
         )
     }
 
+    // Every field on this screen fell back to "جاري التحميل…" with nothing to
+    // ever replace it: these three reads were unguarded, so a repository that
+    // is not open does not merely leave the screen loading forever — it
+    // throws out of a LaunchedEffect, which is not a state this composable
+    // can recover from. Now it fails visibly and says so.
+    var loadFailed by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
-        myPublicKeyHex = repository.getPublicKeyHex()
-        fingerprint = repository.getPublicKeyFingerprint()
-        myUserId = repository.getUserId()
+        try {
+            myPublicKeyHex = repository.getPublicKeyHex()
+            fingerprint = repository.getPublicKeyFingerprint()
+            myUserId = repository.getUserId()
+        } catch (e: Exception) {
+            loadFailed = true
+        }
     }
+    val pendingLabel = if (loadFailed) "تعذّر قراءة مفاتيحك" else "جاري التحميل..."
 
     val qrData = myPublicKeyHex ?: ""
     val myQRBitmap = remember(qrData) {
@@ -175,7 +186,7 @@ fun KeyVerificationScreen(
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = fingerprint?.chunked(2)?.joinToString(" ") ?: "جاري التحميل...",
+                            text = fingerprint?.chunked(2)?.joinToString(" ") ?: pendingLabel,
                             style = MaterialTheme.typography.bodyMedium.copy(textDirection = androidx.compose.ui.text.style.TextDirection.Ltr),
                             color = mc.glassOnCard,
                             fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
@@ -205,7 +216,7 @@ fun KeyVerificationScreen(
                                     color = mc.glassOnCard.copy(alpha = 0.65f)
                                 )
                                 Text(
-                                    text = myUserId ?: "جاري التحميل...",
+                                    text = myUserId ?: pendingLabel,
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = mc.glassOnCard,
                                     fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
@@ -217,7 +228,7 @@ fun KeyVerificationScreen(
                                     color = mc.glassOnCard.copy(alpha = 0.65f)
                                 )
                                 Text(
-                                    text = myPublicKeyHex ?: "جاري التحميل...",
+                                    text = myPublicKeyHex ?: pendingLabel,
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = mc.glassOnCard,
                                     fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace

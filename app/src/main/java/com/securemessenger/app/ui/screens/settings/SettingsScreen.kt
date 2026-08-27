@@ -23,8 +23,6 @@ import com.securemessenger.app.BuildConfig
 import com.securemessenger.app.SecureMessengerApp
 import com.securemessenger.app.security.AppSettings
 import com.securemessenger.app.service.MessengerService
-import com.securemessenger.app.ui.GlassBottomNavBar
-import com.securemessenger.app.ui.GlassNavItem
 import com.securemessenger.app.ui.GlassTopBar
 import com.securemessenger.app.ui.glassBackground
 import com.securemessenger.app.ui.glassCard
@@ -51,9 +49,6 @@ fun SettingsScreen(
     onStealthModeClick: () -> Unit,
     onDataWiped: () -> Unit,
     onProfileClick: () -> Unit = {},
-    onNavChats: () -> Unit = {},
-    onNavContacts: () -> Unit = {},
-    onNavProfile: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -83,14 +78,6 @@ fun SettingsScreen(
     // so both switches below would be meaningless — hide the whole section.
     val relayAvailable = remember { BuildConfig.RELAY_URL.isNotBlank() }
     var showCryptoGlossary by remember { mutableStateOf(false) }
-    val navItems = remember {
-        listOf(
-            GlassNavItem("المحادثات", Icons.Default.ChatBubble),
-            GlassNavItem("جهات الاتصال", Icons.Default.Group),
-            GlassNavItem("الإعدادات", Icons.Default.Settings),
-            GlassNavItem("ملفي", Icons.Default.Person)
-        )
-    }
     val username = AppSettings.getUsername(context)
     val themeLabel = when (themeMode) {
         AppSettings.ThemeMode.SYSTEM -> "تلقائي"
@@ -101,24 +88,21 @@ fun SettingsScreen(
     Box(modifier = Modifier.fillMaxSize().glassBackground(mc.listGradient)) {
         Scaffold(
             containerColor = Color.Transparent,
-            topBar = { GlassTopBar(title = "الإعدادات") },
-            bottomBar = {
-                GlassBottomNavBar(
-                    items = navItems,
-                    selectedIndex = 2,
-                    onSelect = { index ->
-                        when (index) {
-                            0 -> onNavChats()
-                            1 -> onNavContacts()
-                            3 -> onNavProfile()
-                        }
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 10.dp)
-                        .navigationBarsPadding()
-                )
-            },
+            // A back arrow, and no bottom bar.
+            //
+            // This screen had it the other way round: the top bar carried no
+            // onBack at all, so the bottom bar was the only visible way out —
+            // while AppNavigation was passing onBackClick = { popBackStack() }
+            // that the screen never called. A dead parameter with a live wire
+            // attached, which is worse than an unused one, because the caller
+            // believed it had provided an escape.
+            //
+            // The bar also had to go for a second reason: the home screen
+            // dropped it, so walking home -> settings made a navigation bar
+            // appear from nowhere. Its entries are all still reachable —
+            // chats is back, profile is the row at the top of this screen,
+            // contacts is on the home screen.
+            topBar = { GlassTopBar(title = "الإعدادات", onBack = onBackClick) },
             snackbarHost = { SnackbarHost(snackbarHostState) }
         ) { paddingValues ->
             Column(

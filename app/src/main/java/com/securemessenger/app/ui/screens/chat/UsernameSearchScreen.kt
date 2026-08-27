@@ -81,18 +81,25 @@ fun UsernameSearchScreen(onBackClick: () -> Unit) {
         Column(modifier = Modifier.fillMaxSize()) {
             GlassTopBar(title = "البحث باسم المستخدم", onBack = onBackClick)
 
-            Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 22.dp)) {
+            Column(modifier = Modifier.fillMaxSize().padding(horizontal = 22.dp)) {
                 Spacer(modifier = Modifier.height(8.dp))
                 SearchField(value = query, onValueChange = { query = it }, textColor = mc.glassOnCard)
                 Spacer(modifier = Modifier.height(20.dp))
 
                 when (val state = lookupState) {
+                    // Centred in the space it actually has. Before typing,
+                    // this hint is the only thing on the screen, and it was
+                    // pinned under the search field with three quarters of
+                    // the display empty below it.
                     LookupState.Idle -> Text(
                         text = "اكتب 3 أحرف على الأقل من اسم المستخدم للبحث.\nالنتيجة تحتاج موافقتك أنت — والطرف الآخر — قبل أن تصبح محادثة.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = mc.glassOnCard.copy(alpha = 0.6f),
                         textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth().padding(top = 24.dp)
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                            .wrapContentHeight(Alignment.CenterVertically)
                     )
                     LookupState.Loading -> Box(Modifier.fillMaxWidth().padding(top = 32.dp), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator()
