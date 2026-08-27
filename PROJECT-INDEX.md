@@ -5,7 +5,7 @@
 ابحث هنا أولاً بـ Grep قبل فتح أي ملف مصدر كامل. سطر `يُستخدم في:` تحت أي class/object/interface = تطابق استيراد FQN فعلي، أفضل-جهد وليس مضموناً 100%.
 ⚠ بجانب اسم ملف = يتجاوز 300 سطر.
 
-**130** ملف مفحوص، **2417** تعريفاً.
+**130** ملف مفحوص، **2412** تعريفاً.
 
 
 ## app/
@@ -1165,7 +1165,7 @@ data class OutgoingConnectionRequest ( @PrimaryKey val recipientIdentityPublicKe
 - L3 `private val USERNAME_LIKE`
 - L10 `fun formatContactName (raw: String): String` — A stored contact name is either a claimed @username or (when we never
 
-### app/src/main/java/com/securemessenger/app/ui/GlassComponents.kt (240 سطر)  [package com.securemessenger.app.ui]
+### app/src/main/java/com/securemessenger/app/ui/GlassComponents.kt (147 سطر)  [package com.securemessenger.app.ui]
 - L52 `fun Modifier (colors: List<Color>): Modifier` — The page backdrop every glass screen sits on — now the drifting aurora the
 - L61 `fun Modifier` — The backdrop for onboarding and security moments (Setup, Loading, Stealth
 - L71 `fun Modifier (radius: Dp = 16.dp, strong: Boolean = false): Modifier` — The single reusable "glass card" surface — a translucent rounded panel
@@ -1173,14 +1173,6 @@ data class OutgoingConnectionRequest ( @PrimaryKey val recipientIdentityPublicKe
   - L103 `val mc`
 - L128 `@Composable fun GlassTopBar ( title: String, modifier: Modifier = Modifier, onBack: (() -> Unit)? = null, actions: (@Composable RowScope.() -> Unit)? = null )` — Plain-text convenience overload of [GlassTopBar].
   - L134 `val mc`
-- L148 `data class GlassNavItem ( val label: String, val icon: ImageVector, /** e.g. pending connection-request count on "جهات الاتصال" — 0 shows no badge at all. */ val badgeCount: Int = 0 )`
-  يُستخدم في: app/src/main/java/com/securemessenger/app/ui/screens/settings/SettingsScreen.kt
-- L149 `val label : String,`
-- L150 `val icon : ImageVector,`
-- L152 `val badgeCount : Int` — e.g. pending connection-request count on "جهات الاتصال" — 0 shows no badge at all.
-- L163 `@OptIn(ExperimentalMaterial3Api::class)
-@Composable fun GlassBottomNavBar ( items: List<GlassNavItem>, selectedIndex: Int, onSelect: (Int) -> Unit, modifier: Modifier = Modifier )` — Floating frosted-pill bottom navigation bar — Telegram-style, glassy, with
-  - L169 `val mc`
 
 ### app/src/main/java/com/securemessenger/app/ui/MainActivity.kt (112 سطر)  [package com.securemessenger.app.ui]
 - L28 `class MainActivity : FragmentActivity()` — MainActivity - Entry point for the app UI.
@@ -1247,7 +1239,7 @@ private fun rememberLiquidPalette (dark: Boolean): LiquidPalette`
 - L356 `@Composable fun rememberPressScale ( source: MutableInteractionSource, pressedScale: Float = 0.972f ): State<Float>` — Press feedback as a spring rather than a ripple. Glass does not ripple; it
   - L360 `val pressed`
 
-### app/src/main/java/com/securemessenger/app/ui/navigation/AppNavigation.kt (499 سطر) ⚠  [package com.securemessenger.app.ui.navigation]
+### app/src/main/java/com/securemessenger/app/ui/navigation/AppNavigation.kt (496 سطر) ⚠  [package com.securemessenger.app.ui.navigation]
 - L45 `sealed class Screen (val route: String)`
   - L46 `object Calculator`
   - L47 `object Loading`
@@ -1729,7 +1721,7 @@ private fun EmojiPanel (onEmojiClick: (String) -> Unit)`
   - L235 `fun decodeFromBitmap (bitmap: Bitmap): String?` — The decoding itself, split out from the file loading so it can be exercised directly.
   - L263 `private fun loadDownsampled (context: Context, uri: Uri): Bitmap?`
 
-### app/src/main/java/com/securemessenger/app/ui/screens/chat/UsernameSearchScreen.kt (212 سطر)  [package com.securemessenger.app.ui.screens.chat]
+### app/src/main/java/com/securemessenger/app/ui/screens/chat/UsernameSearchScreen.kt (219 سطر)  [package com.securemessenger.app.ui.screens.chat]
 - L30 `private sealed class LookupState`
   - L31 `data object Idle`
   - L32 `data object Loading`
@@ -1746,13 +1738,13 @@ private fun EmojiPanel (onEmojiClick: (String) -> Unit)`
   - L54 `var sending`
   - L55 `var sendError`
   - L56 `var justSent`
-- L134 `@Composable
+- L141 `@Composable
 private fun SearchField (value: String, onValueChange: (String) -> Unit, textColor: Color)`
-- L158 `@Composable
+- L165 `@Composable
 private fun EmptyResultMessage (text: String, textColor: Color)`
-- L169 `@Composable
+- L176 `@Composable
 private fun FoundResultCard ( username: String, alreadyPending: Boolean, sending: Boolean, errorMessage: String?, onSendRequest: () -> Unit )`
-  - L176 `val mc`
+  - L183 `val mc`
 
 ### app/src/main/java/com/securemessenger/app/ui/screens/loading/LoadingScreen.kt (77 سطر)  [package com.securemessenger.app.ui.screens.loading]
 - L26 `@Composable fun LoadingScreen ()` — Shown briefly while an existing account unlocks itself with its device-stored key.
@@ -1804,33 +1796,32 @@ internal fun RowValue (text: String)`
 internal fun SettingsDropdownSheet ( title: String, options: List<String>, selectedOption: String, onDismiss: () -> Unit, onOptionSelected: (String) -> Unit )`
   - L124 `val mc`
 
-### app/src/main/java/com/securemessenger/app/ui/screens/settings/SettingsScreen.kt (635 سطر) ⚠  [package com.securemessenger.app.ui.screens.settings]
-- L48 `@OptIn(ExperimentalMaterial3Api::class)
-@Composable fun SettingsScreen ( onBackClick: () -> Unit, onVerificationClick: () -> Unit, onStealthModeClick: () -> Unit, onDataWiped: () -> Unit, onProfileClick: () -> Unit = {}, onNavChats: () -> Unit = {}, onNavContacts: () -> Unit = {}, onNavProfile: () -> Unit = {} )` — SettingsScreen - Security settings and app configuration.
-  - L58 `val context`
-  - L59 `val scope`
-  - L60 `val snackbarHostState`
-  - L61 `val mc`
-  - L63 `val themeMode`
-  - L64 `var autoDestructEnabled`
-  - L65 `var autoDestructTime`
-  - L68 `var showThemeDialog`
-  - L69 `var showDestructTimeDialog`
-  - L70 `var showWipeDialog`
-  - L71 `var showCodeDialog`
-  - L72 `var showDuressDialog`
-  - L75 `var accessCodeSet`
-  - L76 `var duressCodeSet`
-  - L77 `var relayEnabled`
-  - L78 `var backgroundDelivery`
-  - L79 `var notificationMode`
-  - L80 `var showNotificationDialog`
-  - L81 `var coverTrafficEnabled`
-  - L84 `val relayAvailable`
-  - L85 `var showCryptoGlossary`
-  - L86 `val navItems`
-  - L94 `val username`
-  - L95 `val themeLabel`
+### app/src/main/java/com/securemessenger/app/ui/screens/settings/SettingsScreen.kt (619 سطر) ⚠  [package com.securemessenger.app.ui.screens.settings]
+- L46 `@OptIn(ExperimentalMaterial3Api::class)
+@Composable fun SettingsScreen ( onBackClick: () -> Unit, onVerificationClick: () -> Unit, onStealthModeClick: () -> Unit, onDataWiped: () -> Unit, onProfileClick: () -> Unit = {}, )` — SettingsScreen - Security settings and app configuration.
+  - L53 `val context`
+  - L54 `val scope`
+  - L55 `val snackbarHostState`
+  - L56 `val mc`
+  - L58 `val themeMode`
+  - L59 `var autoDestructEnabled`
+  - L60 `var autoDestructTime`
+  - L63 `var showThemeDialog`
+  - L64 `var showDestructTimeDialog`
+  - L65 `var showWipeDialog`
+  - L66 `var showCodeDialog`
+  - L67 `var showDuressDialog`
+  - L70 `var accessCodeSet`
+  - L71 `var duressCodeSet`
+  - L72 `var relayEnabled`
+  - L73 `var backgroundDelivery`
+  - L74 `var notificationMode`
+  - L75 `var showNotificationDialog`
+  - L76 `var coverTrafficEnabled`
+  - L79 `val relayAvailable`
+  - L80 `var showCryptoGlossary`
+  - L81 `val username`
+  - L82 `val themeLabel`
 
 ### app/src/main/java/com/securemessenger/app/ui/screens/settings/StealthModeScreen.kt (271 سطر)  [package com.securemessenger.app.ui.screens.settings]
 - L43 `@OptIn(ExperimentalMaterial3Api::class)
@@ -1850,7 +1841,7 @@ private fun StealthModeScreenLightPreview ()`
 - L246 `@Composable fun StepItem ( number: String, text: String )`
   - L250 `val mc`
 
-### app/src/main/java/com/securemessenger/app/ui/screens/setup/SetupScreen.kt (195 سطر)  [package com.securemessenger.app.ui.screens.setup]
+### app/src/main/java/com/securemessenger/app/ui/screens/setup/SetupScreen.kt (202 سطر)  [package com.securemessenger.app.ui.screens.setup]
 - L25 `internal val USERNAME_REGEX`
 - L32 `@OptIn(ExperimentalMaterial3Api::class)
 @Composable fun SetupScreen ( onSetupComplete: () -> Unit )` — SetupScreen - Initial app setup and key generation.
@@ -1865,10 +1856,10 @@ private fun StealthModeScreenLightPreview ()`
   - L44 `val scope`
   - L45 `val context`
   - L46 `val mc`
-- L179 `@Composable
+- L186 `@Composable
 private fun StepDots (step: Int)`
-  - L180 `val mc`
-  - L181 `val inactive`
+  - L187 `val mc`
+  - L188 `val inactive`
 
 ### app/src/main/java/com/securemessenger/app/ui/screens/setup/SetupSteps.kt (383 سطر) ⚠  [package com.securemessenger.app.ui.screens.setup]
 - L48 `@Composable fun WelcomeStep (onContinue: () -> Unit)` — The three [SetupScreen] steps, plus their small supporting composables.
@@ -1902,7 +1893,7 @@ private fun ProfileStepPreview ()`
 private fun GeneratingStepPreview ()`
 - L382 `private fun Modifier`
 
-### app/src/main/java/com/securemessenger/app/ui/screens/verification/KeyVerificationScreen.kt (288 سطر)  [package com.securemessenger.app.ui.screens.verification]
+### app/src/main/java/com/securemessenger/app/ui/screens/verification/KeyVerificationScreen.kt (299 سطر)  [package com.securemessenger.app.ui.screens.verification]
 - L36 `@OptIn(ExperimentalMaterial3Api::class)
 @Composable fun KeyVerificationScreen ( contactId: String?, onBackClick: () -> Unit )`
   - L40 `var showMyQR`
@@ -1915,9 +1906,11 @@ private fun GeneratingStepPreview ()`
   - L47 `val mc`
   - L49 `val scanLauncher`
   - L62 `fun launchScan ()`
-  - L78 `val qrData`
-  - L79 `val myQRBitmap`
-- L265 `@Composable
+  - L77 `var loadFailed`
+  - L87 `val pendingLabel`
+  - L89 `val qrData`
+  - L90 `val myQRBitmap`
+- L276 `@Composable
 private fun StatusPill ( icon: androidx.compose.ui.graphics.vector.ImageVector, tint: Color, title: String, subtitle: String )`
 
 ### app/src/main/java/com/securemessenger/app/ui/screens/verification/VerificationComponents.kt (29 سطر)  [package com.securemessenger.app.ui.screens.verification]
@@ -2014,21 +2007,21 @@ private fun StatusPill ( icon: androidx.compose.ui.graphics.vector.ImageVector, 
   - L79 `private fun preview (message: EncryptedMessage): String`
   - L86 `private fun Contact ( lastMessage: String, lastTimestamp: Long, unreadCount: Int, lastIsMine: Boolean, lastIsRead: Boolean, lastIsSelfDestruct: Boolean ): ContactUiModel`
 
-### app/src/main/java/com/securemessenger/app/ui/viewmodel/ConnectionRequestsViewModel.kt (70 سطر)  [package com.securemessenger.app.ui.viewmodel]
-- L15 `data class IncomingRequestUiModel ( val senderIdentityPublicKeyHex: String, val senderUserId: String, val senderUsername: String, val receivedAt: Long )`
+### app/src/main/java/com/securemessenger/app/ui/viewmodel/ConnectionRequestsViewModel.kt (97 سطر)  [package com.securemessenger.app.ui.viewmodel]
+- L18 `data class IncomingRequestUiModel ( val senderIdentityPublicKeyHex: String, val senderUserId: String, val senderUsername: String, val receivedAt: Long )`
   يُستخدم في: app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatListScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ConnectionRequestsScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/NewChatScreen.kt
-- L16 `val senderIdentityPublicKeyHex : String,`
-- L17 `val senderUserId : String,`
-- L18 `val senderUsername : String,`
-- L19 `val receivedAt : Long`
-- L28 `class ConnectionRequestsViewModel ( private val repository: SecureRepository = SecureMessengerApp.instance.repository ) : ViewModel()` — Pending self-introductions found via username search, waiting on an
+- L19 `val senderIdentityPublicKeyHex : String,`
+- L20 `val senderUserId : String,`
+- L21 `val senderUsername : String,`
+- L22 `val receivedAt : Long`
+- L31 `class ConnectionRequestsViewModel ( private val repository: SecureRepository = SecureMessengerApp.instance.repository ) : ViewModel()` — Pending self-introductions found via username search, waiting on an
   يُستخدم في: app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatListScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ConnectionRequestsScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/NewChatScreen.kt
-- L29 `private val repository : SecureRepository`
-  - L32 `val incomingRequests : StateFlow<List<IncomingRequestUiModel>>`
-  - L42 `private val _actionInProgress`
-  - L43 `val actionInProgress : StateFlow<String?>`
-  - L45 `fun accept (senderIdentityPublicKeyHex: String, onResult: (Boolean) -> Unit)`
-  - L58 `fun reject (senderIdentityPublicKeyHex: String)`
+- L32 `private val repository : SecureRepository`
+  - L58 `val incomingRequests : StateFlow<List<IncomingRequestUiModel>>` — Built lazily, and that is a crash fix rather than a style preference.
+  - L69 `private val _actionInProgress`
+  - L70 `val actionInProgress : StateFlow<String?>`
+  - L72 `fun accept (senderIdentityPublicKeyHex: String, onResult: (Boolean) -> Unit)`
+  - L85 `fun reject (senderIdentityPublicKeyHex: String)`
 
 ### app/src/main/java/com/securemessenger/app/ui/viewmodel/ConversationViewModel.kt (514 سطر) ⚠  [package com.securemessenger.app.ui.viewmodel]
 - L24 `data class MessageUiModel ( val id: Long?, val clientId: String?, val text: String, val direction: Int, val timestamp: Long, val isRead: Boolean, val isExpired: Boolean, val media: MediaCodec.LocalMedia? = null, // Social interaction state val reactionMine: String? = null, val reactionTheirs: String? = null, val replyToClientId: String? = null, val replySnippet: String? = null, val isDeleted: Boolean = false, val edited: Boolean = false, // True while the outgoing envelope still sits in the durable outbox // (queued/in-flight, no relay ack yet) — drives the "sending…" clock tick. val isPending: Boolean = false )`

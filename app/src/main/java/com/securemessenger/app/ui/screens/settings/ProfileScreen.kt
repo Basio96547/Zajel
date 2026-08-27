@@ -59,12 +59,30 @@ fun ProfileScreen(
     var fingerprint by remember { mutableStateOf<String?>(null) }
     var showNameDialog by remember { mutableStateOf(false) }
 
+    // Guarded for the same reason KeyVerificationScreen's reads are: an
+    // exception thrown inside a LaunchedEffect is not a state the composable
+    // can recover from, and every one of these touches a repository that
+    // throws while its database is closed. The screen tour caught this one by
+    // rendering the screen — it is the only place that ever does so before a
+    // database exists.
+    //
+    // Falling back to blank is right here in a way it would not be on a
+    // screen that shows a *contact's* identity: this is your own profile, and
+    // an empty name is visibly empty rather than quietly wrong.
     LaunchedEffect(Unit) {
-        repository.getMyAvatarFlow().collect { avatarBytes = it }
+        try {
+            repository.getMyAvatarFlow().collect { avatarBytes = it }
+        } catch (e: Exception) {
+            avatarBytes = null
+        }
     }
     LaunchedEffect(Unit) {
-        displayName = repository.getMyDisplayName() ?: ""
-        fingerprint = repository.getPublicKeyFingerprint()
+        try {
+            displayName = repository.getMyDisplayName() ?: ""
+            fingerprint = repository.getPublicKeyFingerprint()
+        } catch (e: Exception) {
+            fingerprint = null
+        }
     }
 
     val avatarPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
