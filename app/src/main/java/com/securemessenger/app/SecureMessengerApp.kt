@@ -81,7 +81,7 @@ class SecureMessengerApp : Application() {
                             // new bubble, so handle it before anything else.
                             val control = ChatPayloads.tryParseControl(received.plaintext)
                             if (control != null) {
-                                repository.applyIncomingControl(control)
+                                repository.applyIncomingControl(control, received.senderId)
                             } else {
                                 // No directory to resolve a display name from anymore —
                                 // a message can only ever arrive from someone we already
@@ -118,7 +118,21 @@ class SecureMessengerApp : Application() {
                                         senderUsername = senderUsername
                                     )
                                 }
-                                announceArrival(received.senderId, textPayload?.text ?: media?.let { null })
+                                // A plain text message — the overwhelmingly
+                                // common case — carries no ChatPayloads wrapper
+                                // (that only appears on replies), so its preview
+                                // has to come from the raw plaintext. An earlier
+                                // version read `textPayload?.text ?: media?.let { null }`,
+                                // whose second branch is `null` by construction:
+                                // the preview was therefore null for every
+                                // ordinary message, and the "الاسم ومقتطف من النص"
+                                // notification setting could never show any text.
+                                val preview = when {
+                                    media != null -> null // nothing readable to preview
+                                    textPayload != null -> textPayload.text
+                                    else -> runCatching { received.plaintext.toString(Charsets.UTF_8) }.getOrNull()
+                                }
+                                announceArrival(received.senderId, preview)
                             }
                         } catch (_: Exception) {
                             // Ignore a single malformed/undeliverable message.
@@ -162,6 +176,13 @@ class SecureMessengerApp : Application() {
         incomingJob = null
         messagingClient?.disconnect()
         messagingClient = null
+        // Every hide is also the natural checkpoint for purging any
+        // plaintext media a viewer decrypted to cacheDir for an external app
+        // to open — see SecureRepository.purgeDecryptedMediaCache. Only a
+        // full wipe used to clean this up at all. Safe even on the very
+        // first hide of a fresh install: this only touches a cache
+        // directory, not the (possibly not yet initialize()'d) database.
+        repository.purgeDecryptedMediaCache()
     }
 
     override fun onCreate() {
@@ -198,6 +219,20 @@ class SecureMessengerApp : Application() {
             // Handle initialization error
             e.printStackTrace()
         }
+
+        // Self-destructing messages' TTL is only ever actually enforced by
+        // this periodic WorkManager job (see MessageCleanupWorker) — nothing
+        // else deletes an expired message. It used to be scheduled only from
+        // MessageCleanupService.onCreate(), but nothing in the app ever
+        // starts that Service (only BootReceiver called
+        // schedulePeriodicCleanup directly, on ACTION_BOOT_COMPLETED), so a
+        // fresh install that hadn't yet been through a reboot had no
+        // enforcement at all — every "disappearing" message just... stayed,
+        // silently breaking the one promise self-destruct messages make.
+        // enqueueUniquePeriodicWork + KEEP below makes this idempotent, so
+        // calling it here too (on every process start, not just after a
+        // reboot) is safe even though BootReceiver still also calls it.
+        com.securemessenger.app.service.MessageCleanupService.schedulePeriodicCleanup(this)
     }
 
     override fun attachBaseContext(base: Context) {

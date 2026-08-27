@@ -15,8 +15,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -31,6 +29,7 @@ import com.securemessenger.app.ui.theme.LocalMessengerColors
 import com.securemessenger.app.ui.theme.MessengerTheme
 import com.securemessenger.app.ui.theme.SemanticColors
 import com.securemessenger.app.ui.viewmodel.ChatListViewModel
+import com.securemessenger.app.ui.viewmodel.ConnectionRequestsViewModel
 import com.securemessenger.app.ui.viewmodel.ContactUiModel
 
 @OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
@@ -40,24 +39,28 @@ fun ChatListScreen(
     onSettingsClick: () -> Unit,
     onNewChatClick: () -> Unit,
     onProfileClick: () -> Unit = {},
-    viewModel: ChatListViewModel = viewModel()
+    viewModel: ChatListViewModel = viewModel(),
+    connectionRequestsViewModel: ConnectionRequestsViewModel = viewModel()
 ) {
     val contacts by viewModel.contacts.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
+    val incomingRequests by connectionRequestsViewModel.incomingRequests.collectAsState()
     val mc = LocalMessengerColors.current
 
     var searchQuery by remember { mutableStateOf("") }
-    val searchFocusRequester = remember { FocusRequester() }
     val visibleContacts = remember(contacts, searchQuery) {
         if (searchQuery.isBlank()) contacts
         else contacts.filter {
             it.displayName.contains(searchQuery, ignoreCase = true) || it.lastMessage.contains(searchQuery, ignoreCase = true)
         }
     }
-    val navItems = remember {
+    // "جهات الاتصال" doubles as the entry point to pending connection
+    // requests found via username search — badged the same way an unread
+    // count would be, so a waiting request is never silently missed.
+    val navItems = remember(incomingRequests.size) {
         listOf(
             GlassNavItem("المحادثات", Icons.Default.ChatBubble),
-            GlassNavItem("جهات الاتصال", Icons.Default.Group),
+            GlassNavItem("جهات الاتصال", Icons.Default.Group, badgeCount = incomingRequests.size),
             GlassNavItem("الإعدادات", Icons.Default.Settings),
             GlassNavItem("ملفي", Icons.Default.Person)
         )
@@ -68,18 +71,10 @@ fun ChatListScreen(
             containerColor = androidx.compose.ui.graphics.Color.Transparent,
             topBar = {
                 Column {
-                    GlassTopBar(
-                        title = "المحادثات",
-                        actions = {
-                            IconButton(onClick = { searchFocusRequester.requestFocus() }) {
-                                Icon(Icons.Default.Search, contentDescription = "بحث في المحادثات", tint = mc.glassOnCard.copy(alpha = 0.7f))
-                            }
-                        }
-                    )
+                    GlassTopBar(title = "المحادثات")
                     SearchRow(
                         value = searchQuery,
                         onValueChange = { searchQuery = it },
-                        focusRequester = searchFocusRequester,
                         textColor = mc.glassOnCard
                     )
                     ConnectionStatusBar()
@@ -168,13 +163,14 @@ fun ChatListScreen(
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         items(visibleContacts, key = { it.id }) { contact ->
-                            // A conversation with a new message jumps to the top of
-                            // the list (sorted by lastTimestamp) — this animates that
-                            // reordering instead of it just teleporting there.
+                            // A conversation moving within its group — pinned or
+                            // not, see ChatListViewModel's sort — animates into its
+                            // new position instead of just teleporting there.
                             Box(modifier = Modifier.animateItemPlacement()) {
                                 ChatListItem(
                                     contact = contact,
-                                    onClick = { onConversationClick(contact.id) }
+                                    onClick = { onConversationClick(contact.id) },
+                                    onTogglePin = { viewModel.togglePin(contact.id) }
                                 )
                             }
                         }
@@ -205,7 +201,6 @@ fun ChatListScreen(
 private fun SearchRow(
     value: String,
     onValueChange: (String) -> Unit,
-    focusRequester: FocusRequester,
     textColor: androidx.compose.ui.graphics.Color
 ) {
     val mc = LocalMessengerColors.current
@@ -229,21 +224,11 @@ private fun SearchRow(
                 singleLine = true,
                 textStyle = MaterialTheme.typography.bodyMedium.copy(color = textColor),
                 cursorBrush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.primary),
-                modifier = Modifier.fillMaxWidth().focusRequester(focusRequester)
+                modifier = Modifier.fillMaxWidth()
             )
         }
     }
     Spacer(modifier = Modifier.height(4.dp))
-}
-
-private fun formatChatTime(timestamp: Long): String {
-    if (timestamp <= 0L) return ""
-    val now = java.util.Calendar.getInstance()
-    val then = java.util.Calendar.getInstance().apply { timeInMillis = timestamp }
-    val sameDay = now.get(java.util.Calendar.YEAR) == then.get(java.util.Calendar.YEAR) &&
-        now.get(java.util.Calendar.DAY_OF_YEAR) == then.get(java.util.Calendar.DAY_OF_YEAR)
-    val pattern = if (sameDay) "HH:mm" else "dd/MM"
-    return java.text.SimpleDateFormat(pattern, java.util.Locale.getDefault()).format(java.util.Date(timestamp))
 }
 
 /** One shimmering placeholder row, shape-matched to [ChatListItem] — shown only until the first real snapshot loads. */
@@ -268,147 +253,5 @@ private fun ChatListItemSkeleton() {
     Spacer(modifier = Modifier.height(8.dp))
 }
 
-@Composable
-fun ChatListItem(
-    contact: ContactUiModel,
-    onClick: () -> Unit
-) {
-    val mc = LocalMessengerColors.current
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .glassCard(radius = 18.dp)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 13.dp, vertical = 11.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Avatar(
-            name = contact.displayName,
-            size = 48.dp,
-            id = contact.id,
-            avatarBytes = contact.avatarBytes
-        )
-
-        Spacer(modifier = Modifier.width(12.dp))
-
-        Column(modifier = Modifier.weight(1f)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = contact.displayName,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = mc.glassOnCard,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f, fill = false)
-                )
-                if (contact.isVerified) {
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Icon(
-                        imageVector = Icons.Default.Verified,
-                        contentDescription = "متحقق",
-                        modifier = Modifier.size(15.dp),
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                }
-                Spacer(modifier = Modifier.weight(1f))
-                Text(
-                    text = formatChatTime(contact.lastTimestamp),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = mc.glassOnCard.copy(alpha = 0.55f)
-                )
-            }
-
-            Spacer(modifier = Modifier.height(2.dp))
-
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                when {
-                    contact.lastIsSelfDestruct -> {
-                        Icon(
-                            imageVector = Icons.Default.Schedule,
-                            contentDescription = null,
-                            modifier = Modifier.size(14.dp),
-                            tint = SemanticColors.orange
-                        )
-                        Spacer(modifier = Modifier.width(5.dp))
-                    }
-                    contact.lastIsMine && contact.lastMessage.isNotBlank() -> {
-                        Icon(
-                            imageVector = if (contact.lastIsRead) Icons.Default.DoneAll else Icons.Default.Done,
-                            contentDescription = null,
-                            modifier = Modifier.size(15.dp),
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                    }
-                }
-                Text(
-                    text = if (contact.lastIsSelfDestruct) "رسالة ذاتية التدمير"
-                    else contact.lastMessage.ifBlank { "اضغط لبدء المحادثة" },
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = mc.glassOnCard.copy(alpha = 0.65f),
-                    modifier = Modifier.weight(1f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                if (contact.unreadCount > 0) {
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Box(
-                        modifier = Modifier
-                            .defaultMinSize(minWidth = 20.dp)
-                            .height(20.dp)
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(MaterialTheme.colorScheme.primary)
-                            .padding(horizontal = 6.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = if (contact.unreadCount > 99) "99+" else contact.unreadCount.toString(),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onPrimary
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Preview(name = "Chat list item — dark", showBackground = true)
-@Composable
-private fun ChatListItemDarkPreview() {
-    MessengerTheme(darkTheme = true) {
-        Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            ChatListItem(
-                contact = ContactUiModel(
-                    id = "1", displayName = "سارة", isVerified = true,
-                    lastMessage = "وش رأيك بالتصميم الجديد؟", lastTimestamp = 0L, unreadCount = 2
-                ),
-                onClick = {}
-            )
-            ChatListItem(
-                contact = ContactUiModel(
-                    id = "2", displayName = "أحمد", isVerified = false,
-                    lastMessage = "تمام، شكراً لك", lastTimestamp = 0L, unreadCount = 0,
-                    lastIsMine = true, lastIsRead = true
-                ),
-                onClick = {}
-            )
-        }
-    }
-}
-
-@Preview(name = "Chat list item — light", showBackground = true)
-@Composable
-private fun ChatListItemLightPreview() {
-    MessengerTheme(darkTheme = false) {
-        Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            ChatListItem(
-                contact = ContactUiModel(
-                    id = "1", displayName = "سارة", isVerified = true,
-                    lastMessage = "وش رأيك بالتصميم الجديد؟", lastTimestamp = 0L, unreadCount = 2
-                ),
-                onClick = {}
-            )
-        }
-    }
-}
+// ---------- moved out ----------
+// (ChatListItem, formatChatTime, ChatListItemDarkPreview, ChatListItemLightPreview: ChatListItem.kt)

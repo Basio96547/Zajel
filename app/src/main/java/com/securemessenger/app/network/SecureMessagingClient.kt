@@ -2,11 +2,13 @@ package com.securemessenger.app.network
 
 import android.content.Context
 import android.util.Log
+import com.securemessenger.core.B64
 import com.securemessenger.core.crypto.LibsodiumWrapper
 import com.securemessenger.core.crypto.MailboxToken
 import com.securemessenger.core.crypto.MessagePadding
 import com.securemessenger.core.crypto.PqKem
 import com.securemessenger.core.crypto.SignalProtocol
+import com.securemessenger.app.data.model.OutgoingConnectionRequest
 import com.securemessenger.app.data.repository.SecureRepository
 import com.securemessenger.app.security.AppSettings
 import com.securemessenger.app.network.local.DiscoveredPeer
@@ -21,6 +23,7 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.delay
@@ -59,8 +62,12 @@ private const val SERVER_IDLE_TIMEOUT_MS = 90 * 1000
 
 /** How often everything still unacknowledged is retried. */
 private const val OUTBOX_RETRY_MS = 60 * 1000L
-/** Shortest gap between two relay deposits of the *same* envelope — see [SecureMessagingClient.retryOutbox]. */
+/** Shortest gap between two relay deposits of the *same* envelope, for one freshly stuck — widens the longer it's been undelivered; see [SecureMessagingClient.relayRetryFloorFor]. */
 private const val RELAY_RETRY_FLOOR_MS = 15 * 60 * 1000L
+/** Once an outbox entry has been undelivered for over an hour — see [SecureMessagingClient.relayRetryFloorFor]. */
+private const val RELAY_RETRY_FLOOR_STALE_MS = 60 * 60 * 1000L
+/** Once an outbox entry has been undelivered for over a day — see [SecureMessagingClient.relayRetryFloorFor]. */
+private const val RELAY_RETRY_FLOOR_ABANDONED_MS = 6 * 60 * 60 * 1000L
 
 /** How long to wait for a prekey bundle over a direct local socket. */
 private const val LOCAL_BUNDLE_TIMEOUT_MS = 8_000L
@@ -74,6 +81,13 @@ private const val RELAY_BUNDLE_TIMEOUT_MS = 75_000L
 
 /** Minimum time between handing our bundle (which burns a one-time prekey) to the same claimed userId — bounds how fast a peer that learned a valid userId can drain the OTK pool by spamming challenges. */
 private const val BUNDLE_HANDOUT_MIN_INTERVAL_MS = 10_000L
+
+/** How long a persisted "already handled this envelope" record is kept — see [SecureMessagingClient.onceOnly]. Deliberately generous: it only needs to outlast the longest a legitimate resend could plausibly still be arriving, and a stale row costs nothing but a few bytes. */
+private const val SEEN_ENVELOPE_TTL_MS = 30L * 24 * 60 * 60 * 1000L
+
+/** How often we poll the directory for introductions waiting for us — a far rarer event than a chat message, so a slower cadence than [RelayClient]'s own poll is plenty. */
+private const val INTRO_POLL_MIN_MS = 20_000L
+private const val INTRO_POLL_MAX_MS = 40_000L
 
 /**
  * SecureMessagingClient — fully peer-to-peer. There is no external server of
@@ -151,15 +165,51 @@ class SecureMessagingClient(
             ) { envelopeJson, pendingSecretHex -> handleRelayEnvelope(envelopeJson, pendingSecretHex) }
         }
 
-    // Envelopes already processed, keyed by "type:id". The outbox legitimately
-    // resends an envelope whose ack was lost, and with two transports the same
-    // envelope can also arrive twice at once — both must be acked again but
-    // neither may be decrypted again (the ratchet consumed that message key, so
-    // a second decrypt would fail and, worse, a duplicate would surface in the
-    // chat). The remembered value is the ack token, so a repeat can be acked
-    // from cache without touching the ratchet.
-    private val seenEnvelopes = object : LinkedHashMap<String, String?>(64, 0.75f, false) {
-        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, String?>?): Boolean = size > 512
+    // The optional username-directory path — wholly separate from [relay]: a
+    // build can carry one, both, or neither. Null when no directoryUrl was
+    // compiled in, which fully removes username search/claim from the app,
+    // same escape hatch as relay's own RELAY_URL check.
+    private val directory: DirectoryClient? =
+        com.securemessenger.app.BuildConfig.DIRECTORY_URL.takeIf { it.isNotBlank() }?.let { url ->
+            DirectoryClient(baseUrl = url.trimEnd('/'), http = relayHttp)
+        }
+
+    private var introductionPollJob: Job? = null
+
+    // Envelopes already SUCCESSFULLY processed, keyed by "type:id". The outbox
+    // legitimately resends an envelope whose ack was lost, and with two
+    // transports the same envelope can also arrive twice at once — both must
+    // be acked again but neither may be decrypted again (the ratchet consumed
+    // that message key, so a second decrypt would fail and, worse, a
+    // duplicate would surface in the chat). The remembered value is the ack
+    // token, so a repeat can be acked from cache without touching the ratchet.
+    //
+    // Only ever holds envelopes the handler actually finished (see onceOnly)
+    // — never one it dropped (no session yet, lost a simultaneous-initiation
+    // race, unrecognized sender). Caching a drop would make it permanent: the
+    // sender's outbox keeps resending the identical envelope, and every one
+    // of those resends would be discarded from this cache before the handler
+    // — by now possibly able to succeed — ever ran again.
+    //
+    // In-memory only, so it's a fast path, not the source of truth: it is
+    // wiped every time the calculator disguise hides and reveals (a fresh
+    // SecureMessagingClient is created each time — see
+    // SecureMessengerApp.initializeMessagingClient), which happens far more
+    // often than a real app restart. [SecureRepository.getSeenEnvelopeAckToken]
+    // is the persisted twin that survives that; see onceOnly.
+    private val seenEnvelopes = object : LinkedHashMap<String, String>(64, 0.75f, false) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, String>?): Boolean = size > 512
+    }
+
+    // Memoizes unsealEnvelope, keyed by the sealed ciphertext itself — see
+    // unsealEnvelope. Small and short-lived on purpose: its only job is
+    // covering the SAME envelope being unsealed twice within one delivery
+    // (handleRelayEnvelope peeks at the sender up front, then the normal
+    // per-type handler unseals the identical envelope again), not acting as a
+    // second dedup layer — that's what seenEnvelopes/onceOnly already do, at
+    // the message level rather than the crypto-op level.
+    private val unsealCache = object : LinkedHashMap<String, JSONObject>(16, 0.75f, false) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, JSONObject>?): Boolean = size > 32
     }
 
     private val _connectionState = MutableStateFlow<ConnectionState>(ConnectionState.Disconnected)
@@ -196,6 +246,20 @@ class SecureMessagingClient(
     private val contactLocks = mutableMapOf<String, Mutex>()
     private fun lockFor(contactId: String): Mutex =
         synchronized(contactLocks) { contactLocks.getOrPut(contactId) { Mutex() } }
+
+    // Guards "establish an initiator session for this contact if none exists"
+    // (X3DH: a live prekey-bundle fetch that can take up to
+    // RELAY_BUNDLE_TIMEOUT_MS). Deliberately separate from [lockFor]'s ratchet
+    // lock: that one is also needed to decrypt an incoming message from this
+    // same contact, and must never sit blocked behind a slow handshake to them
+    // — see getOrCreateInitiatorSession and sendMessageInternal. This lock only
+    // prevents two concurrent sends to a brand-new contact from independently
+    // racing X3DH (which would clobber each other's pendingBundleRequests entry
+    // and leave one of them waiting the full timeout for a reply that already
+    // arrived).
+    private val handshakeLocks = mutableMapOf<String, Mutex>()
+    private fun handshakeLockFor(contactId: String): Mutex =
+        synchronized(handshakeLocks) { handshakeLocks.getOrPut(contactId) { Mutex() } }
 
     private val _incomingMessages = Channel<MessageReceived>(Channel.UNLIMITED)
     val incomingMessages: ReceiveChannel<MessageReceived> get() = _incomingMessages
@@ -257,14 +321,58 @@ class SecureMessagingClient(
             // the relay while the calculator disguise is up.
             relay?.start()
             scope.launch { refreshRelaySubscriptions() }
+            // Housekeeping for the persisted de-dup table onceOnly() falls
+            // back to — see SEEN_ENVELOPE_TTL_MS. Once per reveal is plenty;
+            // nothing here is time-critical.
+            scope.launch {
+                try {
+                    repository.pruneSeenEnvelopesOlderThan(SEEN_ENVELOPE_TTL_MS)
+                } catch (e: Exception) {
+                    Log.w(TAG, "pruneSeenEnvelopesOlderThan failed", e)
+                }
+            }
+            // Retry a username claim that couldn't reach the directory at
+            // setup time — see AppSettings.isUsernameClaimedRemotely's doc.
+            // A no-op once already claimed, and silently skipped entirely
+            // when the directory feature isn't configured or no local
+            // username was ever set.
+            scope.launch {
+                try {
+                    ensureUsernameClaimed()
+                } catch (e: Exception) {
+                    Log.w(TAG, "ensureUsernameClaimed failed", e)
+                }
+            }
             outboxJob?.cancel()
             outboxJob = scope.launch {
                 while (isActive) {
-                    delay(OUTBOX_RETRY_MS)
+                    // Runs immediately on every connect (reveal), not just
+                    // every OUTBOX_RETRY_MS after — otherwise a message stuck
+                    // since before the calculator disguise was last hidden
+                    // would sit untouched for up to a minute after reopening
+                    // it, on top of whatever it had already waited.
                     try {
                         retryOutbox()
+                        retryPendingSends()
                     } catch (e: Exception) {
                         Log.w(TAG, "outbox retry failed", e)
+                    }
+                    delay(OUTBOX_RETRY_MS)
+                }
+            }
+            introductionPollJob?.cancel()
+            if (directory != null) {
+                introductionPollJob = scope.launch {
+                    while (isActive) {
+                        delay(
+                            INTRO_POLL_MIN_MS +
+                                (java.security.SecureRandom().nextDouble() * (INTRO_POLL_MAX_MS - INTRO_POLL_MIN_MS)).toLong()
+                        )
+                        try {
+                            pollIntroductions()
+                        } catch (e: Exception) {
+                            Log.w(TAG, "introduction poll failed", e)
+                        }
                     }
                 }
             }
@@ -296,6 +404,15 @@ class SecureMessagingClient(
         discoveryJob?.cancelAndJoin()
         discoveryJob = scope.launch {
             discovery.discoverPeers().collect { peers ->
+                // REPLACE, not merge. The flow emits the complete current peer
+                // set on every change — onServiceLost drops the peer and
+                // re-sends the whole list — so anything absent here is gone.
+                // Merging instead left a departed device marked "discovered"
+                // forever: the contact card went on claiming "ظاهر على الشبكة
+                // المحلية" for a peer that had left, and every send burned the
+                // full connect timeout dialling an address nobody was listening
+                // on before falling back to the relay.
+                discoveredByToken.keys.retainAll(peers.mapTo(HashSet()) { it.token })
                 for (peer in peers) {
                     discoveredByToken[peer.token] = peer
                     val contactId = tokenToContactId[peer.token] ?: continue
@@ -361,7 +478,15 @@ class SecureMessagingClient(
 
     /** User-triggered "retry now" — re-registers and re-scans instead of waiting for the next discovery tick. */
     fun retryNow() {
-        scope.launch { registerAndDiscover() }
+        scope.launch {
+            registerAndDiscover()
+            // The Snackbar this drives is shown for exactly the failures these
+            // two cover — a transport-level retry and a session-establishment
+            // retry — so a manual "retry" should attempt both immediately
+            // rather than leaving the user to wait for the next periodic tick.
+            try { retryOutbox() } catch (e: Exception) { Log.w(TAG, "manual outbox retry failed", e) }
+            try { retryPendingSends() } catch (e: Exception) { Log.w(TAG, "manual pending-send retry failed", e) }
+        }
     }
 
     /**
@@ -411,6 +536,7 @@ class SecureMessagingClient(
         discoveryJob?.cancel()
         rotationJob?.cancel()
         outboxJob?.cancel()
+        introductionPollJob?.cancel()
         try { discovery.unregister() } catch (_: Exception) {
         }
         try { localServer.stop() } catch (_: Exception) {
@@ -559,30 +685,84 @@ class SecureMessagingClient(
     }
 
     /**
+     * How long an entry must wait before another relay deposit is attempted,
+     * given how long it's been sitting undelivered — see [retryOutbox].
+     *
+     * A flat floor forever means a contact who's genuinely gone (blocked,
+     * uninstalled, never coming back) still gets a fresh blob deposited to a
+     * mailbox nobody is polling every [RELAY_RETRY_FLOOR_MS] indefinitely —
+     * real network + battery cost on this device, and the relay keeps
+     * accumulating copies of a message no one will ever collect (until its
+     * own independent 48h retention expires each one). Widening the gap the
+     * longer an entry has been stuck bounds that cost without ever giving up
+     * on the entry — nothing here deletes it; see [retryPendingSends] et al.,
+     * which never expire what they hold either. A freshly-stuck entry keeps
+     * the tight floor so a genuinely brief blip still recovers quickly.
+     */
+    private fun relayRetryFloorFor(ageMs: Long): Long = when {
+        ageMs < 60 * 60 * 1000L -> RELAY_RETRY_FLOOR_MS               // under 1h old
+        ageMs < 24 * 60 * 60 * 1000L -> RELAY_RETRY_FLOOR_STALE_MS    // under 1 day old
+        else -> RELAY_RETRY_FLOOR_ABANDONED_MS                       // 1 day or older
+    }
+
+    /**
      * Periodic sweep of everything still unacknowledged.
      *
      * Without this the outbox would only ever be retried when a contact turns
      * up on the local network — fine when that was the only transport, but a
      * relay deposit that failed (no connectivity, relay unreachable) would
      * otherwise sit unretried forever for a contact who is never on this LAN.
+     *
+     * Entries are processed concurrently: a relay deposit now genuinely waits
+     * for its outcome (see [RelayClient.enqueueAwait]), and one contact stuck
+     * on a slow or failing attempt must not delay everyone else's turn until
+     * the next sweep a full [OUTBOX_RETRY_MS] later.
      */
-    private suspend fun retryOutbox() {
+    private suspend fun retryOutbox() = coroutineScope {
         val pending = repository.getAllOutboxEnvelopes()
         val now = System.currentTimeMillis()
         for (entry in pending) {
-            if (sendDirect(entry.recipientId, entry.envelope)) continue
-            // The relay gets a much slower cadence than local delivery: every
-            // deposit stores a brand-new blob there, so retrying at the local
-            // rate would pile up copies of one message in the recipient's
-            // mailbox and hand the relay a burst of traffic to correlate.
-            val last = relayRetryAt[entry.id] ?: 0L
-            if (now - last < RELAY_RETRY_FLOOR_MS) continue
-            relayRetryAt[entry.id] = now
-            relay?.enqueue(entry.recipientId, entry.envelope)
+            launch {
+                if (sendDirect(entry.recipientId, entry.envelope)) return@launch
+                val last = relayRetryAt[entry.id] ?: 0L
+                val floor = relayRetryFloorFor(now - entry.createdAt)
+                if (now - last < floor) return@launch
+                // Stamped only on an ACTUAL successful deposit — a failed
+                // attempt (relay unreachable, transient error) never landed
+                // anywhere, so it costs nothing to try again on the very next
+                // sweep instead of sitting out the same floor a success would.
+                if (relay?.enqueueAwait(entry.recipientId, entry.envelope) == true) {
+                    relayRetryAt[entry.id] = now
+                }
+            }
         }
         // Drop throttle bookkeeping for envelopes that have since been acked.
+        // Computed from `pending` as fetched above — nothing above removes an
+        // outbox row (only a later ack, via handleAck, does that).
         val live = pending.mapTo(HashSet()) { it.id }
         relayRetryAt.keys.retainAll(live)
+    }
+
+    /**
+     * Re-attempt every message that never made it as far as the outbox at all
+     * — session establishment (the X3DH prekey fetch in
+     * getOrCreateInitiatorSession) failed or timed out the first time. Unlike
+     * [retryOutbox], each of these needs a full resend (sendMessage), not just
+     * a transport retry of an already-sealed envelope — there is no envelope
+     * yet. Run concurrently: one contact stuck on a ~75s relay timeout must
+     * not delay retrying everyone else.
+     */
+    private suspend fun retryPendingSends() = coroutineScope {
+        for (pending in repository.getAllPendingSends()) {
+            launch { sendMessage(pending.recipientId, pending.plaintext, pending.ttlSeconds, pending.clientMessageId) }
+        }
+    }
+
+    /** Same as [retryPendingSends], scoped to messages waiting on one contact — see [flushOutboxTo]. */
+    private suspend fun retryPendingSendsTo(contactId: String) = coroutineScope {
+        for (pending in repository.getPendingSendsForContact(contactId)) {
+            launch { sendMessage(pending.recipientId, pending.plaintext, pending.ttlSeconds, pending.clientMessageId) }
+        }
     }
 
     /**
@@ -649,10 +829,208 @@ class SecureMessagingClient(
     }
 
     /**
-     * Resend every envelope still sitting in the durable outbox for [contactId]
-     * — called the moment that contact is (re)discovered on the network. Rows
-     * are only removed on a matching "ack" (see [handleAck]), so resending is
-     * always safe even if an earlier attempt actually got through.
+     * Best-effort retry of a username claim that couldn't reach the
+     * directory when [com.securemessenger.app.ui.screens.setup.SetupScreen]
+     * first attempted it (offline at setup time) — see
+     * [AppSettings.isUsernameClaimedRemotely]'s doc. A no-op once already
+     * marked claimed, once there's no local username to claim, or when the
+     * directory feature isn't configured for this build.
+     */
+    private suspend fun ensureUsernameClaimed() {
+        val client = directory ?: return
+        if (AppSettings.isUsernameClaimedRemotely(appContext)) return
+        val username = AppSettings.getUsername(appContext) ?: return
+        val identity = getIdentityKeyPair() ?: return
+        val signingPublic = repository.getSigningPublicKey() ?: return
+        val signingSecret = repository.getSigningSecretKey() ?: return
+
+        when (client.claim(username, identity.publicKey, signingPublic) { payload ->
+            LibsodiumWrapper.signDetached(payload, signingSecret)
+        }) {
+            DirectoryClient.ClaimResult.Success, DirectoryClient.ClaimResult.AlreadyRegistered ->
+                AppSettings.setUsernameClaimedRemotely(appContext, true)
+            // Taken (lost a race to someone else after setup already showed
+            // it as available) or Error (still offline/unreachable) — leave
+            // the flag false either way so this simply retries next reveal.
+            // A user who genuinely lost a race has no in-app recovery yet
+            // beyond picking a new username from Settings — same limitation
+            // SetupScreen's synchronous check already has.
+            DirectoryClient.ClaimResult.Taken, DirectoryClient.ClaimResult.Error -> {}
+        }
+    }
+
+    /**
+     * Collect and process every introduction waiting for us. Destructive on
+     * the server, like the relay's own fetch (see [DirectoryClient.fetchIntroductions])
+     * — a blob that fails to process here is simply lost, not retried. That's
+     * acceptable: the sender's own [OutgoingConnectionRequest] is what a "still
+     * pending" UI reads, not delivery of any single accept/request blob, so a
+     * lost one just means the other side eventually tries again from the
+     * search screen — no different in spirit from an unreachable QR pairing
+     * needing a second scan.
+     */
+    private suspend fun pollIntroductions() {
+        val client = directory ?: return
+        val identity = getIdentityKeyPair() ?: return
+        val signingSecret = repository.getSigningSecretKey() ?: return
+        val blobs = client.fetchIntroductions(identity.publicKey) { payload ->
+            LibsodiumWrapper.signDetached(payload, signingSecret)
+        } ?: return
+        for (blob in blobs) {
+            try {
+                handleIntroductionBlob(blob)
+            } catch (e: Exception) {
+                Log.w(TAG, "discarding unreadable introduction blob", e)
+            }
+        }
+    }
+
+    /**
+     * Unseal one collected blob and dispatch by type. Deliberately no
+     * chunking and no extra symmetric layer the way relay traffic gets (see
+     * [MailboxToken.blobKey]'s doc) — introductions are single, small,
+     * one-shot payloads, and crypto_box_seal already fully protects the
+     * content. The directory operator sees only that *some* introduction
+     * landed for this identity — inherent to a deposit API that necessarily
+     * names its recipient, not something an extra layer here would hide.
+     */
+    private suspend fun handleIntroductionBlob(blobBase64: String) {
+        val identity = getIdentityKeyPair() ?: return
+        val outer = JSONObject(String(B64.decode(blobBase64), Charsets.UTF_8))
+        val inner = com.securemessenger.core.net.Envelopes.open(outer, identity.publicKey, identity.secretKey)
+        when (outer.optString("type")) {
+            com.securemessenger.core.net.Envelopes.TYPE_INTRO_REQUEST -> handleIntroRequest(inner)
+            com.securemessenger.core.net.Envelopes.TYPE_INTRO_ACCEPT -> handleIntroAccept(inner)
+        }
+    }
+
+    /**
+     * Someone we've never talked to found us by username and introduced
+     * themselves. Verified BEFORE anything is stored:
+     * [com.securemessenger.core.net.DirectoryProtocol.verifySelfIntroduction]
+     * needs a signing key obtained independently of this payload, so this
+     * does its own fresh directory lookup of the claimed sender username —
+     * the whole anti-impersonation property depends on never trusting
+     * `senderSigningPublicKey` embedded in the payload itself. Only stored
+     * for the user to explicitly accept/reject afterward — nothing here ever
+     * creates a Contact directly.
+     */
+    private suspend fun handleIntroRequest(inner: JSONObject) {
+        val client = directory ?: return
+        val identity = getIdentityKeyPair() ?: return
+        val intro = com.securemessenger.core.net.DirectoryProtocol.parseSelfIntroduction(inner) ?: return
+        if (intro.senderUserId == userId) return
+
+        val trustedSigningKey = when (val result = client.lookup(intro.senderUsername)) {
+            is DirectoryClient.LookupResult.Found -> {
+                // The username must currently resolve to the SAME identity
+                // key this introduction claims to be from — otherwise it's
+                // either stale (they since registered a different username)
+                // or an attempt to borrow someone else's claimed username.
+                if (!result.identityPublicKey.contentEquals(intro.senderIdentityPublicKey)) {
+                    Log.w(TAG, "intro_request username/identity mismatch — refusing")
+                    return
+                }
+                result.signingPublicKey
+            }
+            else -> {
+                Log.w(TAG, "intro_request from unresolvable username — refusing")
+                return
+            }
+        }
+
+        if (!com.securemessenger.core.net.DirectoryProtocol.verifySelfIntroduction(
+                intro, ourIdentityPublicKey = identity.publicKey, trustedSigningPublicKey = trustedSigningKey
+            )
+        ) {
+            Log.w(TAG, "intro_request signature verification failed — refusing")
+            return
+        }
+
+        // Not an error if this is a resend of one already pending, or from
+        // someone already a contact — REPLACE just refreshes what we have.
+        repository.saveIncomingConnectionRequest(
+            senderIdentityPublicKeyHex = B64.toHex(intro.senderIdentityPublicKey),
+            senderUserId = intro.senderUserId,
+            senderUsername = intro.senderUsername,
+            senderSigningPublicKey = intro.senderSigningPublicKey,
+            pairSecret = intro.pairSecret,
+            directAddress = intro.directAddress
+        )
+    }
+
+    /**
+     * The other side of a request we sent has accepted it. Verified against
+     * the signing key WE already captured ourselves at lookup time — see
+     * [OutgoingConnectionRequest.recipientSigningPublicKey] — never a fresh
+     * lookup, since by definition we already trust-anchored them before ever
+     * sending the original request. See
+     * [com.securemessenger.core.net.DirectoryProtocol.verifySelfIntroduction]'s
+     * doc for why the two verification paths differ.
+     */
+    private suspend fun handleIntroAccept(inner: JSONObject) {
+        val identity = getIdentityKeyPair() ?: return
+        val intro = com.securemessenger.core.net.DirectoryProtocol.parseSelfIntroduction(inner) ?: return
+        if (intro.senderUserId == userId) return
+        val recipientKeyHex = B64.toHex(intro.senderIdentityPublicKey)
+        val outgoing = repository.getOutgoingConnectionRequest(recipientKeyHex) ?: run {
+            Log.w(TAG, "intro_accept for a request we have no record of sending — ignoring")
+            return
+        }
+
+        if (!com.securemessenger.core.net.DirectoryProtocol.verifySelfIntroduction(
+                intro, ourIdentityPublicKey = identity.publicKey,
+                trustedSigningPublicKey = outgoing.recipientSigningPublicKey
+            )
+        ) {
+            Log.w(TAG, "intro_accept signature verification failed — ignoring")
+            return
+        }
+
+        // intro.pairSecret is THEIR minted secret (see SelfIntroduction's
+        // doc) — we send on it. Mirrors pairWithScannedContact's relaySendSecret exactly.
+        repository.addContactWithPublicKey(
+            contactId = intro.senderUserId,
+            publicKeyHex = B64.toHex(intro.senderIdentityPublicKey),
+            displayName = intro.senderUsername,
+            relaySendSecret = intro.pairSecret
+        )
+        // The secret WE minted when we sent the original request — we listen
+        // on it. The Contact row above now exists, so this binds immediately
+        // rather than waiting for a first message the way a still-anonymous
+        // QR-minted secret has to (see AppSettings.pendingPairSecrets):
+        // there was never any ambiguity about who this secret was for.
+        val ourMintedSecret = decryptOutgoingPairSecret(outgoing) ?: return
+        repository.bindRelayRecvSecret(intro.senderUserId, ourMintedSecret)
+
+        intro.directAddress
+            ?.takeIf { hint ->
+                com.securemessenger.core.net.LanAddress.parse(hint, LOCAL_RELAY_PORT)
+                    ?.let { (host, p) -> p != boundPort || !com.securemessenger.core.net.LanAddress.isOwnAddress(host) }
+                    ?: false
+            }
+            ?.let { AppSettings.setDirectAddress(appContext, intro.senderUserId, it) }
+
+        refreshTokenMap()
+        refreshRelaySubscriptions()
+        repository.deleteOutgoingConnectionRequest(recipientKeyHex)
+    }
+
+    private fun decryptOutgoingPairSecret(request: OutgoingConnectionRequest): ByteArray? = try {
+        com.securemessenger.app.crypto.AndroidKeyStoreManager.decryptWithMasterKey(request.mintedPairSecretEncrypted)
+    } catch (e: Exception) {
+        Log.e(TAG, "failed to decrypt our own minted pair secret", e)
+        null
+    }
+
+    /**
+     * Resume everything still owed to [contactId] — called the moment that
+     * contact is (re)discovered on the network. Two kinds of unfinished work:
+     * envelopes already sealed and sitting in the durable outbox, and messages
+     * that never got that far because session establishment failed earlier
+     * (see [retryPendingSendsTo]). Outbox rows are only removed on a matching
+     * "ack" (see [handleAck]), so resending is always safe even if an earlier
+     * attempt actually got through.
      */
     private suspend fun flushOutboxTo(contactId: String) {
         repository.getAllOutboxEnvelopes()
@@ -662,6 +1040,7 @@ class SecureMessagingClient(
             // still fails is picked up by [retryOutbox], which is where the
             // rate-limited relay fallback lives.
             .forEach { entry -> sendDirect(contactId, entry.envelope) }
+        retryPendingSendsTo(contactId)
     }
 
     /**
@@ -717,67 +1096,107 @@ class SecureMessagingClient(
 
     suspend fun sendMessage(recipientId: String, plaintext: ByteArray, ttlSeconds: Int? = null, messageId: String? = null): Boolean {
         return try {
-            lockFor(recipientId).withLock { sendMessageLocked(recipientId, plaintext, ttlSeconds, messageId) }
+            sendMessageInternal(recipientId, plaintext, ttlSeconds, messageId)
+            // Any earlier failed attempt for this exact message (see the catch
+            // below) is now moot — it succeeded and is a normal, ack-tracked
+            // OutboxEnvelope instead (written by enqueueAndSend).
+            messageId?.let { repository.deletePendingSend(it) }
             true
         } catch (e: Exception) {
             Log.e(TAG, "sendMessage failed", e)
+            // Establishing a session needs the recipient to answer live (an
+            // X3DH prekey fetch, via getOrCreateInitiatorSession) — when that
+            // fails or times out, the message never reaches enqueueAndSend, so
+            // the durable outbox never learns about it and nothing would ever
+            // retry it. Persisting it here is what retryPendingSends() and
+            // retryPendingSendsTo() actually act on — without it, a contact
+            // who's briefly unreachable the FIRST time you message them loses
+            // that message outright, and the "retry" UI action (which only
+            // re-runs discovery) had nothing to retry.
+            messageId?.let { repository.savePendingSend(it, recipientId, plaintext, ttlSeconds) }
             false
         }
     }
 
-    private suspend fun sendMessageLocked(recipientId: String, plaintext: ByteArray, ttlSeconds: Int?, messageId: String?) {
+    private suspend fun sendMessageInternal(recipientId: String, plaintext: ByteArray, ttlSeconds: Int?, messageId: String?) {
             val recipientPublicKey = getContactIdentityKey(recipientId)
                 ?: throw IllegalStateException("Unknown recipient public key")
 
-            val protocol = getOrCreateInitiatorSession(recipientId)
-            // Pad to a fixed bucket so ciphertext length doesn't leak message size.
-            val encryptedMessage = protocol.encryptMessage(MessagePadding.pad(plaintext))
-            // We are the initiator for this contact unless we established the
-            // session as a responder to them.
-            val weAreInitiator = !responderEphemerals.containsKey(recipientId)
+            // Establishes a session if none exists yet — may need a live round
+            // trip to fetch the recipient's prekey bundle (up to
+            // RELAY_BUNDLE_TIMEOUT_MS ≈ 75s). Deliberately outside the
+            // per-contact ratchet lock below, so a slow handshake with this
+            // contact can never block a message arriving FROM them
+            // (handleMessageEnvelope takes that same lock to decrypt).
+            // Concurrent callers for the same contact are serialized by this
+            // function's own handshake lock instead — see getOrCreateInitiatorSession.
+            getOrCreateInitiatorSession(recipientId)
 
             // Routing id created up front so we can bind a delivery token to it
             // and seal that token inside the envelope (verified in handleAck).
             val envelopeId = java.util.UUID.randomUUID().toString()
             val ackToken = ackTokenFor(envelopeId)
+            val senderIdentityKey = getIdentityKeyPair()?.publicKey
 
-            // Inner envelope holds everything the recipient needs — including who
-            // the sender is and when it was sent. It is sealed to the recipient's
-            // key so anyone else on the local network never sees any of it.
-            val inner = JSONObject().apply {
-                put("senderId", userId)
-                ackToken?.let { put("ackToken", it) }
-                put("ciphertext", android.util.Base64.encodeToString(encryptedMessage.ciphertext, android.util.Base64.NO_WRAP))
-                put("dhPublicKey", android.util.Base64.encodeToString(encryptedMessage.dhPublicKey, android.util.Base64.NO_WRAP))
-                put("chainCounter", encryptedMessage.chainCounter)
-                put("previousChainLength", encryptedMessage.previousChainLength)
-                put("timestamp", System.currentTimeMillis())
-                // Shared id so a read receipt can reference this exact message.
-                messageId?.let { put("messageId", it) }
-                ttlSeconds?.let { put("ttl", it) }
-                getIdentityKeyPair()?.let { identity ->
-                    put("senderIdentityKey", android.util.Base64.encodeToString(identity.publicKey, android.util.Base64.NO_WRAP))
-                }
-                // X3DH bootstrap fields only when we are initiating — they let the
-                // recipient (re)build their responder session.
-                if (weAreInitiator) {
-                    protocol.getInitiatorEphemeralPublicKey()?.let {
-                        put("initiatorEphemeralKey", android.util.Base64.encodeToString(it, android.util.Base64.NO_WRAP))
+            val envelope = lockFor(recipientId).withLock {
+                // Re-read the current session here rather than trust a
+                // reference captured before this lock: a message arriving FROM
+                // this same contact concurrently (simultaneous initiation) can
+                // rebuild it as a responder session between the call above and
+                // this lock being acquired (see createResponderSession /
+                // selectSessionForIncoming's tie-break, which runs under this
+                // very lock keyed by the same contact id). Reading it fresh
+                // here guarantees we always encrypt with — and correctly
+                // describe as initiator or not — whichever session is actually
+                // current, instead of a possibly-abandoned one.
+                val protocol = cachedOrPersisted(recipientId)
+                    ?: throw IllegalStateException("session vanished for $recipientId")
+                // Pad to a fixed bucket so ciphertext length doesn't leak message size.
+                val encryptedMessage = protocol.encryptMessage(MessagePadding.pad(plaintext))
+                // We are the initiator for this contact unless we established the
+                // session as a responder to them.
+                val weAreInitiator = !responderEphemerals.containsKey(recipientId)
+
+                // Inner envelope holds everything the recipient needs — including who
+                // the sender is and when it was sent. It is sealed to the recipient's
+                // key so anyone else on the local network never sees any of it.
+                val inner = JSONObject().apply {
+                    put("senderId", userId)
+                    ackToken?.let { put("ackToken", it) }
+                    put("ciphertext", android.util.Base64.encodeToString(encryptedMessage.ciphertext, android.util.Base64.NO_WRAP))
+                    put("dhPublicKey", android.util.Base64.encodeToString(encryptedMessage.dhPublicKey, android.util.Base64.NO_WRAP))
+                    put("chainCounter", encryptedMessage.chainCounter)
+                    put("previousChainLength", encryptedMessage.previousChainLength)
+                    put("timestamp", System.currentTimeMillis())
+                    // Shared id so a read receipt can reference this exact message.
+                    messageId?.let { put("messageId", it) }
+                    ttlSeconds?.let { put("ttl", it) }
+                    senderIdentityKey?.let {
+                        put("senderIdentityKey", android.util.Base64.encodeToString(it, android.util.Base64.NO_WRAP))
                     }
-                    initiatorOtkIds[recipientId]?.let { put("oneTimePreKeyId", it) }
-                    initiatorPqCiphertexts[recipientId]?.let {
-                        put("pqKemCiphertext", android.util.Base64.encodeToString(it, android.util.Base64.NO_WRAP))
+                    // X3DH bootstrap fields only when we are initiating — they let the
+                    // recipient (re)build their responder session.
+                    if (weAreInitiator) {
+                        protocol.getInitiatorEphemeralPublicKey()?.let {
+                            put("initiatorEphemeralKey", android.util.Base64.encodeToString(it, android.util.Base64.NO_WRAP))
+                        }
+                        initiatorOtkIds[recipientId]?.let { put("oneTimePreKeyId", it) }
+                        initiatorPqCiphertexts[recipientId]?.let {
+                            put("pqKemCiphertext", android.util.Base64.encodeToString(it, android.util.Base64.NO_WRAP))
+                        }
                     }
                 }
+
+                // The ratchet advanced — persist so a restart can resume the session.
+                persistSession(recipientId)
+
+                // The routing id lets the recipient's ack be matched back to this
+                // exact outbox entry.
+                sealedEnvelope("message", inner, recipientPublicKey, envelopeId)
             }
 
-            // The ratchet advanced — persist so a restart can resume the session.
-            persistSession(recipientId)
-
-            // The routing id lets the recipient's ack be matched back to this
-            // exact outbox entry.
-            val envelope = sealedEnvelope("message", inner, recipientPublicKey, envelopeId)
-
+            // DB write + network send of the already-built envelope — deliberately
+            // outside the ratchet lock, since neither touches session state.
             enqueueAndSend(envelopeId, recipientId, envelope.toString(), clientMessageId = messageId)
     }
 
@@ -826,23 +1245,45 @@ class SecureMessagingClient(
     }
 
     /**
-     * Process an envelope exactly once, however many times it arrives.
+     * Process an envelope exactly once, however many times it *successfully*
+     * arrives.
      *
      * A resend whose ack was lost, and the same envelope racing in over both
      * transports at once, are both normal here — but [handler] advances the
      * ratchet, so running it twice would fail to decrypt and could surface a
-     * duplicate in the chat. A repeat therefore skips the handler and reuses
-     * the remembered ack token, so the sender still gets the acknowledgement it
-     * is waiting for and stops retrying.
+     * duplicate in the chat. A repeat of an envelope we already handled
+     * therefore skips [handler] and reuses the remembered ack token, so the
+     * sender still gets the acknowledgement it is waiting for and stops
+     * retrying.
+     *
+     * A repeat of an envelope [handler] previously *dropped* (returned null
+     * without throwing — no session yet, lost a simultaneous-initiation race,
+     * unrecognized sender) is different: nothing was consumed, so it is both
+     * safe and necessary to run [handler] again. The sender's durable outbox
+     * will keep resending that exact envelope regardless, on its own retry
+     * schedule, for as long as whatever blocked it might take to resolve
+     * (e.g. the responder session finishing establishment) — treating that
+     * first drop as final would silently blackhole the message forever and
+     * leave the sender's copy stuck "sending" with no way to ever un-stick.
+     *
+     * Checked in two layers: the in-memory map first (fast, and always
+     * current within one client lifetime), then the persisted table (covers
+     * an envelope handled by an *earlier* client instance — see
+     * [seenEnvelopes]).
      */
     private suspend fun onceOnly(type: String, json: JSONObject, handler: suspend () -> String?): String? {
         val id = json.optString("id").takeIf { it.isNotBlank() } ?: return handler()
         val key = "$type:$id"
-        synchronized(seenEnvelopes) {
-            if (seenEnvelopes.containsKey(key)) return seenEnvelopes[key]
+        synchronized(seenEnvelopes) { seenEnvelopes[key] }?.let { return it }
+        repository.getSeenEnvelopeAckToken(key)?.let { persisted ->
+            synchronized(seenEnvelopes) { seenEnvelopes[key] = persisted }
+            return persisted
         }
         val ackToken = handler()
-        synchronized(seenEnvelopes) { seenEnvelopes[key] = ackToken }
+        if (ackToken != null) {
+            synchronized(seenEnvelopes) { seenEnvelopes[key] = ackToken }
+            repository.rememberSeenEnvelope(key, ackToken)
+        }
         return ackToken
     }
 
@@ -873,11 +1314,23 @@ class SecureMessagingClient(
             type, inner, recipientPublicKey, envelopeId
         )
 
-    /** Unseal a sealed-sender envelope (used for both chat messages and read receipts). */
+    /**
+     * Unseal a sealed-sender envelope (used for both chat messages and read
+     * receipts). Memoized by the sealed ciphertext string, which is safe
+     * because the result is a deterministic function of (that ciphertext, our
+     * own identity key pair) and our identity never changes during this
+     * object's lifetime — see [unsealCache]. The returned object is shared
+     * across every caller that unseals the same envelope: read it, never
+     * mutate it.
+     */
     private suspend fun unsealEnvelope(outer: JSONObject): JSONObject {
         if (!outer.has("sealed")) return outer
+        val sealed = outer.getString("sealed")
+        synchronized(unsealCache) { unsealCache[sealed] }?.let { return it }
         val identity = getIdentityKeyPair() ?: throw IllegalStateException("Identity key not found")
-        return com.securemessenger.core.net.Envelopes.open(outer, identity.publicKey, identity.secretKey)
+        val opened = com.securemessenger.core.net.Envelopes.open(outer, identity.publicKey, identity.secretKey)
+        synchronized(unsealCache) { unsealCache[sealed] = opened }
+        return opened
     }
 
     /** Tell a sender that we've read the messages they sent us. */
@@ -929,7 +1382,15 @@ class SecureMessagingClient(
             val recipientPublicKey = getContactIdentityKey(recipientId) ?: return@withContext false
             val inner = JSONObject().apply { put("senderId", userId) }
             val envelope = sealedEnvelope("typing", inner, recipientPublicKey)
-            sendToContact(recipientId, envelope.toString())
+            // Direct only — deliberately never falls back to the relay like
+            // sendToContact does. A typing indicator that lands after the
+            // relay's poll interval (POLL_MIN_MS..POLL_MAX_MS, so several
+            // seconds at best) is worthless — the conversation has moved on by
+            // the time it arrives — while still costing a real deposit (an
+            // observable, timestamped mailbox write) for nothing. Failing
+            // silently when not directly reachable is exactly right, per the
+            // doc comment above: this is inherently ephemeral already.
+            sendDirect(recipientId, envelope.toString())
         } catch (e: Exception) {
             false
         }
@@ -1107,7 +1568,17 @@ class SecureMessagingClient(
     }
 
     private suspend fun getOrCreateInitiatorSession(contactId: String): SignalProtocol {
-        return cachedOrPersisted(contactId) ?: run {
+        cachedOrPersisted(contactId)?.let { return it }
+        // Two sends fired in quick succession to a contact with no session yet
+        // would otherwise both start X3DH at once — each registers itself in
+        // pendingBundleRequests[contactId], and the second overwrites the
+        // first's entry, so the first's reply (when it arrives) is delivered
+        // to the wrong waiter and the first send times out despite a valid
+        // bundle_announce having come back. Serialize per contact instead.
+        return handshakeLockFor(contactId).withLock {
+            // Re-check: another call may have finished establishing the
+            // session while this one was waiting for the lock.
+            cachedOrPersisted(contactId)?.let { return@withLock it }
             val prekeyBundle = fetchPrekeyBundle(contactId)
             val identityKeyPair = getIdentityKeyPair()
                 ?: throw IllegalStateException("Identity key not found")
@@ -1340,21 +1811,38 @@ class SecureMessagingClient(
      * arrives in it. A QR from an older build carries no secret — that contact
      * then simply has no relay path and stays local-network-only.
      */
+    /**
+     * @param allowKeyChange See [SecureRepository.addContactWithPublicKey] —
+     * only pass true once the caller has explicitly warned the user that
+     * this contact's pinned key is about to change and they've confirmed it.
+     * @return null on an unrelated failure (pairing yourself, a malformed
+     * key, an exception) — see [SecureRepository.ContactPairResult] for
+     * every other outcome, including the refused-without-confirmation case.
+     */
     suspend fun pairWithScannedContact(
         scannedUserId: String,
         identityKeyHex: String,
         displayName: String,
         pairSecretHex: String? = null,
-        directAddress: String? = null
-    ): Boolean =
+        directAddress: String? = null,
+        allowKeyChange: Boolean = false
+    ): com.securemessenger.app.data.repository.ContactPairResult? =
         withContext(Dispatchers.IO) {
             try {
-                if (scannedUserId == userId) return@withContext false
+                if (scannedUserId == userId) return@withContext null
                 val pairSecret = pairSecretHex?.let { MailboxToken.pairSecretFromHex(it) }
-                repository.addContactWithPublicKey(
+                val result = repository.addContactWithPublicKey(
                     scannedUserId, identityKeyHex, displayName,
-                    relaySendSecret = pairSecret
+                    relaySendSecret = pairSecret,
+                    allowKeyChange = allowKeyChange
                 )
+                if (result == com.securemessenger.app.data.repository.ContactPairResult.KEY_CHANGED) {
+                    // Refused — nothing below (address hint, discovery,
+                    // relay subscriptions) should run for a pairing that
+                    // didn't actually go through. The caller re-invokes with
+                    // allowKeyChange = true once the user confirms.
+                    return@withContext result
+                }
                 // The address the other device was listening on when it drew
                 // that QR. Only a starting hint — a successful connection
                 // overwrites it, and mDNS is still tried first — but it means
@@ -1374,12 +1862,174 @@ class SecureMessagingClient(
                     ?.let { AppSettings.setDirectAddress(appContext, scannedUserId, it) }
                 refreshTokenMap()
                 refreshRelaySubscriptions()
-                true
+                result
             } catch (e: Exception) {
                 Log.e(TAG, "pairWithScannedContact failed", e)
-                false
+                null
             }
         }
+
+    /** What [sendConnectionRequest] actually did. */
+    sealed class ConnectionRequestResult {
+        /** Deposited — see [SecureRepository.getOutgoingConnectionRequests] for "still pending" state, or [handleIntroAccept] once it lands. */
+        data object Sent : ConnectionRequestResult()
+        /** A request to this exact identity is already outstanding — nothing re-sent, avoids spamming the same person from a repeat search. */
+        data object AlreadyPending : ConnectionRequestResult()
+        data object UsernameNotFound : ConnectionRequestResult()
+        data object CannotAddSelf : ConnectionRequestResult()
+        /** Directory unreachable, feature disabled, or any other failure. */
+        data object Error : ConnectionRequestResult()
+    }
+
+    /**
+     * Resolve a username without sending anything — what the search screen
+     * calls as the user types, so they see who they'd be contacting before
+     * committing to [sendConnectionRequest]. `null` covers both "not found"
+     * and "directory unreachable/disabled"; the caller only needs a boolean
+     * here, [sendConnectionRequest] is what a real caller distinguishes on.
+     */
+    suspend fun lookupUsername(username: String): DirectoryClient.LookupResult.Found? {
+        val client = directory ?: return null
+        return (client.lookup(username) as? DirectoryClient.LookupResult.Found)
+    }
+
+    /**
+     * Look up [username] and, if found, deposit a signed self-introduction
+     * into their introduction mailbox — the remote equivalent of showing
+     * someone your QR code. Nothing about this contact is trusted or stored
+     * as a real [Contact] yet; that only happens if/when they explicitly
+     * accept (see [handleIntroAccept]).
+     */
+    suspend fun sendConnectionRequest(username: String): ConnectionRequestResult = withContext(Dispatchers.IO) {
+        val client = directory ?: return@withContext ConnectionRequestResult.Error
+        try {
+            val found = when (val result = client.lookup(username)) {
+                is DirectoryClient.LookupResult.Found -> result
+                DirectoryClient.LookupResult.NotFound -> return@withContext ConnectionRequestResult.UsernameNotFound
+                DirectoryClient.LookupResult.Error -> return@withContext ConnectionRequestResult.Error
+            }
+            val recipientKeyHex = B64.toHex(found.identityPublicKey)
+            val identity = getIdentityKeyPair() ?: return@withContext ConnectionRequestResult.Error
+            if (found.identityPublicKey.contentEquals(identity.publicKey)) {
+                return@withContext ConnectionRequestResult.CannotAddSelf
+            }
+            if (repository.getOutgoingConnectionRequest(recipientKeyHex) != null) {
+                return@withContext ConnectionRequestResult.AlreadyPending
+            }
+
+            val myUsername = AppSettings.getUsername(appContext) ?: userId.take(8)
+            val signingSecret = repository.getSigningSecretKey() ?: return@withContext ConnectionRequestResult.Error
+            val signingPublic = repository.getSigningPublicKey() ?: return@withContext ConnectionRequestResult.Error
+            val mintedSecret = MailboxToken.newPairSecret()
+
+            val inner = com.securemessenger.core.net.DirectoryProtocol.buildSelfIntroduction(
+                senderUserId = userId,
+                senderUsername = myUsername,
+                senderIdentityPublicKey = identity.publicKey,
+                senderSigningPublicKey = signingPublic,
+                addresseeIdentityPublicKey = found.identityPublicKey,
+                pairSecret = mintedSecret,
+                directAddress = myDirectAddress(),
+                timestampMillis = System.currentTimeMillis(),
+                sign = { payload -> LibsodiumWrapper.signDetached(payload, signingSecret) }
+            )
+            val outer = sealedEnvelope(
+                com.securemessenger.core.net.Envelopes.TYPE_INTRO_REQUEST, inner, found.identityPublicKey
+            )
+            val blob = B64.encode(outer.toString().toByteArray(Charsets.UTF_8))
+
+            if (!client.depositIntroduction(found.identityPublicKey, blob)) {
+                return@withContext ConnectionRequestResult.Error
+            }
+            repository.saveOutgoingConnectionRequest(
+                recipientIdentityPublicKeyHex = recipientKeyHex,
+                recipientUsername = found.username,
+                recipientSigningPublicKey = found.signingPublicKey,
+                mintedPairSecret = mintedSecret
+            )
+            ConnectionRequestResult.Sent
+        } catch (e: Exception) {
+            Log.e(TAG, "sendConnectionRequest failed", e)
+            ConnectionRequestResult.Error
+        }
+    }
+
+    /**
+     * Accept a pending [IncomingConnectionRequest]: pins their key as a real
+     * [Contact] (mirrors [pairWithScannedContact] exactly — sender's minted
+     * secret becomes our outbound channel), mints our own secret for them to
+     * use inbound, and deposits a signed intro_accept so they can complete
+     * the same steps on their side. False on any failure — the request row
+     * is left in place so the user can simply try again.
+     */
+    suspend fun acceptConnectionRequest(senderIdentityPublicKeyHex: String): Boolean = withContext(Dispatchers.IO) {
+        val client = directory ?: return@withContext false
+        try {
+            val request = repository.getIncomingConnectionRequest(senderIdentityPublicKeyHex) ?: return@withContext false
+            val senderIdentityPublicKey = B64.fromHex(senderIdentityPublicKeyHex) ?: return@withContext false
+            val theirPairSecret = com.securemessenger.app.crypto.AndroidKeyStoreManager
+                .decryptWithMasterKey(request.pairSecretEncrypted)
+
+            repository.addContactWithPublicKey(
+                contactId = request.senderUserId,
+                publicKeyHex = senderIdentityPublicKeyHex,
+                displayName = request.senderUsername,
+                relaySendSecret = theirPairSecret
+            )
+
+            val identity = getIdentityKeyPair() ?: return@withContext false
+            val signingSecret = repository.getSigningSecretKey() ?: return@withContext false
+            val signingPublic = repository.getSigningPublicKey() ?: return@withContext false
+            val myUsername = AppSettings.getUsername(appContext) ?: userId.take(8)
+            val mintedSecret = MailboxToken.newPairSecret()
+
+            // Already have a real Contact row as of the call above, so this
+            // binds immediately — no "pending, whoever claims it" ambiguity
+            // the way a freshly-displayed QR secret has.
+            repository.bindRelayRecvSecret(request.senderUserId, mintedSecret)
+
+            request.directAddress
+                ?.takeIf { hint ->
+                    com.securemessenger.core.net.LanAddress.parse(hint, LOCAL_RELAY_PORT)
+                        ?.let { (host, p) -> p != boundPort || !com.securemessenger.core.net.LanAddress.isOwnAddress(host) }
+                        ?: false
+                }
+                ?.let { AppSettings.setDirectAddress(appContext, request.senderUserId, it) }
+
+            val inner = com.securemessenger.core.net.DirectoryProtocol.buildSelfIntroduction(
+                senderUserId = userId,
+                senderUsername = myUsername,
+                senderIdentityPublicKey = identity.publicKey,
+                senderSigningPublicKey = signingPublic,
+                addresseeIdentityPublicKey = senderIdentityPublicKey,
+                pairSecret = mintedSecret,
+                directAddress = myDirectAddress(),
+                timestampMillis = System.currentTimeMillis(),
+                sign = { payload -> LibsodiumWrapper.signDetached(payload, signingSecret) }
+            )
+            val outer = sealedEnvelope(
+                com.securemessenger.core.net.Envelopes.TYPE_INTRO_ACCEPT, inner, senderIdentityPublicKey
+            )
+            val blob = B64.encode(outer.toString().toByteArray(Charsets.UTF_8))
+            // The Contact is already real regardless of whether this deposit
+            // succeeds — worst case they never learn we accepted and their
+            // own outgoing request just stays "pending" until they retry.
+            client.depositIntroduction(senderIdentityPublicKey, blob)
+
+            refreshTokenMap()
+            refreshRelaySubscriptions()
+            repository.deleteIncomingConnectionRequest(senderIdentityPublicKeyHex)
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "acceptConnectionRequest failed", e)
+            false
+        }
+    }
+
+    /** Discard a pending request with no reply of any kind — indistinguishable, from the sender's side, from "hasn't checked yet". */
+    suspend fun rejectConnectionRequest(senderIdentityPublicKeyHex: String) = withContext(Dispatchers.IO) {
+        repository.deleteIncomingConnectionRequest(senderIdentityPublicKeyHex)
+    }
 
     private suspend fun getIdentityKeyPair(): SignalProtocol.IdentityKeyPair? {
         return repository.getIdentityKeyPair()

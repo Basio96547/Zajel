@@ -85,7 +85,11 @@ data class Contact(
     // addresses. Null until their first relay message actually lands in one of
     // our outstanding minted secrets, which is what tells us which one they
     // took; bound to this contact at that moment and never changed after.
-    val relayRecvSecretEncrypted: ByteArray? = null
+    val relayRecvSecretEncrypted: ByteArray? = null,
+    // Purely local — there is no multi-device concept for one identity here,
+    // so there is nothing to sync. Non-null = pinned, and doubles as the sort
+    // key among several pinned chats (most-recently-pinned first).
+    val pinnedAt: Long? = null
 )
 
 /**
@@ -198,6 +202,45 @@ data class OutboxEnvelope(
 )
 
 /**
+ * PendingSend - a message whose delivery failed before it ever became an
+ * [OutboxEnvelope], because establishing a session with the recipient needs a
+ * live round trip (X3DH prekey fetch) that didn't complete — the recipient
+ * wasn't reachable, or the fetch timed out. Without this, that failure had no
+ * durable trace anywhere: the outbox never got a row (there was no envelope
+ * yet to put in it), so nothing ever retried the send and the UI's "retry"
+ * action had nothing to act on. Removed once the send finally succeeds (at
+ * which point it becomes a normal, ack-tracked [OutboxEnvelope] instead).
+ */
+@Entity(tableName = "pending_sends")
+data class PendingSend(
+    @PrimaryKey
+    val clientMessageId: String,
+    val recipientId: String,
+    val plaintextEncrypted: ByteArray,
+    val ttlSeconds: Int? = null,
+    val createdAt: Long = System.currentTimeMillis()
+)
+
+/**
+ * SeenEnvelope - a persisted record that envelope [envelopeKey] was already
+ * successfully handled, so a resend (the sender's durable outbox keeps
+ * resending until acked) is recognized even after this device's messaging
+ * client was recreated — which happens far more often than a full app
+ * restart, since the calculator disguise does it on every hide/reveal cycle.
+ * Without this, the in-memory-only equivalent forgot every envelope on each
+ * such cycle, so a legitimate resend after one would be handed to the
+ * Double-Ratchet a second time — decrypting against an already-consumed
+ * message key, which fails outright (see SignalProtocol.decryptMessage).
+ */
+@Entity(tableName = "seen_envelopes")
+data class SeenEnvelope(
+    @PrimaryKey
+    val envelopeKey: String,
+    val ackToken: String,
+    val seenAt: Long = System.currentTimeMillis()
+)
+
+/**
  * KeyBundle - stores prekeys for the Signal Protocol.
  * Prekeys are used for initial key exchange with new contacts.
  */
@@ -212,4 +255,66 @@ data class KeyBundle(
     val isOneTime: Boolean = true,
     val isUsed: Boolean = false,
     val createdAt: Long = System.currentTimeMillis()
+)
+
+/**
+ * IncomingConnectionRequest - an unsolicited self-introduction received
+ * through the username directory's introduction mailbox (see
+ * DirectoryProtocol.SelfIntroduction), not yet accepted into a real
+ * [Contact]. Deliberately its own table rather than an early row in
+ * `contacts`: nothing here has been trusted yet, and the two tables'
+ * lifecycle is different — this row is either accepted (becomes a Contact,
+ * then this row is deleted) or rejected (just deleted, no trace kept).
+ *
+ * Keyed by the sender's identity public key, not their self-declared userId —
+ * a userId is exactly the kind of thing an unverified stranger can claim to
+ * be anything before we've decided whether to trust them at all.
+ *
+ * No separate display-name field: per [Entities]'s own note on
+ * `UserProfile.displayNameEncrypted`, a contact only ever learns your
+ * *username* (there's no profile-broadcast protocol), so `senderUsername`
+ * IS what becomes the new Contact's displayNameEncrypted on accept — same as
+ * a QR pairing's `n` field already works today.
+ */
+@Entity(tableName = "incoming_connection_requests")
+data class IncomingConnectionRequest(
+    @PrimaryKey
+    val senderIdentityPublicKeyHex: String,
+    val senderUserId: String,
+    val senderUsername: String,
+    val senderSigningPublicKey: ByteArray,
+    // The pair secret THEY minted for us to listen on — real secret
+    // material, Keystore-encrypted like Contact.relaySendSecretEncrypted.
+    val pairSecretEncrypted: ByteArray,
+    val directAddress: String? = null,
+    val receivedAt: Long = System.currentTimeMillis()
+)
+
+/**
+ * OutgoingConnectionRequest - a self-introduction we sent to someone found by
+ * username search, not yet accepted. Lets the search UI show "بانتظار الرد"
+ * instead of allowing a repeat search-and-send to spam the same person, and
+ * gives [SecureMessagingClient.handleIntroAccept] both the pair secret an
+ * incoming accept is claiming to answer AND the signing key to verify that
+ * accept against — captured here, at lookup time, so accepting it never
+ * needs (or trusts) a second directory round trip. See
+ * DirectoryProtocol.verifySelfIntroduction's doc for why this is the
+ * correct trusted-key source for THIS direction specifically.
+ *
+ * No recipientUserId: we don't have one yet. The directory only ever hands
+ * back a username + public keys (see DirectoryClient.LookupResult) — we
+ * learn the recipient's actual userId only if/when their intro_accept
+ * arrives, at which point handleIntroAccept creates the real Contact
+ * directly and this row is deleted.
+ */
+@Entity(tableName = "outgoing_connection_requests")
+data class OutgoingConnectionRequest(
+    @PrimaryKey
+    val recipientIdentityPublicKeyHex: String,
+    val recipientUsername: String,
+    val recipientSigningPublicKey: ByteArray,
+    // The pair secret WE minted for them to listen on. Keystore-encrypted
+    // like every other pair secret at rest.
+    val mintedPairSecretEncrypted: ByteArray,
+    val sentAt: Long = System.currentTimeMillis()
 )

@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 
 data class ContactUiModel(
     val id: String,
@@ -25,7 +26,8 @@ data class ContactUiModel(
     val avatarBytes: ByteArray? = null,
     val lastIsMine: Boolean = false,
     val lastIsRead: Boolean = false,
-    val lastIsSelfDestruct: Boolean = false
+    val lastIsSelfDestruct: Boolean = false,
+    val pinnedAt: Long? = null
 )
 
 class ChatListViewModel(
@@ -39,6 +41,10 @@ class ChatListViewModel(
     /**
      * Chat list with a last-message preview, time and unread badge — recomputed
      * reactively whenever contacts or messages change (Telegram/WhatsApp style).
+     *
+     * Sort is decided here, in exactly one place: pinned conversations first
+     * (most-recently-pinned first), then everything else by last activity.
+     * Neither the screen nor any other layer re-sorts this list.
      */
     val contacts: StateFlow<List<ContactUiModel>> =
         combine(repository.getContacts(), repository.getAllMessages()) { contacts, messages ->
@@ -57,8 +63,18 @@ class ChatListViewModel(
                     lastIsRead = last?.isRead == true,
                     lastIsSelfDestruct = last?.expiresAt != null && last.isExpired == false
                 )
-            }.sortedByDescending { it.lastTimestamp }
+            }.sortedWith(
+                compareByDescending<ContactUiModel> { it.pinnedAt != null }
+                    .thenByDescending { it.pinnedAt ?: it.lastTimestamp }
+            )
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun togglePin(contactId: String) {
+        val currentlyPinned = contacts.value.firstOrNull { it.id == contactId }?.pinnedAt != null
+        viewModelScope.launch {
+            repository.setContactPinned(contactId, !currentlyPinned)
+        }
+    }
 
     private fun preview(message: EncryptedMessage): String {
         if (message.isDeleted) return "🚫 حُذفت"
@@ -96,7 +112,8 @@ class ChatListViewModel(
             avatarBytes = avatar,
             lastIsMine = lastIsMine,
             lastIsRead = lastIsRead,
-            lastIsSelfDestruct = lastIsSelfDestruct
+            lastIsSelfDestruct = lastIsSelfDestruct,
+            pinnedAt = pinnedAt
         )
     }
 }

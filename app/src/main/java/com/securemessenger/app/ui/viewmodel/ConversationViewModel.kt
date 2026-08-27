@@ -85,6 +85,52 @@ class ConversationViewModel(
     // set right before each error, cleared once retried (or once superseded).
     private var lastFailedAction: (() -> Unit)? = null
 
+    /**
+     * How much is actually lost if [lastFailedAction] gets silently replaced
+     * by a later, unrelated failure before the user ever taps "إعادة" — see
+     * [reportFailure]. Several independently-launched coroutines in this
+     * class (a send, a media send, a reaction/edit/delete delivery) can all
+     * fail around the same time and each wants to set this single shared
+     * slot; without ranking them, whichever happened to finish last simply
+     * overwrote whatever was there, even a strictly more important failure.
+     */
+    private enum class FailureSeverity {
+        /**
+         * The message was never durably saved ANYWHERE — repository.sendMessageToContact
+         * / sendMediaMessage itself threw. There is no other safety net for
+         * this: SecureMessagingClient's pending-send/outbox retries only
+         * ever see a message that made it into local storage in the first
+         * place. Losing this retry action means that message can never be
+         * resent at all, only retyped from scratch.
+         */
+        SAVE_FAILED,
+        /**
+         * The message WAS saved locally but delivery failed or hasn't
+         * happened yet. This is nowhere near as costly to lose track of: the
+         * durable outbox / pending-send retry (SecureMessagingClient) keeps
+         * retrying it automatically regardless of whether this Snackbar's
+         * retry button is ever tapped — losing lastFailedAction here only
+         * costs the convenience of retrying sooner than the next automatic
+         * sweep.
+         */
+        DELIVERY_FAILED
+    }
+
+    private var lastFailureSeverity: FailureSeverity? = null
+
+    /**
+     * Show an error and remember how to retry it — but never let a
+     * DELIVERY_FAILED (self-healing via the durable outbox regardless) silently
+     * bump a still-pending SAVE_FAILED (no other safety net at all) out of
+     * [lastFailedAction] before the user ever sees or retries it.
+     */
+    private fun reportFailure(message: String, severity: FailureSeverity, action: (() -> Unit)? = null) {
+        if (lastFailureSeverity == FailureSeverity.SAVE_FAILED && severity == FailureSeverity.DELIVERY_FAILED) return
+        _error.value = message
+        lastFailedAction = action
+        lastFailureSeverity = severity
+    }
+
     /** Clears the currently-shown error (the Snackbar dismissed/timed out on its own). */
     fun clearError() {
         _error.value = null
@@ -94,6 +140,7 @@ class ConversationViewModel(
     fun retryLastAction() {
         val action = lastFailedAction ?: return
         lastFailedAction = null
+        lastFailureSeverity = null
         _error.value = null
         action()
     }
@@ -187,8 +234,7 @@ class ConversationViewModel(
             val saved = try {
                 repository.sendMessageToContact(contactId, trimmed, ttlSeconds)
             } catch (e: Exception) {
-                _error.value = "فشل حفظ الرسالة: ${e.message}"
-                lastFailedAction = { sendMessage(trimmed) }
+                reportFailure("فشل حفظ الرسالة: ${e.message}", FailureSeverity.SAVE_FAILED) { sendMessage(trimmed) }
                 null
             } finally {
                 _isSending.value = false
@@ -207,20 +253,23 @@ class ConversationViewModel(
                     // it's still connecting — wait for it instead of giving up.
                     val client = app.awaitMessagingClient()
                     if (client == null) {
-                        _error.value = "غير متصل بالشبكة المحلية — الرسالة محفوظة وستُرسَل عند الاتصال"
-                        lastFailedAction = { app.messagingClient?.retryNow() }
+                        reportFailure(
+                            "غير متصل بالشبكة المحلية — الرسالة محفوظة وستُرسَل عند الاتصال",
+                            FailureSeverity.DELIVERY_FAILED
+                        ) { app.messagingClient?.retryNow() }
                         return@launch
                     }
                     val delivered = withContext(Dispatchers.IO) {
                         client.sendMessage(contactId, trimmed.toByteArray(Charsets.UTF_8), ttlSeconds, messageId)
                     }
                     if (!delivered) {
-                        _error.value = "تعذّر الإرسال الآن — سيُعاد المحاولة تلقائياً عند اتصال الطرف الآخر"
-                        lastFailedAction = { app.messagingClient?.retryNow() }
+                        reportFailure(
+                            "تعذّر الإرسال الآن — سيُعاد المحاولة تلقائياً عند اتصال الطرف الآخر",
+                            FailureSeverity.DELIVERY_FAILED
+                        ) { app.messagingClient?.retryNow() }
                     }
                 } catch (e: Exception) {
-                    _error.value = "تعذّر الإرسال الآن"
-                    lastFailedAction = { app.messagingClient?.retryNow() }
+                    reportFailure("تعذّر الإرسال الآن", FailureSeverity.DELIVERY_FAILED) { app.messagingClient?.retryNow() }
                 } finally {
                     if (showingHandshake) _establishingSession.value = false
                 }
@@ -302,8 +351,9 @@ class ConversationViewModel(
             val sent = try {
                 repository.sendMediaMessage(contactId, bytes, mimeType, fileName, mediaType, ttlSeconds, waveform, caption)
             } catch (e: Exception) {
-                _error.value = "فشل حفظ الملف: ${e.message}"
-                lastFailedAction = { sendMedia(bytes, mimeType, fileName, mediaType, waveform, caption) }
+                reportFailure("فشل حفظ الملف: ${e.message}", FailureSeverity.SAVE_FAILED) {
+                    sendMedia(bytes, mimeType, fileName, mediaType, waveform, caption)
+                }
                 null
             } finally {
                 _isSending.value = false
@@ -317,20 +367,23 @@ class ConversationViewModel(
                 try {
                     val client = app.awaitMessagingClient()
                     if (client == null) {
-                        _error.value = "غير متصل بالشبكة المحلية — سيُعاد الإرسال عند الاتصال"
-                        lastFailedAction = { app.messagingClient?.retryNow() }
+                        reportFailure(
+                            "غير متصل بالشبكة المحلية — سيُعاد الإرسال عند الاتصال",
+                            FailureSeverity.DELIVERY_FAILED
+                        ) { app.messagingClient?.retryNow() }
                         return@launch
                     }
                     val delivered = withContext(Dispatchers.IO) {
                         client.sendMessage(contactId, sent.wirePayload, ttlSeconds, messageId)
                     }
                     if (!delivered) {
-                        _error.value = "تعذّر إرسال الملف الآن — سيُعاد المحاولة تلقائياً"
-                        lastFailedAction = { app.messagingClient?.retryNow() }
+                        reportFailure(
+                            "تعذّر إرسال الملف الآن — سيُعاد المحاولة تلقائياً",
+                            FailureSeverity.DELIVERY_FAILED
+                        ) { app.messagingClient?.retryNow() }
                     }
                 } catch (e: Exception) {
-                    _error.value = "تعذّر إرسال الملف الآن"
-                    lastFailedAction = { app.messagingClient?.retryNow() }
+                    reportFailure("تعذّر إرسال الملف الآن", FailureSeverity.DELIVERY_FAILED) { app.messagingClient?.retryNow() }
                 } finally {
                     if (showingHandshake) _establishingSession.value = false
                 }
@@ -340,26 +393,39 @@ class ConversationViewModel(
 
     // ==================== Message interactions ====================
 
-    /** Deliver an already-built wire payload over the relay in the background. */
+    /**
+     * Deliver an already-built wire payload over the relay in the background.
+     * @param messageId travels in the envelope as a read-receipt reference
+     * for a real chat message — pass null for a reaction/edit/delete control
+     * op, which isn't receipted. It doubles as the durable pending-send
+     * tracking key on the SecureMessagingClient side, though: passing null
+     * there means a session-establishment failure for THIS specific send has
+     * no durable retry at all (see react/editMessage/deleteForEveryone,
+     * which pass a fresh id generated purely for that tracking, not for any
+     * receipt).
+     */
     private fun deliver(wirePayload: ByteArray, messageId: String?, ttlSeconds: Int?) {
         val app = SecureMessengerApp.instance
         app.applicationScope.launch {
             try {
                 val client = app.awaitMessagingClient() ?: run {
-                    _error.value = "غير متصل بالشبكة المحلية — سيُعاد الإرسال عند الاتصال"
-                    lastFailedAction = { app.messagingClient?.retryNow() }
+                    reportFailure(
+                        "غير متصل بالشبكة المحلية — سيُعاد الإرسال عند الاتصال",
+                        FailureSeverity.DELIVERY_FAILED
+                    ) { app.messagingClient?.retryNow() }
                     return@launch
                 }
                 val delivered = withContext(Dispatchers.IO) {
                     client.sendMessage(contactId, wirePayload, ttlSeconds, messageId)
                 }
                 if (!delivered) {
-                    _error.value = "تعذّر الإرسال الآن — سيُعاد المحاولة تلقائياً"
-                    lastFailedAction = { app.messagingClient?.retryNow() }
+                    reportFailure(
+                        "تعذّر الإرسال الآن — سيُعاد المحاولة تلقائياً",
+                        FailureSeverity.DELIVERY_FAILED
+                    ) { app.messagingClient?.retryNow() }
                 }
             } catch (_: Exception) {
-                _error.value = "تعذّر الإرسال الآن"
-                lastFailedAction = { app.messagingClient?.retryNow() }
+                reportFailure("تعذّر الإرسال الآن", FailureSeverity.DELIVERY_FAILED) { app.messagingClient?.retryNow() }
             }
         }
     }
@@ -376,7 +442,7 @@ class ConversationViewModel(
             val sent = try {
                 repository.sendReplyMessage(contactId, trimmed, replyToClientId, ttlSeconds)
             } catch (e: Exception) {
-                _error.value = "فشل حفظ الرسالة: ${e.message}"
+                reportFailure("فشل حفظ الرسالة: ${e.message}", FailureSeverity.SAVE_FAILED) { sendReply(trimmed, replyToClientId) }
                 null
             } finally {
                 _isSending.value = false
@@ -386,6 +452,18 @@ class ConversationViewModel(
         }
     }
 
+    /**
+     * A fresh id purely so a control-op send that fails during session
+     * establishment gets the same durable pending-send retry net a regular
+     * message gets (see SecureMessagingClient.sendMessage's savePendingSend,
+     * keyed by this id) — never used for read-receipt purposes, unlike a
+     * real message's clientMessageId. Harmless as the envelope's own
+     * "messageId" field too: SecureMessengerApp's incoming-message handling
+     * only reads that field for a NON-control payload; a control op is
+     * routed by its decrypted content, not by this id.
+     */
+    private fun controlOpTrackingId() = java.util.UUID.randomUUID().toString()
+
     /** Toggle an emoji reaction on a message and mirror it to the peer. */
     fun react(targetClientId: String, emoji: String) {
         viewModelScope.launch {
@@ -394,7 +472,7 @@ class ConversationViewModel(
             } catch (_: Exception) {
                 return@launch
             }
-            deliver(payload, null, null)
+            deliver(payload, controlOpTrackingId(), null)
         }
     }
 
@@ -407,7 +485,7 @@ class ConversationViewModel(
             } catch (_: Exception) {
                 return@launch
             }
-            deliver(payload, null, null)
+            deliver(payload, controlOpTrackingId(), null)
         }
     }
 
@@ -419,7 +497,7 @@ class ConversationViewModel(
             } catch (_: Exception) {
                 return@launch
             }
-            deliver(payload, null, null)
+            deliver(payload, controlOpTrackingId(), null)
         }
     }
 

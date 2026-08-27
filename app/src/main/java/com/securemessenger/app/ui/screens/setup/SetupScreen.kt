@@ -13,10 +13,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.securemessenger.app.SecureMessengerApp
+import com.securemessenger.app.network.DirectoryClient
 import com.securemessenger.app.security.AppSettings
 import com.securemessenger.app.security.DevicePassphrase
 import com.securemessenger.app.ui.onboardingBackground
 import com.securemessenger.app.ui.theme.LocalMessengerColors
+import com.securemessenger.core.crypto.LibsodiumWrapper
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -103,10 +105,48 @@ fun SetupScreen(
                                         repository.setMyDisplayName(displayName)
                                         profileReady = true
                                     }
-                                    // No directory to register with anymore — the handle
-                                    // is purely local, just something to show on your own
-                                    // QR code when someone pairs with you in person.
+                                    // The handle is local-first regardless — shown on our
+                                    // own QR code for in-person pairing whether or not the
+                                    // optional directory claim below succeeds.
                                     AppSettings.setUsername(context, username)
+
+                                    // Optional directory claim — reserves the username so
+                                    // someone can find us by search instead of only QR.
+                                    // Skipped entirely on a build with no directoryUrl
+                                    // compiled in. A network failure here is NOT fatal:
+                                    // SecureMessagingClient.connect() retries opportunistically
+                                    // on every reveal (see AppSettings.isUsernameClaimedRemotely).
+                                    // Only a live, positive "someone else already has this
+                                    // exact name" answer sends the user back to pick another.
+                                    val directoryUrl = com.securemessenger.app.BuildConfig.DIRECTORY_URL
+                                    if (directoryUrl.isNotBlank() && !AppSettings.isUsernameClaimedRemotely(context)) {
+                                        val identity = repository.getIdentityKeyPair()
+                                        val signingPublic = repository.getSigningPublicKey()
+                                        val signingSecret = repository.getSigningSecretKey()
+                                        if (identity != null && signingPublic != null && signingSecret != null) {
+                                            val claimResult = DirectoryClient(
+                                                baseUrl = directoryUrl.trimEnd('/'),
+                                                http = okhttp3.OkHttpClient()
+                                            ).claim(username, identity.publicKey, signingPublic) { payload ->
+                                                LibsodiumWrapper.signDetached(payload, signingSecret)
+                                            }
+                                            when (claimResult) {
+                                                DirectoryClient.ClaimResult.Success, DirectoryClient.ClaimResult.AlreadyRegistered ->
+                                                    AppSettings.setUsernameClaimedRemotely(context, true)
+                                                DirectoryClient.ClaimResult.Taken -> {
+                                                    isGenerating = false
+                                                    step = 1
+                                                    errorMessage = "اسم المستخدم \"@$username\" محجوز — اختر اسماً آخر"
+                                                    return@launch
+                                                }
+                                                DirectoryClient.ClaimResult.Error -> {
+                                                    // Offline/unreachable — proceed; the retry
+                                                    // on next reveal will pick this up.
+                                                }
+                                            }
+                                        }
+                                    }
+
                                     app.initializeMessagingClient()
                                     delay(400)
                                     isGenerating = false

@@ -33,9 +33,21 @@ package com.securemessenger.core.crypto
  * so a recipient who was offline still gets it. A receiver can only collect
  * from ids it still computes, so the rotation window has to be coarse enough
  * that a message deposited before a rollover is still reachable afterwards.
- * Daily rotation with ±1 day of tolerance covers the full retention window with
- * three ids per contact. (The local mDNS discovery token still rotates hourly —
- * that one is live-only, with nothing stored and nothing to outlive a window.)
+ *
+ * THE TOLERANCE HAS TO BE ±2 WINDOWS, NOT ±1. The receiver's tolerated range
+ * is centered on ITS OWN current bucket, which keeps moving forward — it is
+ * not centered on the bucket the message was actually sent in. A message
+ * sent in the last instant of bucket B is still reachable once the receiver
+ * reaches bucket B+1 (±1 covers that), but the receiver reaches B+2 only ~24h
+ * later — nowhere near the 48h the relay actually holds it for — and ±1
+ * stops listening on B at that point. ±2 windows is what actually guarantees
+ * the full 48h retention is covered regardless of *when inside its bucket* a
+ * message was sent: worst case (sent an instant before a rollover), the
+ * receiver only stops listening on that bucket 3 windows (~72h) after the
+ * rollover, i.e. ~48h after the message was actually sent — exactly the
+ * retention period, with no gap. (The local mDNS discovery token still
+ * rotates hourly — that one is live-only, with nothing stored and nothing to
+ * outlive a window, so this phase problem doesn't apply to it.)
  */
 object MailboxToken {
 
@@ -46,11 +58,12 @@ object MailboxToken {
     const val PAIR_SECRET_BYTES = 32
 
     /**
-     * How many neighbouring windows either side we also listen on. One window
-     * back covers the relay's 48-hour retention; one forward absorbs clock skew
-     * where the sender has already rolled over and we have not.
+     * How many neighbouring windows either side we also listen on — see the
+     * class doc for why this must be 2, not 1, to actually guarantee the
+     * relay's full 48-hour retention window is covered regardless of when
+     * inside its bucket a message was sent.
      */
-    const val BUCKET_TOLERANCE = 1L
+    const val BUCKET_TOLERANCE = 2L
 
     fun currentBucket(nowMillis: Long = System.currentTimeMillis()): Long = nowMillis / ROTATION_MS
 
@@ -111,4 +124,35 @@ object MailboxToken {
             key = pairSecret,
             length = 32
         )
+
+    /**
+     * The one-shot, non-rotating mailbox a stranger deposits an introduction
+     * request into — see `directory/` (the username-lookup service) and
+     * `DirectoryProtocol`. This is the single deliberate exception to the
+     * three properties in the class doc above:
+     *
+     *  - It IS computable by anyone who looks the owner up — that is the
+     *    entire point of a directory. What stays protected is *reading* it:
+     *    the directory's `/introductions/fetch` requires a live signature
+     *    from the owner's signing key, so knowing the id is not the same as
+     *    being authorized to collect from it.
+     *  - It deliberately does NOT rotate like [mailboxId]. Rotation there
+     *    defends against a relay correlating one conversation's long-lived
+     *    traffic; this id is already permanently computable from public
+     *    data, so rotating it would only cost both sides complexity for a
+     *    privacy property it was never going to have.
+     *  - It is used for exactly one thing — a signed, one-time introduction
+     *    — and never for ongoing conversation traffic. Once accepted, a
+     *    conversation moves onto the normal symmetric, rotating, unguessable
+     *    mailboxes above like any QR-paired contact.
+     *
+     * Unkeyed (no pair secret exists yet — that is what this exchange is
+     * for) and domain-separated from every other hash in this file so this
+     * id space can never collide with a real mailbox id's.
+     */
+    fun introMailboxId(identityPublicKey: ByteArray): String =
+        LibsodiumWrapper.blake2b(
+            data = "intro|v1|".toByteArray(Charsets.UTF_8) + identityPublicKey,
+            length = 16
+        ).joinToString("") { "%02x".format(it) }
 }

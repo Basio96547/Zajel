@@ -36,6 +36,13 @@ object LibsodiumWrapper {
     // (there used to be an `associatedData` parameter that was silently ignored,
     // which falsely implied the header was authenticated).
     fun encryptSymmetric(plaintext: ByteArray, key: ByteArray): ByteArray {
+        // JNA marshals whatever-length array it's handed straight to native
+        // libsodium, which reads/writes its fixed KEYBYTES window regardless
+        // — a too-short key silently reads adjacent native memory instead of
+        // failing, and a too-long one is silently truncated. Every caller in
+        // this codebase happens to pass a correctly-sized, locally-generated
+        // key today, but nothing enforced that at this boundary.
+        require(key.size == SecretBox.KEYBYTES) { "symmetric key must be ${SecretBox.KEYBYTES} bytes, got ${key.size}" }
         val nonce = lazySodium.randomBytesBuf(SecretBox.NONCEBYTES)
         val ciphertext = ByteArray(plaintext.size + SecretBox.MACBYTES)
 
@@ -51,6 +58,7 @@ object LibsodiumWrapper {
     }
 
     fun decryptSymmetric(ciphertext: ByteArray, key: ByteArray): ByteArray {
+        require(key.size == SecretBox.KEYBYTES) { "symmetric key must be ${SecretBox.KEYBYTES} bytes, got ${key.size}" }
         if (ciphertext.size < SecretBox.NONCEBYTES + SecretBox.MACBYTES) {
             throw IllegalArgumentException("Ciphertext too short")
         }
@@ -71,6 +79,8 @@ object LibsodiumWrapper {
     }
 
     fun encryptAsymmetric(plaintext: ByteArray, recipientPublicKey: ByteArray, senderSecretKey: ByteArray): ByteArray {
+        require(recipientPublicKey.size == Box.PUBLICKEYBYTES) { "recipient public key must be ${Box.PUBLICKEYBYTES} bytes, got ${recipientPublicKey.size}" }
+        require(senderSecretKey.size == Box.SECRETKEYBYTES) { "sender secret key must be ${Box.SECRETKEYBYTES} bytes, got ${senderSecretKey.size}" }
         val nonce = lazySodium.randomBytesBuf(Box.NONCEBYTES)
         val ciphertext = ByteArray(plaintext.size + Box.MACBYTES)
 
@@ -86,6 +96,8 @@ object LibsodiumWrapper {
     }
 
     fun decryptAsymmetric(ciphertext: ByteArray, senderPublicKey: ByteArray, recipientSecretKey: ByteArray): ByteArray {
+        require(senderPublicKey.size == Box.PUBLICKEYBYTES) { "sender public key must be ${Box.PUBLICKEYBYTES} bytes, got ${senderPublicKey.size}" }
+        require(recipientSecretKey.size == Box.SECRETKEYBYTES) { "recipient secret key must be ${Box.SECRETKEYBYTES} bytes, got ${recipientSecretKey.size}" }
         if (ciphertext.size < Box.NONCEBYTES + Box.MACBYTES) {
             throw IllegalArgumentException("Ciphertext too short")
         }
@@ -111,6 +123,7 @@ object LibsodiumWrapper {
      * sender (libsodium crypto_box_seal). Used for sealed-sender metadata privacy.
      */
     fun sealTo(message: ByteArray, recipientPublicKey: ByteArray): ByteArray {
+        require(recipientPublicKey.size == Box.PUBLICKEYBYTES) { "recipient public key must be ${Box.PUBLICKEYBYTES} bytes, got ${recipientPublicKey.size}" }
         val cipher = ByteArray(message.size + Box.SEALBYTES)
         val ok = lazySodium.cryptoBoxSeal(cipher, message, message.size.toLong(), recipientPublicKey)
         if (!ok) throw RuntimeException("Seal failed")
@@ -121,6 +134,8 @@ object LibsodiumWrapper {
      * Open a sealed box with the recipient's own keypair.
      */
     fun sealOpen(sealed: ByteArray, recipientPublicKey: ByteArray, recipientSecretKey: ByteArray): ByteArray {
+        require(recipientPublicKey.size == Box.PUBLICKEYBYTES) { "recipient public key must be ${Box.PUBLICKEYBYTES} bytes, got ${recipientPublicKey.size}" }
+        require(recipientSecretKey.size == Box.SECRETKEYBYTES) { "recipient secret key must be ${Box.SECRETKEYBYTES} bytes, got ${recipientSecretKey.size}" }
         if (sealed.size < Box.SEALBYTES) throw IllegalArgumentException("Sealed box too short")
         val message = ByteArray(sealed.size - Box.SEALBYTES)
         val ok = lazySodium.cryptoBoxSealOpen(message, sealed, sealed.size.toLong(), recipientPublicKey, recipientSecretKey)
@@ -129,6 +144,12 @@ object LibsodiumWrapper {
     }
 
     fun deriveSharedSecret(mySecretKey: ByteArray, theirPublicKey: ByteArray): ByteArray {
+        // X25519 scalar multiplication: both operands are fixed 32-byte
+        // values (no named LazySodium constant is imported into this file
+        // for ScalarMult specifically, but the size is fixed by the
+        // primitive, same as Box.PUBLICKEYBYTES/SECRETKEYBYTES above).
+        require(mySecretKey.size == 32) { "secret key must be 32 bytes for X25519 scalar multiplication, got ${mySecretKey.size}" }
+        require(theirPublicKey.size == 32) { "public key must be 32 bytes for X25519 scalar multiplication, got ${theirPublicKey.size}" }
         val sharedSecret = ByteArray(32)
         val result = lazySodium.cryptoScalarMult(sharedSecret, mySecretKey, theirPublicKey)
 

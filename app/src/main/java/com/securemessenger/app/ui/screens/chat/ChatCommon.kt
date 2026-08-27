@@ -14,6 +14,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -29,9 +30,11 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.securemessenger.app.SecureMessengerApp
 import com.securemessenger.app.network.ConnectionState
 import com.securemessenger.app.ui.theme.Dims
+import com.securemessenger.app.ui.theme.LocalMessengerColors
 
 /** Small building blocks shared across every chat screen (not just the conversation itself). */
 
@@ -190,6 +193,55 @@ fun Avatar(
                     .background(MaterialTheme.colorScheme.surface)
                     .padding(1.dp)
             )
+        }
+    }
+}
+
+// ---------- encrypted banner ----------
+// Extracted from MessageBubble.kt — see the pointer comment in ConversationScreen.kt.
+
+/** Centered pill reminding the reader every message here is end-to-end encrypted. */
+@Composable
+internal fun EncryptedBanner() {
+    val mc = LocalMessengerColors.current
+    Box(Modifier.fillMaxWidth().padding(bottom = Dims.s8), contentAlignment = Alignment.Center) {
+        Row(
+            modifier = Modifier
+                .clip(RoundedCornerShape(12.dp))
+                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
+                .padding(horizontal = 12.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Default.Lock,
+                contentDescription = null,
+                modifier = Modifier.size(12.dp),
+                tint = MaterialTheme.colorScheme.primary
+            )
+            Spacer(Modifier.width(5.dp))
+            Text(
+                "الرسائل مشفّرة من الطرف للطرف",
+                style = MaterialTheme.typography.labelSmall,
+                fontSize = 10.sp,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
+    }
+}
+
+// ---------- date separator ----------
+
+@Composable
+internal fun DateSeparator(label: String) {
+    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+        Box(
+            Modifier
+                .padding(vertical = Dims.s6)
+                .clip(RoundedCornerShape(12.dp))
+                .background(Color(0x66000000))
+                .padding(horizontal = Dims.s12, vertical = Dims.s4)
+        ) {
+            Text(label, style = MaterialTheme.typography.labelSmall, color = Color.White)
         }
     }
 }

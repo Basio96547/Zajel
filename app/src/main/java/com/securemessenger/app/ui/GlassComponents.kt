@@ -8,6 +8,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
@@ -133,7 +136,9 @@ fun GlassTopBar(
 data class GlassNavItem(
     val label: String,
     val icon: ImageVector,
-    val selectedIcon: ImageVector = icon
+    val selectedIcon: ImageVector = icon,
+    /** e.g. pending connection-request count on "جهات الاتصال" — 0 shows no badge at all. */
+    val badgeCount: Int = 0
 )
 
 /**
@@ -142,6 +147,7 @@ data class GlassNavItem(
  * itself visibly animates rather than hard-cutting. Pass [selectedIndex] =
  * -1 for drill-down screens that don't correspond to any single tab.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GlassBottomNavBar(
     items: List<GlassNavItem>,
@@ -196,12 +202,18 @@ fun GlassBottomNavBar(
                         .clickable { onSelect(index) }
                         .padding(vertical = 4.dp)
                 ) {
-                    Icon(
-                        imageVector = if (selected) item.selectedIcon else item.icon,
-                        contentDescription = item.label,
-                        tint = tint,
-                        modifier = Modifier.size(23.dp)
-                    )
+                    BadgedBox(badge = {
+                        if (item.badgeCount > 0) {
+                            Badge { Text(if (item.badgeCount > 99) "99+" else item.badgeCount.toString()) }
+                        }
+                    }) {
+                        Icon(
+                            imageVector = if (selected) item.selectedIcon else item.icon,
+                            contentDescription = item.label,
+                            tint = tint,
+                            modifier = Modifier.size(23.dp)
+                        )
+                    }
                     Spacer(Modifier.height(2.dp))
                     Text(
                         text = item.label,

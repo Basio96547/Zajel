@@ -56,6 +56,9 @@ interface ContactDao {
     @Query("UPDATE contacts SET nicknameEncrypted = :nickname WHERE id = :contactId")
     suspend fun setNickname(contactId: String, nickname: ByteArray?)
 
+    @Query("UPDATE contacts SET pinnedAt = :pinnedAt WHERE id = :contactId")
+    suspend fun setPinned(contactId: String, pinnedAt: Long?)
+
     @Delete
     suspend fun deleteContact(contact: Contact)
 
@@ -222,6 +225,49 @@ interface OutboxDao {
 }
 
 /**
+ * Data Access Object for messages that failed before reaching the outbox
+ * (session establishment never completed) and still need a full resend.
+ */
+@Dao
+interface PendingSendDao {
+
+    @Query("SELECT * FROM pending_sends ORDER BY createdAt ASC")
+    suspend fun getAll(): List<PendingSend>
+
+    @Query("SELECT * FROM pending_sends ORDER BY createdAt ASC")
+    fun observeAll(): Flow<List<PendingSend>>
+
+    @Query("SELECT * FROM pending_sends WHERE recipientId = :contactId ORDER BY createdAt ASC")
+    suspend fun getForContact(contactId: String): List<PendingSend>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insert(pending: PendingSend)
+
+    @Query("DELETE FROM pending_sends WHERE clientMessageId = :id")
+    suspend fun deleteById(id: String)
+
+    @Query("DELETE FROM pending_sends WHERE recipientId = :contactId")
+    suspend fun deleteAllForContact(contactId: String)
+}
+
+/**
+ * Data Access Object for the persisted twin of the in-memory envelope-dedup
+ * cache — see [SeenEnvelope].
+ */
+@Dao
+interface SeenEnvelopeDao {
+
+    @Query("SELECT * FROM seen_envelopes WHERE envelopeKey = :key LIMIT 1")
+    suspend fun get(key: String): SeenEnvelope?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(envelope: SeenEnvelope)
+
+    @Query("DELETE FROM seen_envelopes WHERE seenAt < :cutoff")
+    suspend fun pruneOlderThan(cutoff: Long)
+}
+
+/**
  * Data Access Object for persisted Double-Ratchet sessions.
  */
 @Dao
@@ -238,4 +284,44 @@ interface RatchetSessionDao {
 
     @Query("DELETE FROM ratchet_sessions")
     suspend fun deleteAll()
+}
+
+/**
+ * Data Access Object for self-introductions received via the username
+ * directory, not yet accepted or rejected.
+ */
+@Dao
+interface IncomingConnectionRequestDao {
+
+    @Query("SELECT * FROM incoming_connection_requests ORDER BY receivedAt DESC")
+    fun observeAll(): Flow<List<IncomingConnectionRequest>>
+
+    @Query("SELECT * FROM incoming_connection_requests WHERE senderIdentityPublicKeyHex = :keyHex")
+    suspend fun get(keyHex: String): IncomingConnectionRequest?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insert(request: IncomingConnectionRequest)
+
+    @Query("DELETE FROM incoming_connection_requests WHERE senderIdentityPublicKeyHex = :keyHex")
+    suspend fun deleteByKey(keyHex: String)
+}
+
+/**
+ * Data Access Object for self-introductions we sent via the username
+ * directory, not yet answered.
+ */
+@Dao
+interface OutgoingConnectionRequestDao {
+
+    @Query("SELECT * FROM outgoing_connection_requests ORDER BY sentAt DESC")
+    fun observeAll(): Flow<List<OutgoingConnectionRequest>>
+
+    @Query("SELECT * FROM outgoing_connection_requests WHERE recipientIdentityPublicKeyHex = :keyHex")
+    suspend fun get(keyHex: String): OutgoingConnectionRequest?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insert(request: OutgoingConnectionRequest)
+
+    @Query("DELETE FROM outgoing_connection_requests WHERE recipientIdentityPublicKeyHex = :keyHex")
+    suspend fun deleteByKey(keyHex: String)
 }

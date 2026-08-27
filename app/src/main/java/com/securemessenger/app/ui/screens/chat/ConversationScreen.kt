@@ -639,122 +639,13 @@ fun ConversationScreen(
     }
 }
 
-/** A fresh cache file exposed via FileProvider — where the camera app writes the captured photo. */
-private fun createCameraOutputUri(context: android.content.Context): Uri {
-    val dir = File(context.cacheDir, "camera_capture").apply { mkdirs() }
-    val file = File(dir, "capture_${System.currentTimeMillis()}.jpg")
-    return FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-}
-
-// ---------- file picking ----------
-
-internal data class PickedFile(val bytes: ByteArray, val mimeType: String, val fileName: String, val mediaType: Int)
-
-private fun readPickedFile(context: android.content.Context, uri: Uri): PickedFile? {
-    val resolver = context.contentResolver
-    val mimeType = resolver.getType(uri) ?: return null
-    val mediaType = when {
-        mimeType.startsWith("image/") -> MediaCodec.TYPE_IMAGE
-        mimeType.startsWith("video/") -> MediaCodec.TYPE_VIDEO
-        mimeType.startsWith("audio/") -> MediaCodec.TYPE_AUDIO
-        // Anything else (PDF, docx, …) — the "ملف" attachment option should
-        // actually accept arbitrary files, not silently drop them.
-        else -> MediaCodec.TYPE_FILE
-    }
-    var fileName = "file"
-    resolver.query(uri, null, null, null, null)?.use { cursor ->
-        val idx = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-        if (idx >= 0 && cursor.moveToFirst()) fileName = cursor.getString(idx) ?: fileName
-    }
-    val bytes = resolver.openInputStream(uri)?.use { it.readBytes() } ?: return null
-    return PickedFile(bytes, mimeType, fileName, mediaType)
-}
-
-// ---------- rows (messages + day separators) ----------
-
-private sealed class ChatRow(val key: String) {
-    class Day(val label: String, id: String) : ChatRow("day-$id")
-    class Msg(
-        val message: MessageUiModel,
-        // Whether this bubble sits first/last in a run of consecutive
-        // same-sender messages (same calendar day) — drives the tighter
-        // grouped spacing and the "tail only on the last one" shape.
-        val isFirstInGroup: Boolean,
-        val isLastInGroup: Boolean
-    ) : ChatRow("msg-${message.id ?: message.timestamp}")
-    // 2+ caption-less photos from the same sender sent within a couple of
-    // minutes of each other — rendered as one mosaic grid instead of a
-    // stack of separate bubbles.
-    class Album(val images: List<MessageUiModel>) : ChatRow("album-${images.first().id ?: images.first().timestamp}")
-}
-
-private const val ALBUM_BATCH_WINDOW_MS = 120_000L
-
-private fun buildRows(messages: List<MessageUiModel>): List<ChatRow> {
-    val rows = mutableListOf<ChatRow>()
-    var lastDay = ""
-    var i = 0
-    while (i < messages.size) {
-        val m = messages[i]
-        val dayId = dayKey(m.timestamp)
-        if (dayId != lastDay) {
-            rows += ChatRow.Day(dayLabel(m.timestamp), dayId)
-            lastDay = dayId
-        }
-
-        fun isAlbumable(x: MessageUiModel) =
-            !x.isDeleted && x.media?.mediaType == MediaCodec.TYPE_IMAGE && x.media.caption.isNullOrBlank()
-
-        if (isAlbumable(m)) {
-            val batch = mutableListOf(m)
-            var j = i + 1
-            while (j < messages.size) {
-                val next = messages[j]
-                if (dayKey(next.timestamp) == dayId && isAlbumable(next) && next.direction == m.direction &&
-                    next.timestamp - batch.last().timestamp <= ALBUM_BATCH_WINDOW_MS
-                ) {
-                    batch += next
-                    j++
-                } else break
-            }
-            if (batch.size >= 2) {
-                rows += ChatRow.Album(batch)
-                i = j
-                continue
-            }
-        }
-
-        val prev = messages.getOrNull(i - 1)
-        val next = messages.getOrNull(i + 1)
-        val groupedWithPrev = prev != null && dayKey(prev.timestamp) == dayId && prev.direction == m.direction
-        val groupedWithNext = next != null && dayKey(next.timestamp) == dayId && next.direction == m.direction
-        rows += ChatRow.Msg(m, isFirstInGroup = !groupedWithPrev, isLastInGroup = !groupedWithNext)
-        i++
-    }
-    return rows
-}
-
-private fun dayKey(ts: Long): String =
-    SimpleDateFormat("yyyyMMdd", Locale.getDefault()).format(Date(ts))
-
-private fun dayLabel(ts: Long): String {
-    val now = Calendar.getInstance()
-    val then = Calendar.getInstance().apply { timeInMillis = ts }
-    fun sameDay(offset: Int): Boolean {
-        val c = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, offset) }
-        return c.get(Calendar.YEAR) == then.get(Calendar.YEAR) &&
-            c.get(Calendar.DAY_OF_YEAR) == then.get(Calendar.DAY_OF_YEAR)
-    }
-    return when {
-        sameDay(0) -> "اليوم"
-        sameDay(-1) -> "أمس"
-        else -> SimpleDateFormat("d MMMM yyyy", Locale.getDefault()).format(Date(ts))
-    }
-}
-
 // ---------- message bubble ----------
-// (MessageBubble, AlbumBubble, DateSeparator: MessageBubble.kt)
+// (ChatRow, buildRows, dayKey, dayLabel: ConversationRows.kt)
+// (PickedFile, readPickedFile, createCameraOutputUri: AttachmentPicking.kt)
+// (MessageBubble: MessageBubble.kt)
+// (AlbumBubble, AlbumThumbnail: AlbumBubble.kt)
 // (MediaContent family, FullScreenImageViewer: MediaContent.kt)
-// (MessageInput, EmojiPanel, ComposeContextStrip, MediaCaptionStrip: MessageInput.kt)
+// (MessageInput, EmojiPanel: MessageInput.kt)
+// (ComposeContextStrip, MediaCaptionStrip: ComposeStrips.kt)
 // (AttachmentSheet, MessageActionSheet: ConversationSheets.kt)
-// (ShimmerBox, ConnectionStatusBar, Avatar: ChatCommon.kt)
+// (EncryptedBanner, DateSeparator, ShimmerBox, ConnectionStatusBar, Avatar: ChatCommon.kt)

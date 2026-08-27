@@ -1,0 +1,46 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "sm-directory",
+	"main": "src/index.ts",
+	"compatibility_date": "2026-01-15",
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "sm-directory",
+			// Placeholder — replace with the id `wrangler d1 create sm-directory`
+			// prints, then run `npm run db:init` to apply schema.sql. Deliberately
+			// a separate database from the blind relay: this service is the one
+			// place in the whole system that intentionally holds a persistent,
+			// identity-keyed record (a username claim), and keeping it out of
+			// relay/ means relay/src/index.ts's "no accounts, no usernames" claim
+			// stays literally true rather than becoming documentation that lies.
+			"database_id": "REPLACE_WITH_D1_DATABASE_ID"
+		}
+	],
+	// Per-IP, not per-account — this service has no accounts. Tighter on claim
+	// (a write, and the one place squatting/hammering matters) than on the
+	// three read/deposit paths, which share one limiter since none of them is
+	// meaningfully more sensitive than the others. Neither stops a patient,
+	// distributed enumerator; that's an accepted cost of running a public
+	// namespace at all, not a gap specific to this config.
+	"ratelimits": [
+		{
+			"name": "CLAIM_LIMITER",
+			"namespace_id": "1",
+			"simple": { "limit": 5, "period": 60 }
+		},
+		{
+			"name": "QUERY_LIMITER",
+			"namespace_id": "2",
+			"simple": { "limit": 30, "period": 60 }
+		}
+	],
+	// On, unlike the blind relay. This service's entire job is running a public
+	// namespace (an available/taken username, live or not) — the observability
+	// tradeoff that makes sense for a dead-drop (see relay/wrangler.jsonc) would
+	// just hide operational problems here for no privacy gained. What must never
+	// be logged is *who looked up whom* — see src/index.ts's handler comments.
+	"observability": {
+		"enabled": true
+	}
+}

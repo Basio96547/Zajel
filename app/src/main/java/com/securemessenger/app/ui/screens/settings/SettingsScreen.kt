@@ -488,6 +488,13 @@ fun SettingsScreen(
 
     if (showCodeDialog) {
         var input by remember { mutableStateOf("") }
+        // Refuse a new access code that matches the already-configured duress
+        // code — silently letting the two collide would neutralize the panic
+        // wipe: onEquals() only treats an entered code as duress when it does
+        // NOT also match the access code, so a collision makes the duress
+        // branch permanently unreachable, with nothing telling the user their
+        // panic code stopped working.
+        val collidesWithDuressCode = input.isNotEmpty() && AppSettings.verifyDuressCode(context, input)
         AlertDialog(
             onDismissRequest = { showCodeDialog = false },
             containerColor = mc.glassCardStrong,
@@ -508,6 +515,10 @@ fun SettingsScreen(
                             onValueChange = { new -> input = new.filter { it.isDigit() }.take(10) },
                             singleLine = true,
                             label = { Text("رقم من 3 إلى 10 أرقام") },
+                            isError = collidesWithDuressCode,
+                            supportingText = {
+                                if (collidesWithDuressCode) Text("يجب أن يختلف عن رمز الطوارئ")
+                            },
                             keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                                 keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
                             )
@@ -518,13 +529,13 @@ fun SettingsScreen(
             confirmButton = {
                 TextButton(
                     onClick = {
-                        if (input.length in 3..10) {
+                        if (input.length in 3..10 && !collidesWithDuressCode) {
                             AppSettings.setAccessCode(context, input)
                             accessCodeSet = true
                             showCodeDialog = false
                         }
                     },
-                    enabled = input.length in 3..10
+                    enabled = input.length in 3..10 && !collidesWithDuressCode
                 ) {
                     Text("حفظ")
                 }

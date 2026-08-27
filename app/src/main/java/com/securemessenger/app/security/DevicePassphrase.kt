@@ -26,9 +26,23 @@ object DevicePassphrase {
         val existing = SecurePreferences.getString(context, KEY)
         if (existing != null) return@withContext existing.toCharArray()
 
+        // Encode to bytes (Base64.encode), not a String (encodeToString) —
+        // then convert those bytes directly to the CharArray this function
+        // returns, without an intermediate String. Base64 output is always
+        // plain ASCII, so the byte-for-byte cast below is exact and
+        // lossless. One String still has to be built, at the putString call
+        // below, purely because Android's SharedPreferences API has no
+        // CharArray-based write — that's an unavoidable platform limit, not
+        // something this function can route around — but this way it's ONE
+        // String construction instead of two (encodeToString would have
+        // created its own, separate from the one toCharArray() used to
+        // build the very value this function returns).
         val random = ByteArray(32).also { SecureRandom().nextBytes(it) }
-        val passphrase = Base64.encodeToString(random, Base64.NO_WRAP)
-        SecurePreferences.putString(context, KEY, passphrase)
-        passphrase.toCharArray()
+        val encodedBytes = Base64.encode(random, Base64.NO_WRAP)
+        val chars = CharArray(encodedBytes.size) { encodedBytes[it].toInt().toChar() }
+        java.util.Arrays.fill(random, 0)
+        java.util.Arrays.fill(encodedBytes, 0)
+        SecurePreferences.putString(context, KEY, String(chars))
+        chars
     }
 }

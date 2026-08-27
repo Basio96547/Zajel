@@ -77,6 +77,20 @@ object SecurePreferences {
     }
 
     /**
+     * Store a long value securely.
+     */
+    fun putLong(context: Context, key: String, value: Long) {
+        getPreferences(context).edit().putLong(key, value).apply()
+    }
+
+    /**
+     * Retrieve a long value securely.
+     */
+    fun getLong(context: Context, key: String, defaultValue: Long = 0L): Long {
+        return getPreferences(context).getLong(key, defaultValue)
+    }
+
+    /**
      * Remove a key.
      */
     fun remove(context: Context, key: String) {

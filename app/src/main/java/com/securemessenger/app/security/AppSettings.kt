@@ -17,6 +17,7 @@ object AppSettings {
     private const val KEY_AUTODESTRUCT_SECONDS = "setting_autodestruct_seconds"
     private const val KEY_STEALTH = "setting_stealth_enabled"
     private const val KEY_USERNAME = "profile_username"
+    private const val KEY_USERNAME_CLAIMED = "profile_username_claimed_remotely"
     private const val KEY_ACCESS_CODE = "calculator_access_code"
     private const val KEY_DURESS_CODE = "calculator_duress_code"
     private const val KEY_THEME_MODE = "setting_theme_mode"
@@ -39,8 +40,14 @@ object AppSettings {
     fun hasAccessCode(context: Context): Boolean =
         !SecurePreferences.getString(context, KEY_ACCESS_CODE, null).isNullOrBlank()
 
-    fun setAccessCode(context: Context, code: String) =
+    fun setAccessCode(context: Context, code: String) {
         SecurePreferences.putString(context, KEY_ACCESS_CODE, hashCode(code))
+        // A real code now exists — the calculator's fresh-install bootstrap
+        // path (see isBootstrapArmed) has done its one job and must not stay
+        // usable, or a wipe later (which clears the code above right back to
+        // "unset") would silently re-open it.
+        disarmBootstrap(context)
+    }
 
     /** Constant-time check of a typed number against the stored access code. */
     fun verifyAccessCode(context: Context, input: String): Boolean =
@@ -66,6 +73,77 @@ object AppSettings {
     fun verifyDuressCode(context: Context, input: String): Boolean =
         verifyStoredCode(context, KEY_DURESS_CODE, input) { setDuressCode(context, it) }
 
+    // ==================== Calculator bootstrap gate ====================
+    //
+    // CalculatorScreen's "no access code chosen yet -> a plain number opens
+    // Setup" path exists only so a fresh install has some way in. Gating it
+    // on hasAccessCode() alone is not safe: a full or duress wipe clears the
+    // access code too, which would silently re-open that exact same path —
+    // so someone probing "the calculator" right after a duress wipe just
+    // ran would have the app reveal "generate your encryption keys" the
+    // moment they typed a few more digits. Precisely the tell the duress
+    // feature exists to prevent.
+    //
+    // This flag answers a different question than hasAccessCode(): not "is
+    // a code set right now" but "has this install ever been through Setup."
+    // It lives in its own plain SharedPreferences file, deliberately NOT
+    // SecurePreferences — clearAll() (called by every wipe, see
+    // SecureRepository.wipeAllData) must never touch it, or it would just
+    // reset to its default-armed state on every wipe and solve nothing. It
+    // holds no secret (its own existence reveals nothing SettingUp a
+    // calculator icon doesn't already), so it needs no encryption.
+
+    private const val BOOTSTRAP_PREFS_NAME = "calc_prefs"
+    private const val KEY_BOOTSTRAP_ARMED = "setup_bootstrap_armed"
+
+    private fun bootstrapPrefs(context: Context) =
+        context.getSharedPreferences(BOOTSTRAP_PREFS_NAME, Context.MODE_PRIVATE)
+
+    /** True while the fresh-install bootstrap path should still work. Defaults true (a never-before-seen install has no reason to be locked out of Setup). */
+    fun isBootstrapArmed(context: Context): Boolean =
+        bootstrapPrefs(context).getBoolean(KEY_BOOTSTRAP_ARMED, true)
+
+    /** Called the moment a real access code is chosen (see setAccessCode) — the bootstrap path has done its one job. */
+    fun disarmBootstrap(context: Context) {
+        bootstrapPrefs(context).edit().putBoolean(KEY_BOOTSTRAP_ARMED, false).apply()
+    }
+
+    /**
+     * Re-opens the bootstrap path. Only ever called from [SecretCodeReceiver],
+     * itself only reachable by deliberately dialing a specific out-of-band
+     * code in the phone app — never from anything reachable on the visible
+     * calculator screen, so this can't become a second way past a real code.
+     */
+    fun rearmBootstrap(context: Context) {
+        bootstrapPrefs(context).edit().putBoolean(KEY_BOOTSTRAP_ARMED, true).apply()
+    }
+
+    // ==================== Calculator brute-force throttle ====================
+    //
+    // Persisted (not just in-memory Compose state in CalculatorScreen) so
+    // swiping the app away from Recents and reopening it — an ordinary,
+    // tool-free action requiring no exploit — can't reset an accumulating
+    // lockout back to zero. Stored in SecurePreferences like the codes
+    // themselves: resetting on a wipe is fine, since a wipe is the rare,
+    // deliberate event this throttle isn't meant to survive anyway (the
+    // codes it was protecting are gone too).
+
+    private const val KEY_CODE_MISS_STREAK = "calc_code_miss_streak"
+    private const val KEY_CODE_LOCKED_UNTIL = "calc_code_locked_until"
+
+    fun codeMissStreak(context: Context): Int =
+        SecurePreferences.getInt(context, KEY_CODE_MISS_STREAK, 0)
+
+    fun setCodeMissStreak(context: Context, streak: Int) =
+        SecurePreferences.putInt(context, KEY_CODE_MISS_STREAK, streak)
+
+    /** Epoch millis until which further code checks are paused — the calculator itself keeps working normally throughout. */
+    fun codeCheckLockedUntil(context: Context): Long =
+        SecurePreferences.getLong(context, KEY_CODE_LOCKED_UNTIL, 0L)
+
+    fun setCodeCheckLockedUntil(context: Context, until: Long) =
+        SecurePreferences.putLong(context, KEY_CODE_LOCKED_UNTIL, until)
+
     // ---- salted-hash helpers ----
 
     private fun hashCode(code: String): String {
@@ -77,13 +155,31 @@ object AppSettings {
         return "v1:" + b64(salt) + ":" + b64(hash)
     }
 
+    // Fixed, non-secret salt used only to burn the same amount of hashing
+    // time as a real check when nothing is stored — see verifyStoredCode.
+    // It is never compared against anything, so it needs no randomness.
+    private val DUMMY_SALT = ByteArray(16)
+
     private fun verifyStoredCode(
         context: Context,
         key: String,
         input: String,
         migrate: (String) -> Unit
     ): Boolean {
-        val stored = SecurePreferences.getString(context, key, null)?.takeIf { it.isNotBlank() } ?: return false
+        val stored = SecurePreferences.getString(context, key, null)?.takeIf { it.isNotBlank() }
+        if (stored == null) {
+            // Do the same shape of work (one BLAKE2b call) a real check would
+            // do, even though there's nothing to compare against. Without
+            // this, checking a code that isn't configured (most commonly: no
+            // duress code set) returns measurably faster than checking one
+            // that is — a timing measurement alone would then reveal WHETHER
+            // this phone has a duress/panic-wipe code at all, before ever
+            // guessing at its value.
+            com.securemessenger.core.crypto.LibsodiumWrapper.blake2b(
+                DUMMY_SALT + input.toByteArray(Charsets.UTF_8), length = 32
+            )
+            return false
+        }
         if (stored.startsWith("v1:")) {
             val parts = stored.split(":")
             if (parts.size != 3) return false
@@ -142,6 +238,22 @@ object AppSettings {
 
     fun clearUsername(context: Context) =
         SecurePreferences.remove(context, KEY_USERNAME)
+
+    /**
+     * Whether our local username has actually been claimed on the directory
+     * service yet — separate from [getUsername], which is set locally at
+     * setup regardless of connectivity. False either means the claim hasn't
+     * been attempted (directory feature not configured), or it was attempted
+     * and failed (offline at setup time) — [SecureMessagingClient.connect]
+     * retries opportunistically on every reveal while this stays false, so a
+     * user who finished setup offline still ends up searchable once they're
+     * back online, without needing to redo anything.
+     */
+    fun isUsernameClaimedRemotely(context: Context): Boolean =
+        SecurePreferences.getBoolean(context, KEY_USERNAME_CLAIMED, false)
+
+    fun setUsernameClaimedRemotely(context: Context, claimed: Boolean) =
+        SecurePreferences.putBoolean(context, KEY_USERNAME_CLAIMED, claimed)
 
     // ==================== Auto-destruct label mapping ====================
 

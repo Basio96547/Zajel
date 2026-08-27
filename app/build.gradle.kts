@@ -12,6 +12,14 @@ plugins {
 // `-PrelayUrl=https://...` or a `relayUrl=` line in gradle.properties.
 val relayUrl: String = (project.findProperty("relayUrl") as String?) ?: ""
 
+// Base URL of the optional username directory (see directory/) — a wholly
+// separate, opt-in service from the relay above. Same escape hatch, same
+// reasoning: empty compiles it out entirely, so a build with no directoryUrl
+// set has no username-search/claim code path reachable at all, only QR
+// pairing. Point it at your own deployment with `-PdirectoryUrl=https://...`
+// or a `directoryUrl=` line in gradle.properties.
+val directoryUrl: String = (project.findProperty("directoryUrl") as String?) ?: ""
+
 android {
     namespace = "com.securemessenger.app"
     compileSdk = 35
@@ -42,12 +50,14 @@ android {
             isDebuggable = false
             buildConfigField("Boolean", "OFFLINE_MODE", "false")
             buildConfigField("String", "RELAY_URL", "\"$relayUrl\"")
+            buildConfigField("String", "DIRECTORY_URL", "\"$directoryUrl\"")
         }
         debug {
             isMinifyEnabled = false
             isDebuggable = true
             buildConfigField("Boolean", "OFFLINE_MODE", "false")
             buildConfigField("String", "RELAY_URL", "\"$relayUrl\"")
+            buildConfigField("String", "DIRECTORY_URL", "\"$directoryUrl\"")
         }
     }
 

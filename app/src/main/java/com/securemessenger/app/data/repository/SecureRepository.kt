@@ -10,6 +10,7 @@ import com.securemessenger.core.crypto.SignalProtocol
 import com.securemessenger.app.data.local.SecureDatabase
 import com.securemessenger.app.data.model.*
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.Dispatchers
@@ -27,6 +28,16 @@ data class LoadedRatchetSession(
     val responderEphemeralHex: String?,
     val initiatorOtkId: Int?
 )
+
+/** What [SecureRepository.addContactWithPublicKey] actually did — see that function. */
+enum class ContactPairResult {
+    /** A brand-new contact. */
+    ADDED,
+    /** An existing contact, scanned again with the same key (or a first-ever scan). */
+    UNCHANGED,
+    /** An existing contact, but the scanned key differs from the one already pinned — refused; see allowKeyChange. */
+    KEY_CHANGED
+}
 
 /**
  * SecureRepository - manages all data operations with encryption/decryption.
@@ -243,6 +254,11 @@ class SecureRepository(private val context: Context) {
         database?.contactDao()?.setMuted(contactId, muted)
     }
 
+    /** Local-only — pinning isn't part of any wire format, so nothing about it ever reaches a peer or the relay. */
+    suspend fun setContactPinned(contactId: String, pinned: Boolean) = withContext(Dispatchers.IO) {
+        database?.contactDao()?.setPinned(contactId, if (pinned) System.currentTimeMillis() else null)
+    }
+
     suspend fun setContactNickname(contactId: String, nickname: String?) = withContext(Dispatchers.IO) {
         val encrypted = nickname?.takeIf { it.isNotBlank() }?.let {
             AndroidKeyStoreManager.encryptWithMasterKey(it.toByteArray(Charsets.UTF_8))
@@ -284,6 +300,7 @@ class SecureRepository(private val context: Context) {
         database?.sessionDao()?.deleteAllSessionsForContact(contactId)
         database?.keyBundleDao()?.deleteAllPreKeysForContact(contactId)
         database?.ratchetSessionDao()?.delete(contactId)
+        database?.pendingSendDao()?.deleteAllForContact(contactId)
         database?.contactDao()?.deleteContactById(contactId)
     }
 
@@ -553,18 +570,42 @@ class SecureRepository(private val context: Context) {
         database?.messageDao()?.deleteById(messageId)
     }
 
-    /** Apply a control op that arrived from the peer (react / edit / delete). */
-    suspend fun applyIncomingControl(control: ChatPayloads.Control) = withContext(Dispatchers.IO) {
+    /**
+     * Apply a control op that arrived from the peer (react / edit / delete).
+     * @param senderId whoever's session this control op actually decrypted
+     * under (see handleMessageEnvelope) — used to confirm the target message
+     * really belongs to a conversation with them before touching it.
+     */
+    suspend fun applyIncomingControl(control: ChatPayloads.Control, senderId: String) = withContext(Dispatchers.IO) {
         val dao = database?.messageDao() ?: return@withContext
+        // A sealed envelope proves nothing about who sent it beyond the
+        // fact it decrypted under this contact's session (see
+        // handleMessageEnvelope) — but nothing here previously confirmed the
+        // target message actually belongs to a conversation with THIS
+        // sender at all, let alone that they're allowed to touch it. Every
+        // other write in this class that's reachable from a peer is scoped
+        // this way already (see markSentMessagesReadByClientIdsForRecipient's
+        // doc comment, which explicitly notes an unscoped variant was
+        // removed for the same reason) — react/edit/delete were the one gap.
+        val target = dao.getMessageByClientId(control.targetClientId) ?: return@withContext
         when (control.op) {
             ChatPayloads.OP_REACT -> {
-                val msg = dao.getMessageByClientId(control.targetClientId) ?: return@withContext
-                val current = parseReactions(msg.reactionsJson)
+                // Either party may react to either message in the
+                // conversation (ordinary messenger behavior) — just confirm
+                // the target is actually part of a conversation WITH this
+                // sender, so a control op can't reach into an unrelated one.
+                if (target.senderId != senderId && target.recipientId != senderId) return@withContext
+                val current = parseReactions(target.reactionsJson)
                 val emoji = control.emoji ?: ""
                 if (emoji.isBlank()) current.remove("them") else current["them"] = emoji
                 dao.updateReactions(control.targetClientId, serializeReactions(current))
             }
             ChatPayloads.OP_EDIT -> {
+                // Only the ORIGINAL author may edit their own message — never
+                // one WE sent them. Without this a forged/unrelated edit
+                // could silently rewrite the displayed text of a message
+                // from the other direction of the same conversation.
+                if (target.senderId != senderId) return@withContext
                 val newText = control.text ?: return@withContext
                 dao.applyEdit(
                     control.targetClientId,
@@ -572,7 +613,12 @@ class SecureRepository(private val context: Context) {
                     System.currentTimeMillis()
                 )
             }
-            ChatPayloads.OP_DELETE -> dao.markDeletedByClientId(control.targetClientId)
+            ChatPayloads.OP_DELETE -> {
+                // Same rule as edit: only the original author may tombstone
+                // their own message.
+                if (target.senderId != senderId) return@withContext
+                dao.markDeletedByClientId(control.targetClientId)
+            }
         }
     }
 
@@ -636,6 +682,23 @@ class SecureRepository(private val context: Context) {
             File(mediaDir(), ref).delete()
         } catch (_: Exception) {
         }
+    }
+
+    /**
+     * Delete every plaintext file ever written to cacheDir/decrypted_media —
+     * MediaContent's "open in external app" has to decrypt a copy to disk
+     * there so a FileProvider URI can hand it to another app. Until now the
+     * ONLY thing that ever cleaned that directory up was a full/duress wipe
+     * (wipeAllData): closing the message, deleting it, or its TTL expiring
+     * left the decrypted plaintext sitting there indefinitely — recoverable
+     * via a stale FileProvider grant, ADB, or device forensics, long after
+     * the user believes nothing is left unencrypted. Called on every
+     * disguise hide (see SecureMessengerApp.stopMessagingClient), which is
+     * both the natural "nothing external should still be reading these"
+     * checkpoint and something that happens far more often than a wipe.
+     */
+    fun purgeDecryptedMediaCache() {
+        runCatching { File(context.cacheDir, "decrypted_media").deleteRecursively() }
     }
 
     data class SentMedia(val message: EncryptedMessage, val wirePayload: ByteArray)
@@ -918,21 +981,54 @@ class SecureRepository(private val context: Context) {
     suspend fun getPublicKeyFingerprint(): String? = withContext(Dispatchers.IO) {
         val profile = getProfile() ?: return@withContext null
         val hash = LibsodiumWrapper.blake2b(profile.publicKey, length = 32)
-        hash.take(4).joinToString("") { "%02x".format(it) }
+        // 8 bytes (64 bits), not 4 (32 bits) — a 32-bit fingerprint is
+        // brute-forceable to a chosen target value in well under an hour on
+        // rented GPU time, which defeats the point of a value shown on a
+        // screen titled "key verification": someone could craft a keypair
+        // whose fingerprint visually/audibly matches a specific victim's.
+        // 64 bits raises that to computationally infeasible. This value
+        // never gates isVerified by itself — only an exact 32-byte match via
+        // a full QR re-scan does (see verifyScannedKey) — but it's shown
+        // alongside that as if it were a meaningful check on its own, so it
+        // needs to actually be one.
+        hash.take(8).joinToString("") { "%02x".format(it) }
     }
 
     suspend fun getPublicKeyHex(): String? = withContext(Dispatchers.IO) {
         getProfile()?.publicKey?.joinToString("") { "%02x".format(it) }
     }
 
+    /**
+     * Pair (or re-pair) a contact from a scanned QR code.
+     *
+     * Refuses to silently replace an EXISTING contact's pinned identity key
+     * unless [allowKeyChange] is explicitly true. TOFU pinning (trust the key
+     * seen the first time, over the in-person QR channel, forever after) is
+     * the entire foundation the "verified" checkmark and every subsequent
+     * X3DH handshake rest on — a contact's userId is not secret (it's shown
+     * on their own share screen), so without this check anyone who learns it
+     * could get a victim to scan an attacker-controlled QR claiming to be
+     * "the same" contact and have their pinned key silently swapped, with
+     * nothing telling the victim it happened. [allowKeyChange] exists so the
+     * caller (NewChatScreen) can show that warning and let the user decide —
+     * "they got a new phone" is a real, legitimate reason for this to happen
+     * too, this just makes sure it's a decision, not a surprise.
+     */
     suspend fun addContactWithPublicKey(
         contactId: String,
         publicKeyHex: String,
         displayName: String,
-        relaySendSecret: ByteArray? = null
-    ) = withContext(Dispatchers.IO) {
+        relaySendSecret: ByteArray? = null,
+        allowKeyChange: Boolean = false
+    ): ContactPairResult = withContext(Dispatchers.IO) {
         val publicKey = hexToBytes(publicKeyHex)
         require(publicKey.size == 32) { "Public key must be 32 bytes (64 hex chars)" }
+
+        val existing = getContact(contactId)
+        val keyChanged = existing != null && !existing.publicKey.contentEquals(publicKey)
+        if (keyChanged && !allowKeyChange) {
+            return@withContext ContactPairResult.KEY_CHANGED
+        }
 
         addContact(
             Contact(
@@ -943,11 +1039,16 @@ class SecureRepository(private val context: Context) {
                 ),
                 relaySendSecretEncrypted = relaySendSecret?.let {
                     AndroidKeyStoreManager.encryptWithMasterKey(it)
-                }
+                },
+                // A genuine key change invalidates any prior manual
+                // verification — it vouched for a key that is no longer the
+                // one pinned here.
+                isVerified = if (keyChanged) false else (existing?.isVerified ?: false)
             )
         )
 
         storeContactPrekeys(contactId, publicKey, publicKey)
+        if (existing == null) ContactPairResult.ADDED else ContactPairResult.UNCHANGED
     }
 
     /**
@@ -987,6 +1088,76 @@ class SecureRepository(private val context: Context) {
         addContact(
             contact.copy(relayRecvSecretEncrypted = AndroidKeyStoreManager.encryptWithMasterKey(secret))
         )
+    }
+
+    // ==================== Connection requests (username-directory introductions) ====================
+    // A self-introduction found via the optional directory search, sitting
+    // between "unknown stranger" and a real Contact until explicitly
+    // accepted or rejected — see IncomingConnectionRequest/
+    // OutgoingConnectionRequest in Entities.kt for why these are their own
+    // tables. As with Contact, encrypted fields here are handed back raw
+    // (still encrypted) to callers, which decrypt exactly what they need
+    // with AndroidKeyStoreManager — the same layering ChatListViewModel
+    // already uses for Contact.displayNameEncrypted.
+
+    fun getIncomingConnectionRequests(): Flow<List<IncomingConnectionRequest>> =
+        requireDb().incomingConnectionRequestDao().observeAll()
+
+    suspend fun getIncomingConnectionRequest(senderIdentityPublicKeyHex: String): IncomingConnectionRequest? =
+        withContext(Dispatchers.IO) {
+            database?.incomingConnectionRequestDao()?.get(senderIdentityPublicKeyHex)
+        }
+
+    suspend fun saveIncomingConnectionRequest(
+        senderIdentityPublicKeyHex: String,
+        senderUserId: String,
+        senderUsername: String,
+        senderSigningPublicKey: ByteArray,
+        pairSecret: ByteArray,
+        directAddress: String?
+    ) = withContext(Dispatchers.IO) {
+        database?.incomingConnectionRequestDao()?.insert(
+            IncomingConnectionRequest(
+                senderIdentityPublicKeyHex = senderIdentityPublicKeyHex,
+                senderUserId = senderUserId,
+                senderUsername = senderUsername,
+                senderSigningPublicKey = senderSigningPublicKey,
+                pairSecretEncrypted = AndroidKeyStoreManager.encryptWithMasterKey(pairSecret),
+                directAddress = directAddress
+            )
+        )
+    }
+
+    suspend fun deleteIncomingConnectionRequest(senderIdentityPublicKeyHex: String) = withContext(Dispatchers.IO) {
+        database?.incomingConnectionRequestDao()?.deleteByKey(senderIdentityPublicKeyHex)
+    }
+
+    fun getOutgoingConnectionRequests(): Flow<List<OutgoingConnectionRequest>> =
+        requireDb().outgoingConnectionRequestDao().observeAll()
+
+    suspend fun getOutgoingConnectionRequest(recipientIdentityPublicKeyHex: String): OutgoingConnectionRequest? =
+        withContext(Dispatchers.IO) {
+            database?.outgoingConnectionRequestDao()?.get(recipientIdentityPublicKeyHex)
+        }
+
+    suspend fun saveOutgoingConnectionRequest(
+        recipientIdentityPublicKeyHex: String,
+        recipientUsername: String,
+        recipientSigningPublicKey: ByteArray,
+        mintedPairSecret: ByteArray
+    ) = withContext(Dispatchers.IO) {
+        database?.outgoingConnectionRequestDao()?.insert(
+            OutgoingConnectionRequest(
+                recipientIdentityPublicKeyHex = recipientIdentityPublicKeyHex,
+                recipientUsername = recipientUsername,
+                recipientSigningPublicKey = recipientSigningPublicKey,
+                mintedPairSecretEncrypted = AndroidKeyStoreManager.encryptWithMasterKey(mintedPairSecret)
+            )
+        )
+    }
+
+    suspend fun deleteOutgoingConnectionRequest(recipientIdentityPublicKeyHex: String) = withContext(Dispatchers.IO) {
+        database?.outgoingConnectionRequestDao()?.deleteByKey(recipientIdentityPublicKeyHex)
     }
 
     private fun hexToBytes(hex: String): ByteArray {
@@ -1143,19 +1314,88 @@ class SecureRepository(private val context: Context) {
         database?.outboxDao()?.getAll() ?: emptyList()
     }
 
-    /** clientMessageId set of every message still awaiting the relay's ack — drives the "sending…" tick. */
+    /** clientMessageId set of every message still awaiting the relay's ack, or still pending a resend — drives the "sending…" tick. */
     fun observePendingClientMessageIds(): Flow<Set<String>> =
-        requireDb().outboxDao().observeAll().map { list -> list.mapNotNull { it.clientMessageId }.toSet() }
+        combine(
+            requireDb().outboxDao().observeAll().map { list -> list.mapNotNull { it.clientMessageId }.toSet() },
+            requireDb().pendingSendDao().observeAll().map { list -> list.map { it.clientMessageId }.toSet() }
+        ) { fromOutbox, fromPending -> fromOutbox + fromPending }
+
+    // ==================== Pending sends (session establishment failed) ====================
+
+    /** A [PendingSend] with its plaintext decrypted, ready to feed straight back into a resend. */
+    data class DecryptedPendingSend(
+        val clientMessageId: String,
+        val recipientId: String,
+        val plaintext: ByteArray,
+        val ttlSeconds: Int?
+    )
+
+    private fun PendingSend.decrypted() = DecryptedPendingSend(
+        clientMessageId = clientMessageId,
+        recipientId = recipientId,
+        plaintext = AndroidKeyStoreManager.decryptWithMasterKey(plaintextEncrypted),
+        ttlSeconds = ttlSeconds
+    )
+
+    suspend fun savePendingSend(clientMessageId: String, recipientId: String, plaintext: ByteArray, ttlSeconds: Int?) =
+        withContext(Dispatchers.IO) {
+            database?.pendingSendDao()?.insert(
+                PendingSend(
+                    clientMessageId = clientMessageId,
+                    recipientId = recipientId,
+                    plaintextEncrypted = AndroidKeyStoreManager.encryptWithMasterKey(plaintext),
+                    ttlSeconds = ttlSeconds
+                )
+            )
+        }
+
+    suspend fun deletePendingSend(clientMessageId: String) = withContext(Dispatchers.IO) {
+        database?.pendingSendDao()?.deleteById(clientMessageId)
+    }
+
+    suspend fun getAllPendingSends(): List<DecryptedPendingSend> = withContext(Dispatchers.IO) {
+        database?.pendingSendDao()?.getAll()?.map { it.decrypted() } ?: emptyList()
+    }
+
+    suspend fun getPendingSendsForContact(contactId: String): List<DecryptedPendingSend> = withContext(Dispatchers.IO) {
+        database?.pendingSendDao()?.getForContact(contactId)?.map { it.decrypted() } ?: emptyList()
+    }
+
+    // ==================== Seen-envelope de-dup (persisted across client restarts) ====================
+
+    /** The remembered ack token for an already-successfully-handled envelope, or null if it was never (successfully) seen. */
+    suspend fun getSeenEnvelopeAckToken(key: String): String? = withContext(Dispatchers.IO) {
+        database?.seenEnvelopeDao()?.get(key)?.ackToken
+    }
+
+    /** Remember that [key] was successfully handled, so a resend can be acked again without reprocessing it. */
+    suspend fun rememberSeenEnvelope(key: String, ackToken: String) = withContext(Dispatchers.IO) {
+        database?.seenEnvelopeDao()?.upsert(SeenEnvelope(envelopeKey = key, ackToken = ackToken))
+    }
+
+    suspend fun pruneSeenEnvelopesOlderThan(maxAgeMs: Long) = withContext(Dispatchers.IO) {
+        database?.seenEnvelopeDao()?.pruneOlderThan(System.currentTimeMillis() - maxAgeMs)
+    }
 
     // ==================== Cleanup ====================
 
     suspend fun wipeAllData() = withContext(kotlinx.coroutines.NonCancellable + Dispatchers.IO) {
         // Runs as NonCancellable: a duress wipe must complete even if the app is
         // torn down the instant it starts.
-        database?.apply {
-            clearAllTables()
-            close()
-        }
+        database?.clearAllTables()
+        // SecureDatabase.closeDatabase() — NOT the instance's own close() —
+        // is what also nulls the static SecureDatabase.INSTANCE. Calling only
+        // the instance method (as this used to) left that singleton pointing
+        // at a closed database; the very next initialize() (Setup, right
+        // after this wipe, is the normal next step for either a manual or a
+        // duress wipe) would call SecureDatabase.getInstance() with a fresh
+        // passphrase, get the stale closed instance back unchanged, and run
+        // against it — silently discarding the new passphrase and leaving
+        // the app trying to use a database handle that's already shut down,
+        // immediately after a wipe is exactly the worst moment for anything
+        // to visibly break.
+        SecureDatabase.closeDatabase()
         SecureDatabase.wipeDatabase(context)
         database = null
 
@@ -1172,9 +1412,13 @@ class SecureRepository(private val context: Context) {
         dbPassphrase?.let { java.util.Arrays.fill(it, ' ') }
         dbPassphrase = null
         runCatching { com.securemessenger.app.security.SecurePreferences.clearAll(context) }
-        // Last, once nothing else needs it: the Keystore master key itself.
-        // Everything it protected is already gone above; leaving the entry
-        // behind would be the one trace that survives a "complete" wipe.
+        // Last, once nothing else needs them: the Keystore keys themselves.
+        // Everything they protected is already gone above; leaving either
+        // entry behind would be a trace that survives a "complete" wipe —
+        // the master key AndroidKeyStoreManager uses for the DB/field
+        // encryption, and the separate biometric-gated key DisguiseGateKey
+        // uses only to make the reveal prompt cryptographically real.
         runCatching { AndroidKeyStoreManager.wipeKeys() }
+        runCatching { com.securemessenger.app.security.DisguiseGateKey.reset() }
     }
 }

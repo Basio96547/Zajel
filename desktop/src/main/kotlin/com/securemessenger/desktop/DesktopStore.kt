@@ -64,6 +64,7 @@ class DesktopStore(private val file: File) {
     private val sessions = mutableMapOf<String, StoredSession>()
     private val messages = mutableListOf<StoredMessage>()
     private val outbox = linkedMapOf<String, StoredOutbox>()
+    private val pendingSends = linkedMapOf<String, StoredPendingSend>()
 
     /** Pair secrets we minted by showing a QR, not yet claimed by whoever scanned it. */
     private val pendingPairSecrets = mutableListOf<String>()
@@ -79,7 +80,9 @@ class DesktopStore(private val file: File) {
         /** Minted by US and taken by them — we listen on the mailbox it addresses. */
         var relayRecvSecret: ByteArray? = null,
         /** "host:port" that worked, came in on a QR, or was typed by hand. */
-        var directAddress: String? = null
+        var directAddress: String? = null,
+        /** Local-only, like the phone — non-null = pinned, and doubles as the sort key among several pins. */
+        var pinnedAt: Long? = null
     )
 
     data class StoredSession(
@@ -95,7 +98,10 @@ class DesktopStore(private val file: File) {
         val text: String,
         val timestamp: Long,
         val clientMessageId: String?,
-        var delivered: Boolean = false
+        var delivered: Boolean = false,
+        // Outgoing: the recipient's receipt confirmed they read it. Incoming:
+        // we've already told them we saw it, so we don't re-send a receipt.
+        var read: Boolean = false
     )
 
     data class StoredOutbox(
@@ -104,6 +110,14 @@ class DesktopStore(private val file: File) {
         val envelope: String,
         val clientMessageId: String?
     )
+
+    /**
+     * A message whose delivery failed before it ever became a StoredOutbox
+     * entry, because establishing a session with the recipient needs a live
+     * round trip (X3DH prekey fetch) that didn't complete. See
+     * DesktopMessagingClient.sendMessageAndTrack / retryPendingSends.
+     */
+    data class StoredPendingSend(val clientMessageId: String, val contactId: String, val text: String)
 
     // ================= lifecycle =================
 
@@ -183,13 +197,39 @@ class DesktopStore(private val file: File) {
 
     // ================= mutations =================
 
+    /** What [upsertContact] actually did. */
+    enum class ContactPairResult { ADDED, UNCHANGED, KEY_CHANGED }
+
+    /**
+     * Refuses to silently replace an EXISTING contact's pinned identity key
+     * unless [allowKeyChange] is explicitly true — mirrors the Android app's
+     * SecureRepository.addContactWithPublicKey. A contact's userId is not
+     * secret (it's shown on their own share screen), so without this check
+     * anyone who learns it could get a QR scanned that silently re-pins them
+     * to an attacker's key, with nothing telling the user it happened.
+     */
     @Synchronized
-    fun upsertContact(contact: StoredContact) {
+    fun upsertContact(contact: StoredContact, allowKeyChange: Boolean = false): ContactPairResult {
+        val existing = contacts[contact.id]
+        val keyChanged = existing != null && !existing.publicKey.contentEquals(contact.publicKey)
+        if (keyChanged && !allowKeyChange) return ContactPairResult.KEY_CHANGED
         contacts[contact.id] = contact
         save()
+        return if (existing == null) ContactPairResult.ADDED else ContactPairResult.UNCHANGED
     }
 
+    // @Synchronized on every read below, not just the mutators above: this
+    // class's collections (contacts/sessions/messages/outbox/oneTimePreKeys)
+    // are plain ArrayList/LinkedHashMap, and @Synchronized only excludes
+    // OTHER @Synchronized callers — it does nothing to protect an
+    // unsynchronized read racing a mutator on another thread. MainScreen
+    // polls these every ~700ms on the UI thread while network coroutines on
+    // Dispatchers.IO concurrently mutate them on message send/receive; that
+    // is a real, continuously-exercised concurrent-access pattern, not a
+    // theoretical one.
+    @Synchronized
     fun contact(id: String): StoredContact? = contacts[id]
+    @Synchronized
     fun allContacts(): List<StoredContact> = contacts.values.toList()
 
     @Synchronized
@@ -197,14 +237,22 @@ class DesktopStore(private val file: File) {
         contacts[contactId]?.let { it.directAddress = hostPort?.trim()?.takeIf(String::isNotBlank); save() }
     }
 
+    /** Local-only, like the phone — nothing about this is ever sent to a peer or the relay. */
+    @Synchronized
+    fun setPinned(contactId: String, pinned: Boolean) {
+        contacts[contactId]?.let { it.pinnedAt = if (pinned) System.currentTimeMillis() else null; save() }
+    }
+
     @Synchronized
     fun bindRelayRecvSecret(contactId: String, secret: ByteArray) {
         contacts[contactId]?.let { if (it.relayRecvSecret == null) { it.relayRecvSecret = secret; save() } }
     }
 
+    @Synchronized
     fun unusedPreKeys(): List<SignalProtocol.PreKeyPair> =
         oneTimePreKeys.filterNot { it.used }.map { SignalProtocol.PreKeyPair(it.id, it.publicKey, it.secretKey) }
 
+    @Synchronized
     fun preKeySecret(id: Int): ByteArray? = oneTimePreKeys.firstOrNull { it.id == id }?.secretKey
 
     @Synchronized
@@ -212,6 +260,7 @@ class DesktopStore(private val file: File) {
         oneTimePreKeys.firstOrNull { it.id == id }?.let { it.used = true; save() }
     }
 
+    @Synchronized
     fun session(contactId: String): StoredSession? = sessions[contactId]
 
     @Synchronized
@@ -226,6 +275,7 @@ class DesktopStore(private val file: File) {
         save()
     }
 
+    @Synchronized
     fun messagesWith(contactId: String): List<StoredMessage> =
         messages.filter { it.contactId == contactId }.sortedBy { it.timestamp }
 
@@ -233,6 +283,42 @@ class DesktopStore(private val file: File) {
     fun markDelivered(clientMessageId: String?) {
         if (clientMessageId == null) return
         messages.firstOrNull { it.clientMessageId == clientMessageId }?.let { it.delivered = true; save() }
+    }
+
+    /**
+     * Apply an incoming read receipt. Scoped to [contactId] so a receipt can
+     * only flip messages we actually sent TO that contact — matching the
+     * phone's same rule (a forged receipt naming someone else's message id
+     * must not be able to mark it read).
+     */
+    @Synchronized
+    fun markReadByRecipient(contactId: String, clientMessageIds: List<String>) {
+        if (clientMessageIds.isEmpty()) return
+        val ids = clientMessageIds.toHashSet()
+        var changed = false
+        messages.forEach {
+            if (it.outgoing && it.contactId == contactId && it.clientMessageId in ids && !it.read) {
+                it.read = true; changed = true
+            }
+        }
+        if (changed) save()
+    }
+
+    /**
+     * Mark every not-yet-seen incoming message from [contactId] as seen, and
+     * return the client message ids that just transitioned — the batch a
+     * caller should send one read receipt for. Idempotent: nothing to report
+     * a second time once already marked.
+     */
+    @Synchronized
+    fun markSeenLocallyAndGetNewIds(contactId: String): List<String> {
+        val newly = messages.filter {
+            !it.outgoing && it.contactId == contactId && it.clientMessageId != null && !it.read
+        }
+        if (newly.isEmpty()) return emptyList()
+        newly.forEach { it.read = true }
+        save()
+        return newly.mapNotNull { it.clientMessageId }
     }
 
     @Synchronized
@@ -250,8 +336,28 @@ class DesktopStore(private val file: File) {
         }
     }
 
+    @Synchronized
     fun allOutbox(): List<StoredOutbox> = outbox.values.toList()
 
+    @Synchronized
+    fun addPendingSend(entry: StoredPendingSend) {
+        pendingSends[entry.clientMessageId] = entry
+        save()
+    }
+
+    @Synchronized
+    fun removePendingSend(clientMessageId: String) {
+        if (pendingSends.remove(clientMessageId) != null) save()
+    }
+
+    @Synchronized
+    fun allPendingSends(): List<StoredPendingSend> = pendingSends.values.toList()
+
+    @Synchronized
+    fun pendingSendsForContact(contactId: String): List<StoredPendingSend> =
+        pendingSends.values.filter { it.contactId == contactId }
+
+    @Synchronized
     fun pendingSecrets(): List<String> = pendingPairSecrets.toList()
 
     @Synchronized
@@ -302,6 +408,7 @@ class DesktopStore(private val file: File) {
                         it.relaySendSecret?.let { s -> put("send", B64.encode(s)) }
                         it.relayRecvSecret?.let { s -> put("recv", B64.encode(s)) }
                         it.directAddress?.let { a -> put("addr", a) }
+                        it.pinnedAt?.let { p -> put("pinned", p) }
                     })
                 }
             })
@@ -320,7 +427,7 @@ class DesktopStore(private val file: File) {
                 messages.forEach {
                     put(JSONObject().apply {
                         put("contact", it.contactId); put("out", it.outgoing); put("text", it.text)
-                        put("ts", it.timestamp); put("delivered", it.delivered)
+                        put("ts", it.timestamp); put("delivered", it.delivered); put("read", it.read)
                         it.clientMessageId?.let { c -> put("cid", c) }
                     })
                 }
@@ -330,6 +437,13 @@ class DesktopStore(private val file: File) {
                     put(JSONObject().apply {
                         put("id", it.id); put("to", it.recipientId); put("env", it.envelope)
                         it.clientMessageId?.let { c -> put("cid", c) }
+                    })
+                }
+            })
+            put("pendingSends", JSONArray().apply {
+                pendingSends.values.forEach {
+                    put(JSONObject().apply {
+                        put("cid", it.clientMessageId); put("to", it.contactId); put("text", it.text)
                     })
                 }
             })
@@ -379,7 +493,8 @@ class DesktopStore(private val file: File) {
                     displayName = o.optString("name"),
                     relaySendSecret = B64.decodeOrNull(o.optString("send")),
                     relayRecvSecret = B64.decodeOrNull(o.optString("recv")),
-                    directAddress = o.optString("addr").takeIf { it.isNotBlank() }
+                    directAddress = o.optString("addr").takeIf { it.isNotBlank() },
+                    pinnedAt = if (o.has("pinned")) o.getLong("pinned") else null
                 )
             }
         }
@@ -403,7 +518,8 @@ class DesktopStore(private val file: File) {
                     contactId = o.getString("contact"), outgoing = o.getBoolean("out"),
                     text = o.getString("text"), timestamp = o.getLong("ts"),
                     clientMessageId = o.optString("cid").takeIf { it.isNotBlank() },
-                    delivered = o.optBoolean("delivered")
+                    delivered = o.optBoolean("delivered"),
+                    read = o.optBoolean("read")
                 )
             }
         }
@@ -414,6 +530,18 @@ class DesktopStore(private val file: File) {
                 outbox[o.getString("id")] = StoredOutbox(
                     o.getString("id"), o.getString("to"), o.getString("env"),
                     o.optString("cid").takeIf { it.isNotBlank() }
+                )
+            }
+        }
+        pendingSends.clear()
+        // Absent entirely in a save file written before this field existed —
+        // optJSONArray returning null and the loop simply not running is the
+        // correct, harmless behavior for that case.
+        json.optJSONArray("pendingSends")?.let { arr ->
+            for (i in 0 until arr.length()) {
+                val o = arr.getJSONObject(i)
+                pendingSends[o.getString("cid")] = StoredPendingSend(
+                    o.getString("cid"), o.getString("to"), o.getString("text")
                 )
             }
         }

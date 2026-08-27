@@ -45,6 +45,19 @@ class SignalProtocol(
     // still decrypt instead of desyncing the whole chain.
     private val skippedMessageKeys = mutableMapOf<String, ByteArray>()
     private val maxSkip = 1000
+    // Hard ceiling on the TOTAL number of cached-but-unclaimed skipped keys
+    // across the whole session — separate from maxSkip, which only bounds
+    // how far a SINGLE message may jump ahead. Without this, a peer who
+    // simply never sends the specific in-between counter values needed to
+    // consume an entry (trivial: they control their own send timing) could
+    // keep adding up to maxSkip fresh entries per message indefinitely —
+    // each one persisted into the encrypted on-disk session row too (see
+    // SecureRepository.saveRatchetSession) — a slow-burn memory/storage
+    // exhaustion from a single contact. A modest multiple of maxSkip is
+    // generous headroom for any plausible legitimate reordering (direct
+    // socket vs. relay delivery racing, at most) without leaving the map
+    // truly unbounded.
+    private val maxTotalSkipped = maxSkip * 2
 
     init {
         // Start from our identity key; the real ratchet root/chain keys are
@@ -215,6 +228,11 @@ class SignalProtocol(
         // Ratchet chain key forward
         chainKeySend = advanceChainKey(chainKeySend)
         sendChainCounter++
+        // Matches decryptMessageInternal's secureWipe of its own one-time
+        // message key — this one was never wiped, leaving every outgoing
+        // message's key recoverable from heap remnants for longer than
+        // necessary on the send side specifically.
+        LibsodiumWrapper.secureWipe(messageKey)
 
         return EncryptedMessage(
             ciphertext = ciphertext,
@@ -301,6 +319,9 @@ class SignalProtocol(
         val theirKey = theirRatchetPublicKey ?: return
         if (untilCounter - receiveChainCounter > maxSkip) {
             throw IllegalStateException("Too many skipped messages")
+        }
+        if (skippedMessageKeys.size + (untilCounter - receiveChainCounter) > maxTotalSkipped) {
+            throw IllegalStateException("Too many unclaimed skipped-message keys accumulated")
         }
         var current = chain
         while (receiveChainCounter < untilCounter) {

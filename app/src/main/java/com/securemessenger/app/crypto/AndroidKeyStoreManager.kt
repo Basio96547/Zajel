@@ -29,7 +29,15 @@ object AndroidKeyStoreManager {
     /**
      * Generate or retrieve the master key from Android Keystore.
      * This key is used to encrypt the actual encryption keys.
+     *
+     * @Synchronized: without it, two concurrent first-run callers (app boot
+     * racing a background service's own initialization, say) could both see
+     * no existing entry and both call generateMasterKey() — the second
+     * silently replaces the Keystore entry the first just created, since
+     * both target the same alias, permanently orphaning anything already
+     * encrypted under the first one.
      */
+    @Synchronized
     fun getOrCreateMasterKey(): SecretKey {
         val existingKey = keyStore.getEntry(KEY_ALIAS, null) as? KeyStore.SecretKeyEntry
         if (existingKey != null) {

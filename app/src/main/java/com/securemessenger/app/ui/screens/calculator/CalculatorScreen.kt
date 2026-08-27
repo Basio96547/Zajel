@@ -94,14 +94,6 @@ fun CalculatorScreen(onUnlock: () -> Unit, onDuress: () -> Unit = {}) {
     var currentInput by remember { mutableStateOf("0") }
     var justEvaluated by remember { mutableStateOf(false) }
     val formatter = remember { DecimalFormat("#,##0.##########") }
-    // Invisible brute-force throttle for the secret code. Code entry is always
-    // "type a bare number, press =", never using an operator, so genuine
-    // calculator use (which resets this in onOperator) never trips it; only a
-    // run of bare-number "=" presses — the shape of code-guessing — does. After
-    // too many misses, code checks pause briefly while the calculator keeps
-    // working normally (so nothing visibly "locks").
-    var codeMissStreak by remember { mutableStateOf(0) }
-    var codeCheckLockedUntil by remember { mutableStateOf(0L) }
 
     fun applyOp(op: Op, a: Double, b: Double): Double = when (op) {
         Op.ADD -> a + b
@@ -145,7 +137,7 @@ fun CalculatorScreen(onUnlock: () -> Unit, onDuress: () -> Unit = {}) {
     fun onOperator(op: Op) {
         // Using an operator is a clear signal of genuine calculator use, not
         // code-guessing — clear the miss streak.
-        codeMissStreak = 0
+        AppSettings.setCodeMissStreak(context, 0)
         val value = currentInput.toDoubleOrNull() ?: 0.0
         firstOperand = if (firstOperand == null) value else {
             val result = applyOp(pendingOp ?: op, firstOperand!!, value)
@@ -164,49 +156,60 @@ fun CalculatorScreen(onUnlock: () -> Unit, onDuress: () -> Unit = {}) {
         // Secret gate: a plain number (no operator used) matching the access
         // code opens the messenger instead of "calculating" it. Codes are
         // verified against a salted hash in constant time (never compared as
-        // plaintext), and repeated misses throttle further checks.
+        // plaintext), and repeated misses throttle further checks. The streak
+        // and lockout are both persisted (AppSettings, backed by
+        // EncryptedSharedPreferences) rather than kept in Compose state —
+        // swiping the app away from Recents and reopening it must not hand
+        // back a clean slate.
         if (pendingOp == null && firstOperand == null && currentInput.length >= 3) {
             val now = System.currentTimeMillis()
-            if (now >= codeCheckLockedUntil) {
-                if (!AppSettings.hasAccessCode(context)) {
-                    // Bootstrap: no code has ever been chosen yet (fresh
-                    // install) — there is nothing to check the input against,
-                    // and nothing sensitive exists yet either (no account, no
+            if (now >= AppSettings.codeCheckLockedUntil(context)) {
+                // Bootstrap only runs while it's still armed — see
+                // isBootstrapArmed. A fresh install (never armed false) can
+                // always reach Setup this way; a device that has already
+                // finished Setup once cannot, even if a later wipe clears
+                // hasAccessCode() back to "unset" — otherwise the exact same
+                // "any number opens Setup" path a fresh install needs would
+                // silently reopen right after a duress wipe, which is the one
+                // moment it must never be reachable.
+                if (!AppSettings.hasAccessCode(context) && AppSettings.isBootstrapArmed(context)) {
+                    // Nothing sensitive exists yet either way (no account, no
                     // keys, no messages: Setup is what creates all of that).
                     // Any plain number proceeds straight in, landing on Setup,
                     // where choosing a real access code is mandatory before
-                    // anything sensitive is ever created. Without this special
-                    // case, a fresh install could never get past this screen
-                    // at all: onUnlock() is only ever called from here, and
-                    // verifyAccessCode()/verifyDuressCode() both always return
-                    // false when no code is stored yet — a dead end with no
-                    // way in whatsoever.
-                    codeMissStreak = 0
+                    // anything sensitive is ever created.
+                    AppSettings.setCodeMissStreak(context, 0)
                     reset()
                     onUnlock()
                     return
                 }
                 // Duress takes effect only when it does NOT also match the real
                 // access code — safer to fail toward "just unlocks" than toward
-                // "silently wipes everything" if the two ever collide.
+                // "silently wipes everything" if the two ever collide. (The
+                // Settings screen also refuses to let the two codes collide in
+                // the first place — see SettingsScreen's showCodeDialog /
+                // showDuressDialog — so this is a second, defense-in-depth line,
+                // not the only thing preventing it.)
                 val duressMatch = AppSettings.verifyDuressCode(context, currentInput)
                 val accessMatch = AppSettings.verifyAccessCode(context, currentInput)
                 if (duressMatch && !accessMatch) {
-                    codeMissStreak = 0
+                    AppSettings.setCodeMissStreak(context, 0)
                     reset()
                     onDuress()
                     return
                 }
                 if (accessMatch) {
-                    codeMissStreak = 0
+                    AppSettings.setCodeMissStreak(context, 0)
                     reset()
                     onUnlock()
                     return
                 }
-                codeMissStreak++
-                if (codeMissStreak >= 5) {
-                    codeCheckLockedUntil = now + 30_000L
-                    codeMissStreak = 0
+                val streak = AppSettings.codeMissStreak(context) + 1
+                if (streak >= 5) {
+                    AppSettings.setCodeCheckLockedUntil(context, now + 30_000L)
+                    AppSettings.setCodeMissStreak(context, 0)
+                } else {
+                    AppSettings.setCodeMissStreak(context, streak)
                 }
             }
         }

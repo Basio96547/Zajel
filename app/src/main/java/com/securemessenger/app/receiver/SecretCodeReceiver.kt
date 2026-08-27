@@ -24,6 +24,16 @@ class SecretCodeReceiver : BroadcastReceiver() {
                 PackageManager.DONT_KILL_APP
             )
             AppSettings.setStealthEnabled(context, false)
+            // Re-open the calculator's fresh-install Setup path (see
+            // AppSettings.isBootstrapArmed/rearmBootstrap) so this same
+            // out-of-band trigger also doubles as "let me back into Setup"
+            // after a wipe — but only when there's genuinely no access code
+            // configured right now. If a real code already exists, dialing
+            // this fixed, memorized code must never become a second way past
+            // it.
+            if (!AppSettings.hasAccessCode(context)) {
+                AppSettings.rearmBootstrap(context)
+            }
         } catch (_: Exception) {
         }
     }

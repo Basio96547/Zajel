@@ -598,8 +598,16 @@ private fun WaveformScrubber(
 
 private fun openInExternalApp(context: android.content.Context, bytes: ByteArray, media: MediaCodec.LocalMedia) {
     // media.fileName is already sanitized to a bare, safe basename by
-    // MediaCodec.tryParseWirePayload (no path separators / traversal).
-    val dir = File(context.cacheDir, "decrypted_media").apply { mkdirs() }
+    // MediaCodec.tryParseWirePayload (no path separators / traversal), but
+    // it's peer-chosen and NOT unique — two different messages can easily
+    // share a filename (e.g. both "invoice.pdf"). A random per-invocation
+    // subdirectory keeps each decrypted copy from overwriting another one
+    // that might still be mid-read by whatever app the previous share sent
+    // it to, while still handing this app's own external viewer the clean,
+    // original filename (still covered by the existing decrypted_media/
+    // FileProvider path — it grants the whole subtree, not just direct
+    // children).
+    val dir = File(context.cacheDir, "decrypted_media/${java.util.UUID.randomUUID()}").apply { mkdirs() }
     val file = File(dir, media.fileName)
     file.writeBytes(bytes)
     val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)

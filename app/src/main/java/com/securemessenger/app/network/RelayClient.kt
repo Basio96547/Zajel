@@ -173,30 +173,52 @@ class RelayClient(
      * Beyond that check the deposit stays fire-and-forget: it may sit behind a
      * deliberate random delay, and the durable outbox is what guarantees
      * eventual delivery, so blocking the send path on the HTTP round trip
-     * would buy nothing.
+     * would buy nothing. A caller that DOES need to know whether the deposit
+     * actually landed — the periodic retry sweep, which is already off the
+     * interactive path — should call [enqueueAwait] instead.
      */
     suspend fun enqueue(contactId: String, envelopeJson: String): Boolean {
+        if (!isEnabled) return false
+        if (repository.getRelaySendSecret(contactId) == null) {
+            Log.w(TAG, "no outbound pair secret for $contactId — this contact has no relay path")
+            return false
+        }
+        scope.launch { enqueueAwait(contactId, envelopeJson) }
+        return true
+    }
+
+    /**
+     * Same as [enqueue], but waits for the HTTP deposit to actually finish and
+     * reports whether it truly succeeded, instead of firing it in the
+     * background and reporting only "was queued." Deliberately not what the
+     * interactive send path uses (see [enqueue]) — the jitter delay plus the
+     * round trip would make sending feel stuck. The periodic retry sweep
+     * ([SecureMessagingClient.retryOutbox]) already runs off the UI, though,
+     * and needs the real outcome: it only advances its anti-pileup floor after
+     * a deposit that actually landed, never one that failed before ever
+     * leaving the device (which would otherwise be retried no sooner than
+     * RELAY_RETRY_FLOOR_MS later for no reason — nothing was piled up).
+     */
+    suspend fun enqueueAwait(contactId: String, envelopeJson: String): Boolean {
         if (!isEnabled) return false
         val secret = repository.getRelaySendSecret(contactId) ?: run {
             Log.w(TAG, "no outbound pair secret for $contactId — this contact has no relay path")
             return false
         }
-        scope.launch {
-            try {
-                // Break the "A deposited at T, B collected at T+ε" correlation
-                // the relay could otherwise draw between two mailboxes.
-                if (AppSettings.isCoverTrafficEnabled(appContext)) {
-                    delay(randomBetween(0, MAX_SEND_JITTER_MS))
-                }
-                depositBlobs(
-                    MailboxToken.outboundId(secret),
-                    sealIntoBlobs(secret, envelopeJson.toByteArray(Charsets.UTF_8))
-                )
-            } catch (e: Exception) {
-                Log.w(TAG, "relay deposit failed", e)
+        return try {
+            // Break the "A deposited at T, B collected at T+ε" correlation
+            // the relay could otherwise draw between two mailboxes.
+            if (AppSettings.isCoverTrafficEnabled(appContext)) {
+                delay(randomBetween(0, MAX_SEND_JITTER_MS))
             }
+            depositBlobs(
+                MailboxToken.outboundId(secret),
+                sealIntoBlobs(secret, envelopeJson.toByteArray(Charsets.UTF_8))
+            )
+        } catch (e: Exception) {
+            Log.w(TAG, "relay deposit failed", e)
+            false
         }
-        return true
     }
 
     // ---- receiving ----
@@ -241,6 +263,44 @@ class RelayClient(
             return
         }
 
+        // Reject a group whose declared chunk count alone implies a payload
+        // far beyond any legitimate media message, before ever accumulating
+        // its chunks. The real size cap (SecureRepository.MAX_MEDIA_BYTES) is
+        // only checked once the full envelope has been reassembled,
+        // JSON-parsed and base64-decoded — by then a malicious peer has
+        // already made this device do several full-payload-sized buffer
+        // copies for nothing. The x8 multiplier is headroom for how much
+        // bigger a message's wire form is than its raw content — sealed
+        // envelope base64 stacked with this relay layer's own base64, plus
+        // ciphertext/JSON overhead — generous enough that a legitimate
+        // MAX_MEDIA_BYTES attachment is never affected, while anything
+        // aiming at RelayBlob's own much larger MAX_CHUNKS ceiling is caught
+        // immediately instead of after the fact.
+        val maxPlausibleGroupBytes = SecureRepository.MAX_MEDIA_BYTES.toLong() * 8
+        if (chunk.count.toLong() * RelayBlob.CHUNK_BYTES > maxPlausibleGroupBytes) {
+            Log.w(TAG, "rejecting implausibly large chunk group (count=${chunk.count}) before accumulating it")
+            return
+        }
+
+        // Cap how many distinct in-progress groups get tracked at once.
+        // RelayBlob.open already bounds any ONE group's chunk count
+        // (MAX_CHUNKS), but nothing previously bounded the NUMBER of
+        // different groups — a peer we already share a pair secret with (a
+        // paired contact gone malicious, or anyone still holding an
+        // unclaimed "pending" QR secret) could deposit endless chunks each
+        // claiming a fresh group id and a count >= 2 they never finish
+        // sending, and only prunePartials() — a once-per-poll, 10-minute-TTL
+        // sweep — would ever reclaim them. This is a hard backstop under
+        // that sweep, not a replacement for it: a real multi-chunk message
+        // already being tracked is never rejected, only a chunk that would
+        // start a BRAND NEW group once the cap is reached — far more
+        // simultaneous in-flight large messages than a personal messenger's
+        // real traffic ever needs.
+        if (partials.size >= MAX_PARTIAL_GROUPS && !partials.containsKey(chunk.group)) {
+            Log.w(TAG, "dropping chunk for new group — $MAX_PARTIAL_GROUPS groups already in flight")
+            return
+        }
+
         val partial = partials.getOrPut(chunk.group) { Partial(chunk.count) }
         if (partial.count != chunk.count) return
         val complete = synchronized(partial) {
@@ -278,12 +338,15 @@ class RelayClient(
         return RelayBlob.seal(secret, payload, group, minSizeClasses)
     }
 
-    private suspend fun depositBlobs(mailboxId: String, blobs: List<String>) {
+    /** True only if every batch's deposit call actually got a response back — see [enqueueAwait]. */
+    private suspend fun depositBlobs(mailboxId: String, blobs: List<String>): Boolean {
+        var allSucceeded = true
         for (batch in blobs.chunked(MAX_DEPOSIT_ITEMS)) {
             val items = JSONArray()
             batch.forEach { items.put(JSONObject().put("m", mailboxId).put("b", it)) }
-            post("/d", JSONObject().put("items", items).toString())
+            if (post("/d", JSONObject().put("items", items).toString()) == null) allSucceeded = false
         }
+        return allSucceeded
     }
 
     /**
@@ -359,5 +422,8 @@ class RelayClient(
         private const val MAX_DEPOSIT_ITEMS = 32
 
         private const val PARTIAL_TTL_MS = 10 * 60 * 1000L
+
+        /** Hard cap on distinct in-progress (incomplete) chunk groups tracked at once — see handleBlob. */
+        private const val MAX_PARTIAL_GROUPS = 64
     }
 }

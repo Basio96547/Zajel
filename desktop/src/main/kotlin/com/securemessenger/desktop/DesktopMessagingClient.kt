@@ -3,8 +3,10 @@ package com.securemessenger.desktop
 import com.securemessenger.core.B64
 import com.securemessenger.core.Platform
 import com.securemessenger.core.crypto.AckToken
+import com.securemessenger.core.crypto.ChatPayloads
 import com.securemessenger.core.crypto.LibsodiumWrapper
 import com.securemessenger.core.crypto.MailboxToken
+import com.securemessenger.core.crypto.MediaCodec
 import com.securemessenger.core.crypto.MessagePadding
 import com.securemessenger.core.crypto.PqKem
 import com.securemessenger.core.crypto.SignalProtocol
@@ -44,6 +46,8 @@ private const val LOCAL_BUNDLE_TIMEOUT_MS = 8_000L
 private const val RELAY_BUNDLE_TIMEOUT_MS = 75_000L
 private const val OUTBOX_RETRY_MS = 60 * 1000L
 private const val BUNDLE_HANDOUT_MIN_INTERVAL_MS = 10_000L
+// Same window the Android app clears a typing pulse after (ConversationViewModel).
+private const val TYPING_TIMEOUT_MS = 4_000L
 
 /**
  * The desktop client's half of the protocol.
@@ -64,7 +68,16 @@ class DesktopMessagingClient(
     private val onMessage: (contactId: String, text: String, clientMessageId: String?) -> Unit,
     private val onStateChanged: () -> Unit
 ) {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    // var, not val: stop() cancels this scope's Job, and a cancelled
+    // CoroutineScope can't usefully host new work — a coroutine launched on
+    // it starts with isActive already false, so every `while (isActive)`
+    // periodic job below (token rotation, outbox retry) would exit
+    // immediately without doing anything. start() replaces it with a fresh
+    // scope whenever the current one is no longer active, so the same
+    // client instance can be stopped and restarted (this app keeps one
+    // instance for its whole lifetime, unlike the Android app which
+    // constructs a fresh one on every reveal).
+    private var scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     /**
      * Sockets to peers on this LAN, bound to the local Wi-Fi/Ethernet address.
@@ -100,6 +113,8 @@ class DesktopMessagingClient(
     private val pendingBundleRequests = ConcurrentHashMap<String, CompletableDeferred<Envelopes.PrekeyBundle>>()
     private val pendingChallengeNonces = ConcurrentHashMap<String, ByteArray>()
     private val lastBundleHandout = ConcurrentHashMap<String, Long>()
+    /** contactId -> when their last typing pulse arrived. Ephemeral, never persisted. */
+    private val lastTypingAt = ConcurrentHashMap<String, Long>()
 
     private val sessions = ConcurrentHashMap<String, SignalProtocol>()
     private val responderEphemerals = ConcurrentHashMap<String, String>()
@@ -110,9 +125,25 @@ class DesktopMessagingClient(
     private fun lockFor(contactId: String): Mutex =
         synchronized(contactLocks) { contactLocks.getOrPut(contactId) { Mutex() } }
 
-    /** Processed envelope ids -> the ack token to re-send, so a duplicate never re-advances the ratchet. */
-    private val seenEnvelopes = object : LinkedHashMap<String, String?>(64, 0.75f, false) {
-        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, String?>?): Boolean = size > 512
+    // Guards "establish an initiator session for this contact if none
+    // exists" (X3DH: a live prekey-bundle fetch, up to RELAY_BUNDLE_TIMEOUT_MS)
+    // — deliberately separate from lockFor's ratchet lock, which is also
+    // needed to decrypt an incoming message from this same contact and must
+    // never sit blocked behind a slow handshake to them. See
+    // initiatorSession / sendMessageInternal.
+    private val handshakeLocks = mutableMapOf<String, Mutex>()
+    private fun handshakeLockFor(contactId: String): Mutex =
+        synchronized(handshakeLocks) { handshakeLocks.getOrPut(contactId) { Mutex() } }
+
+    // Envelopes already SUCCESSFULLY processed, keyed by "type:id" — only
+    // ever holds one the handler actually finished, never one it dropped (no
+    // session yet, lost a simultaneous-initiation race). Caching a drop
+    // would make it permanent: the sender's outbox keeps resending the
+    // identical envelope, and every resend would be discarded from this
+    // cache before the handler — by now possibly able to succeed — ever ran
+    // again. See onceOnly.
+    private val seenEnvelopes = object : LinkedHashMap<String, String>(64, 0.75f, false) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, String>?): Boolean = size > 512
     }
 
     private val relay: DesktopRelayClient? = relayUrl.takeIf { it.isNotBlank() }?.let {
@@ -130,6 +161,11 @@ class DesktopMessagingClient(
     // ================= lifecycle =================
 
     fun start() {
+        // stop() cancelled the previous scope's Job — a coroutine launched
+        // on a cancelled scope never actually runs its body, so every
+        // periodic job below would silently no-op on a restart without
+        // this. See the `scope` property's own doc comment.
+        if (!scope.isActive) scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         val srv = try {
             LocalRelayServer(LOCAL_RELAY_PORT).also { it.start(SERVER_IDLE_TIMEOUT_MS, false); boundPort = LOCAL_RELAY_PORT }
         } catch (e: java.io.IOException) {
@@ -149,6 +185,12 @@ class DesktopMessagingClient(
         // not take the whole client down with it.
         runCatching {
             discovery.start(boundPort, myToken()) { peers ->
+                // REPLACE, not merge — serviceRemoved drops the peer and calls
+                // back with the whole remaining list, so anything missing here
+                // has left the network. Merging kept departed peers "discovered"
+                // forever, which made every send to them wait out the full
+                // connect timeout on a dead address before trying the relay.
+                discoveredByToken.keys.retainAll(peers.mapTo(HashSet()) { it.token })
                 peers.forEach { discoveredByToken[it.token] = it }
                 scope.launch { peers.forEach { peer -> contactIdForToken(peer.token)?.let { flushOutboxTo(it) } } }
             }
@@ -172,8 +214,15 @@ class DesktopMessagingClient(
         }
         jobs += scope.launch {
             while (isActive) {
+                // Runs immediately on every start(), not just every
+                // OUTBOX_RETRY_MS after — otherwise a message stuck since
+                // before the last stop() would sit untouched for up to a
+                // minute after the app comes back up.
+                runCatching {
+                    retryOutbox()
+                    retryPendingSends()
+                }
                 delay(OUTBOX_RETRY_MS)
-                runCatching { retryOutbox() }
             }
         }
     }
@@ -282,6 +331,7 @@ class DesktopMessagingClient(
 
     private suspend fun flushOutboxTo(contactId: String) {
         store.allOutbox().filter { it.recipientId == contactId }.forEach { sendDirect(contactId, it.envelope) }
+        retryPendingSendsTo(contactId)
     }
 
     private suspend fun retryOutbox() {
@@ -293,53 +343,117 @@ class DesktopMessagingClient(
 
     // ================= sending =================
 
-    suspend fun sendMessage(contactId: String, text: String): Boolean = try {
-        lockFor(contactId).withLock { sendLocked(contactId, text) }
-        true
-    } catch (e: Exception) {
-        Platform.log.error(TAG, "sendMessage failed: ${e.message}", e)
-        false
+    /** Send a brand-new, user-typed message. For re-attempting one that already has a local row, see [retryPendingSends]. */
+    suspend fun sendMessage(contactId: String, text: String): Boolean {
+        // Saved locally FIRST, unconditionally — the message must appear in
+        // the sender's own history even if establishing a session with the
+        // recipient (a live X3DH round trip, up to ~75s over the relay)
+        // fails or times out. This used to only create the local row AFTER
+        // a successful handshake, so a failed one didn't just fail to
+        // deliver — the message the user typed never appeared anywhere at
+        // all, not even in their own chat, and nothing ever retried it.
+        val clientMessageId = java.util.UUID.randomUUID().toString()
+        store.addMessage(DesktopStore.StoredMessage(contactId, true, text, System.currentTimeMillis(), clientMessageId))
+        onStateChanged()
+        return sendMessageAndTrack(contactId, text, clientMessageId)
     }
 
-    private suspend fun sendLocked(contactId: String, text: String) {
+    /**
+     * Attempt (or re-attempt) delivery for a message that already has a
+     * local row — either just created above, or a previous attempt that
+     * failed and was persisted as a pending send (see [retryPendingSends]).
+     * Never creates a new local row itself, so a retry can't duplicate the
+     * bubble in the sender's own history.
+     */
+    private suspend fun sendMessageAndTrack(contactId: String, text: String, clientMessageId: String): Boolean {
+        return try {
+            sendMessageInternal(contactId, text, clientMessageId)
+            store.removePendingSend(clientMessageId)
+            true
+        } catch (e: Exception) {
+            Platform.log.error(TAG, "sendMessage failed: ${e.message}", e)
+            // Establishing a session needs the recipient to answer live (an
+            // X3DH prekey fetch, via initiatorSession) — when that fails,
+            // the message never reaches the outbox, so nothing else would
+            // ever retry it. Persisting it here is what retryPendingSends /
+            // retryPendingSendsTo actually act on.
+            store.addPendingSend(DesktopStore.StoredPendingSend(clientMessageId, contactId, text))
+            false
+        }
+    }
+
+    private suspend fun sendMessageInternal(contactId: String, text: String, clientMessageId: String) {
         val contact = store.contact(contactId) ?: throw IllegalStateException("جهة اتصال غير معروفة")
-        val protocol = initiatorSession(contactId)
-        val encrypted = protocol.encryptMessage(MessagePadding.pad(text.toByteArray(Charsets.UTF_8)))
-        val weAreInitiator = !responderEphemerals.containsKey(contactId)
+
+        // May need a live round trip to fetch the recipient's prekey bundle
+        // (up to RELAY_BUNDLE_TIMEOUT_MS ≈ 75s). Deliberately outside the
+        // per-contact ratchet lock below, so a slow handshake with this
+        // contact can never block a message arriving FROM them (handleMessage
+        // takes that same lock to decrypt). Concurrent callers for the same
+        // contact are serialized by initiatorSession's own handshake lock.
+        initiatorSession(contactId)
 
         val envelopeId = java.util.UUID.randomUUID().toString()
-        val clientMessageId = java.util.UUID.randomUUID().toString()
         val ackToken = AckToken.compute(store.identity.secretKey, envelopeId)
 
-        val inner = JSONObject().apply {
-            put("senderId", store.userId)
-            put("ackToken", ackToken)
-            put("ciphertext", B64.encode(encrypted.ciphertext))
-            put("dhPublicKey", B64.encode(encrypted.dhPublicKey))
-            put("chainCounter", encrypted.chainCounter)
-            put("previousChainLength", encrypted.previousChainLength)
-            put("timestamp", System.currentTimeMillis())
-            put("messageId", clientMessageId)
-            put("senderIdentityKey", B64.encode(store.identity.publicKey))
-            if (weAreInitiator) {
-                protocol.getInitiatorEphemeralPublicKey()?.let { put("initiatorEphemeralKey", B64.encode(it)) }
-                initiatorOtkIds[contactId]?.let { put("oneTimePreKeyId", it) }
-                initiatorPqCiphertexts[contactId]?.let { put("pqKemCiphertext", B64.encode(it)) }
+        val envelope = lockFor(contactId).withLock {
+            // Re-read the current session here rather than trust a reference
+            // captured before this lock: a message arriving FROM this same
+            // contact concurrently (simultaneous initiation) can rebuild it
+            // as a responder session between the call above and this lock
+            // being acquired (see responderSession / sessionForIncoming's
+            // tie-break, which runs under this very lock). Reading it fresh
+            // guarantees this always encrypts with — and correctly describes
+            // as initiator or not — whichever session is actually current.
+            val protocol = cached(contactId) ?: throw IllegalStateException("session vanished for $contactId")
+            val encrypted = protocol.encryptMessage(MessagePadding.pad(text.toByteArray(Charsets.UTF_8)))
+            val weAreInitiator = !responderEphemerals.containsKey(contactId)
+
+            val inner = JSONObject().apply {
+                put("senderId", store.userId)
+                put("ackToken", ackToken)
+                put("ciphertext", B64.encode(encrypted.ciphertext))
+                put("dhPublicKey", B64.encode(encrypted.dhPublicKey))
+                put("chainCounter", encrypted.chainCounter)
+                put("previousChainLength", encrypted.previousChainLength)
+                put("timestamp", System.currentTimeMillis())
+                put("messageId", clientMessageId)
+                put("senderIdentityKey", B64.encode(store.identity.publicKey))
+                if (weAreInitiator) {
+                    protocol.getInitiatorEphemeralPublicKey()?.let { put("initiatorEphemeralKey", B64.encode(it)) }
+                    initiatorOtkIds[contactId]?.let { put("oneTimePreKeyId", it) }
+                    initiatorPqCiphertexts[contactId]?.let { put("pqKemCiphertext", B64.encode(it)) }
+                }
             }
+
+            persistSession(contactId)
+            Envelopes.seal(Envelopes.TYPE_MESSAGE, inner, contact.publicKey, envelopeId).toString()
         }
 
-        persistSession(contactId)
-
-        val envelope = Envelopes.seal(
-            Envelopes.TYPE_MESSAGE, inner, contact.publicKey, envelopeId
-        ).toString()
-
-        store.addMessage(
-            DesktopStore.StoredMessage(contactId, true, text, System.currentTimeMillis(), clientMessageId)
-        )
         store.addOutbox(DesktopStore.StoredOutbox(envelopeId, contactId, envelope, clientMessageId))
         onStateChanged()
         sendToContact(contactId, envelope)
+    }
+
+    /**
+     * Re-attempt every message that never made it as far as the outbox —
+     * session establishment failed or timed out the first time. Unlike
+     * [retryOutbox], each of these needs a full resend (sendMessageAndTrack),
+     * not just a transport retry of an already-sealed envelope — there is no
+     * envelope yet. Run concurrently: one contact stuck on a ~75s relay
+     * timeout must not delay retrying everyone else.
+     */
+    private suspend fun retryPendingSends() = kotlinx.coroutines.coroutineScope {
+        for (pending in store.allPendingSends()) {
+            launch { sendMessageAndTrack(pending.contactId, pending.text, pending.clientMessageId) }
+        }
+    }
+
+    /** Same as [retryPendingSends], scoped to messages waiting on one contact — see [flushOutboxTo]. */
+    private suspend fun retryPendingSendsTo(contactId: String) = kotlinx.coroutines.coroutineScope {
+        for (pending in store.pendingSendsForContact(contactId)) {
+            launch { sendMessageAndTrack(pending.contactId, pending.text, pending.clientMessageId) }
+        }
     }
 
     // ================= receiving =================
@@ -355,17 +469,14 @@ class DesktopMessagingClient(
                 Envelopes.TYPE_ACK -> handleAck(json)
                 Envelopes.TYPE_CHALLENGE -> handleChallenge(json, reply)
                 Envelopes.TYPE_BUNDLE_ANNOUNCE -> handleBundleAnnounce(json)
-                // Receipts and typing indicators are accepted and acknowledged
-                // so the phone stops retrying them, but this client has no UI
-                // for either yet — dropping them silently is correct, ignoring
-                // them without an ack would leave them in the phone's outbox.
                 Envelopes.TYPE_RECEIPT -> {
-                    json.optString("id").takeIf { it.isNotBlank() }?.let { id ->
-                        val inner = runCatching { unseal(json) }.getOrNull()
-                        reply(Envelopes.ack(id, inner?.optString("ackToken")?.takeIf { it.isNotBlank() }))
-                    }
+                    val token = onceOnly(Envelopes.TYPE_RECEIPT, json) { handleReceipt(json) }
+                    json.optString("id").takeIf { it.isNotBlank() }?.let { id -> reply(Envelopes.ack(id, token)) }
                 }
-                Envelopes.TYPE_TYPING, Envelopes.TYPE_NOISE -> {}
+                // Ephemeral, no id to dedup against and no ack expected — same
+                // as the phone. Each pulse just refreshes the display window.
+                Envelopes.TYPE_TYPING -> handleTyping(json)
+                Envelopes.TYPE_NOISE -> {}
             }
         } catch (e: Exception) {
             Platform.log.error(TAG, "handleIncoming failed: ${e.message}", e)
@@ -373,19 +484,31 @@ class DesktopMessagingClient(
     }
 
     /**
-     * Run [handler] exactly once per envelope id, however many times it arrives.
+     * Run [handler] exactly once per envelope id, however many times it
+     * *successfully* arrives.
      *
-     * A resend whose ack was lost, and the same envelope racing in over both the
-     * socket and the relay, are both normal. The handler advances the ratchet,
-     * so running it twice would fail to decrypt and could surface a duplicate;
-     * a repeat therefore reuses the remembered ack token instead.
+     * A resend whose ack was lost, and the same envelope racing in over both
+     * the socket and the relay, are both normal. The handler advances the
+     * ratchet, so running it twice on an envelope it already succeeded on
+     * would fail to decrypt and could surface a duplicate — a repeat of THAT
+     * reuses the remembered ack token instead.
+     *
+     * A repeat of an envelope the handler previously *dropped* (returned
+     * null without throwing — no session yet, lost a simultaneous-initiation
+     * race) is different: nothing was consumed, so it's both safe and
+     * necessary to run the handler again. The sender's durable outbox keeps
+     * resending that exact envelope regardless, for as long as whatever
+     * blocked it might take to resolve — caching the drop as if it were
+     * final would silently blackhole the message forever.
      */
     private suspend fun onceOnly(type: String, json: JSONObject, handler: suspend () -> String?): String? {
         val id = json.optString("id").takeIf { it.isNotBlank() } ?: return handler()
         val key = "$type:$id"
-        synchronized(seenEnvelopes) { if (seenEnvelopes.containsKey(key)) return seenEnvelopes[key] }
+        synchronized(seenEnvelopes) { seenEnvelopes[key] }?.let { return it }
         val token = handler()
-        synchronized(seenEnvelopes) { seenEnvelopes[key] = token }
+        if (token != null) {
+            synchronized(seenEnvelopes) { seenEnvelopes[key] = token }
+        }
         return token
     }
 
@@ -411,11 +534,40 @@ class DesktopMessagingClient(
             decrypted
         }
 
-        val text = String(plaintext, Charsets.UTF_8)
         val messageId = json.optString("messageId").takeIf { it.isNotBlank() }
-        // A reply arrives as a structured payload rather than raw text; read the
-        // quoted form when present so it doesn't render as a blob of JSON.
-        val body = com.securemessenger.core.crypto.ChatPayloads.tryParseText(plaintext)?.text ?: text
+
+        // This client has no UI (yet) for modifying an existing message or
+        // for rendering media — sniff the decrypted plaintext's wire "k"
+        // discriminator the same way the phone does, and handle each shape
+        // on purpose instead of falling through to the raw-text branch
+        // below. That branch used to run for EVERY unrecognized shape,
+        // which meant a reaction/edit/delete control op or a media message
+        // from a phone contact rendered as the literal JSON wire payload —
+        // e.g. {"k":"ctl","op":"react",...} — permanently stored as if it
+        // were a real chat message.
+        if (ChatPayloads.tryParseControl(plaintext) != null) {
+            // Accepted and acknowledged (below) so the sender's outbox
+            // clears it, same as TYPE_RECEIPT/TYPE_TYPING elsewhere in this
+            // file — but nothing is stored or shown here. Silently doing
+            // nothing is more honest than either garbling raw JSON into the
+            // chat or half-applying an edit/reaction this client can't
+            // fully represent (no reactionsJson/edit/delete fields on
+            // StoredMessage yet).
+            return ackToken
+        }
+
+        val body = when {
+            MediaCodec.tryParseWirePayload(plaintext) != null ->
+                // Acknowledged like any other message (the sender must not
+                // keep retrying it), but shown as an honest placeholder
+                // instead of either the raw JSON or silently vanishing —
+                // media really did arrive, the user just can't see it here.
+                "📎 وسائط غير مدعومة على سطح المكتب — افتحها من الهاتف"
+            // A reply arrives as a structured payload rather than raw text;
+            // read the quoted form when present so it doesn't render as a
+            // blob of JSON either.
+            else -> ChatPayloads.tryParseText(plaintext)?.text ?: String(plaintext, Charsets.UTF_8)
+        }
 
         store.addMessage(DesktopStore.StoredMessage(senderId, false, body, System.currentTimeMillis(), messageId))
         onMessage(senderId, body, messageId)
@@ -435,6 +587,30 @@ class DesktopMessagingClient(
             store.removeOutbox(id)
             onStateChanged()
         }
+    }
+
+    private fun handleReceipt(outer: JSONObject): String? {
+        val json = runCatching { unseal(outer) }.getOrNull() ?: return null
+        val senderId = json.optString("senderId").takeIf { it.isNotBlank() } ?: return null
+        // A sealed envelope proves nothing about who sent it on its own, so
+        // only accept receipts from a known contact — same rule as the phone.
+        // markReadByRecipient further scopes by that contact, so a receipt
+        // can only flip messages we actually sent them.
+        if (store.contact(senderId) == null) return null
+        val idsArray = json.optJSONArray("messageIds")
+        if (idsArray != null) {
+            val ids = (0 until idsArray.length()).map { idsArray.getString(it) }
+            store.markReadByRecipient(senderId, ids)
+            onStateChanged()
+        }
+        return json.optString("ackToken").takeIf { it.isNotBlank() }
+    }
+
+    private fun handleTyping(outer: JSONObject) {
+        val json = runCatching { unseal(outer) }.getOrNull() ?: return
+        val senderId = json.optString("senderId").takeIf { it.isNotBlank() } ?: return
+        lastTypingAt[senderId] = System.currentTimeMillis()
+        onStateChanged()
     }
 
     // ================= handshake =================
@@ -557,26 +733,38 @@ class DesktopMessagingClient(
         )
     }
 
-    private suspend fun initiatorSession(contactId: String): SignalProtocol = cached(contactId) ?: run {
-        val bundle = fetchBundle(contactId)
-        val protocol = SignalProtocol(store.identity, store.signedPreKey, store.unusedPreKeys())
+    private suspend fun initiatorSession(contactId: String): SignalProtocol {
+        cached(contactId)?.let { return it }
+        // Two sends fired in quick succession to a contact with no session
+        // yet would otherwise both start X3DH at once — each registers
+        // itself in pendingBundleRequests[contactId], and the second
+        // overwrites the first's entry, so the first's reply (when it
+        // arrives) is delivered to the wrong waiter and times out despite a
+        // valid bundle_announce having come back. Serialize per contact.
+        return handshakeLockFor(contactId).withLock {
+            // Re-check: another call may have finished establishing the
+            // session while this one was waiting for the lock.
+            cached(contactId)?.let { return@withLock it }
+            val bundle = fetchBundle(contactId)
+            val protocol = SignalProtocol(store.identity, store.signedPreKey, store.unusedPreKeys())
 
-        val encapsulation = bundle.mlkemPublicKey?.let { PqKem.encapsulate(it) }
-        if (bundle.mlkemPublicKey != null && encapsulation == null) {
-            throw IllegalStateException("الطرف الآخر أعلن مفتاحاً ما بعد الكمّي وفشل التغليف — رفض الرجوع لمستوى أضعف")
+            val encapsulation = bundle.mlkemPublicKey?.let { PqKem.encapsulate(it) }
+            if (bundle.mlkemPublicKey != null && encapsulation == null) {
+                throw IllegalStateException("الطرف الآخر أعلن مفتاحاً ما بعد الكمّي وفشل التغليف — رفض الرجوع لمستوى أضعف")
+            }
+
+            protocol.initializeAsInitiator(
+                recipientIdentityKey = bundle.identityKey,
+                recipientSignedPreKey = bundle.signedPreKey,
+                recipientOneTimePreKey = bundle.oneTimePreKey,
+                pqSharedSecret = encapsulation?.sharedSecret
+            )
+            bundle.oneTimePreKeyId?.let { initiatorOtkIds[contactId] = it }
+            encapsulation?.let { initiatorPqCiphertexts[contactId] = it.ciphertext }
+            sessions[contactId] = protocol
+            responderEphemerals.remove(contactId)
+            protocol
         }
-
-        protocol.initializeAsInitiator(
-            recipientIdentityKey = bundle.identityKey,
-            recipientSignedPreKey = bundle.signedPreKey,
-            recipientOneTimePreKey = bundle.oneTimePreKey,
-            pqSharedSecret = encapsulation?.sharedSecret
-        )
-        bundle.oneTimePreKeyId?.let { initiatorOtkIds[contactId] = it }
-        encapsulation?.let { initiatorPqCiphertexts[contactId] = it.ciphertext }
-        sessions[contactId] = protocol
-        responderEphemerals.remove(contactId)
-        protocol
     }
 
     private fun sessionForIncoming(senderId: String, json: JSONObject): SignalProtocol? {
@@ -671,12 +859,28 @@ class DesktopMessagingClient(
     }
 
     /** Consume a QR payload produced by a phone (or another desktop). */
-    fun pairFromPayload(payload: String): Result<String> = runCatching {
+    /** Thrown by [pairFromPayload] when the scanned key differs from one already pinned — see [DesktopStore.ContactPairResult.KEY_CHANGED]. */
+    class KeyChangedException(val payload: String, val contactId: String) :
+        Exception("مفتاح أمان جهة الاتصال تغيّر منذ آخر اقتران")
+
+    /**
+     * @param allowKeyChange only pass true once the caller has explicitly
+     * warned the user this contact's pinned key is about to change and
+     * they've confirmed it — see [KeyChangedException] and
+     * [DesktopStore.upsertContact].
+     */
+    fun pairFromPayload(payload: String, allowKeyChange: Boolean = false): Result<String> = runCatching {
         val json = JSONObject(payload)
         val theirId = json.getString("u")
         if (theirId == store.userId) throw IllegalArgumentException("هذا رمزك أنت")
-        val publicKey = B64.fromHex(json.getString("k")) ?: throw IllegalArgumentException("مفتاح غير صالح")
-        store.upsertContact(
+        val publicKeyHex = json.getString("k")
+        val publicKey = B64.fromHex(publicKeyHex) ?: throw IllegalArgumentException("مفتاح غير صالح")
+        // The Android app requires exactly 32 bytes here; this side skipped
+        // that check, so a malformed key silently made it into storage and
+        // only failed later, less predictably, wherever it was first used
+        // for a DH. Fail the same way, in the same place, as the phone does.
+        if (publicKey.size != 32) throw IllegalArgumentException("المفتاح يجب أن يكون 32 بايت (64 محرف hex)")
+        val result = store.upsertContact(
             DesktopStore.StoredContact(
                 id = theirId,
                 publicKey = publicKey,
@@ -688,8 +892,12 @@ class DesktopMessagingClient(
                     hint.isNotBlank() && LanAddress.parse(hint, LOCAL_RELAY_PORT)
                         ?.let { (host, p) -> p != boundPort || !LanAddress.isOwnAddress(host) } == true
                 }
-            )
+            ),
+            allowKeyChange = allowKeyChange
         )
+        if (result == DesktopStore.ContactPairResult.KEY_CHANGED) {
+            throw KeyChangedException(payload, theirId)
+        }
         relay?.refreshSubscriptions()
         onStateChanged()
         theirId
@@ -712,5 +920,45 @@ class DesktopMessagingClient(
     fun setDirectAddress(contactId: String, hostPort: String?) {
         store.setDirectAddress(contactId, hostPort)
         peerSockets.remove(contactId)?.let { runCatching { it.close(1000, "address changed") } }
+    }
+
+    /** True while a typing pulse from this contact is still within its display window. */
+    fun isTyping(contactId: String): Boolean =
+        (System.currentTimeMillis() - (lastTypingAt[contactId] ?: 0L)) < TYPING_TIMEOUT_MS
+
+    /**
+     * Tell a contact we're actively typing to them right now. Direct-only,
+     * like the phone: a pulse that lands after the relay's poll interval is
+     * worthless — the conversation has moved on by then — while still
+     * costing a real, observable mailbox deposit for nothing.
+     */
+    suspend fun sendTypingSignal(contactId: String): Boolean {
+        val contact = store.contact(contactId) ?: return false
+        return try {
+            val inner = JSONObject().put("senderId", store.userId)
+            sendDirect(contactId, Envelopes.seal(Envelopes.TYPE_TYPING, inner, contact.publicKey).toString())
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    /** Tell a sender we've read the messages they sent us. */
+    suspend fun sendReadReceipt(contactId: String, clientMessageIds: List<String>): Boolean {
+        if (clientMessageIds.isEmpty()) return true
+        val contact = store.contact(contactId) ?: return false
+        return try {
+            val envelopeId = java.util.UUID.randomUUID().toString()
+            val inner = JSONObject().apply {
+                put("senderId", store.userId)
+                put("messageIds", JSONArray(clientMessageIds))
+                put("ackToken", AckToken.compute(store.identity.secretKey, envelopeId))
+            }
+            val envelope = Envelopes.seal(Envelopes.TYPE_RECEIPT, inner, contact.publicKey, envelopeId).toString()
+            store.addOutbox(DesktopStore.StoredOutbox(envelopeId, contactId, envelope, null))
+            onStateChanged()
+            sendToContact(contactId, envelope)
+        } catch (e: Exception) {
+            false
+        }
     }
 }

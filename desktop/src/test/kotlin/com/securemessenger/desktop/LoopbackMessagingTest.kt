@@ -156,6 +156,52 @@ class LoopbackMessagingTest {
     }
 
     @Test
+    fun `a read receipt marks the sender's copy read, and a typing pulse is seen`() {
+        val storeA = newStore("قارئ-أ")
+        val storeB = newStore("قارئ-ب")
+
+        val gotAtB = CountDownLatch(1)
+
+        val clientA = DesktopMessagingClient(storeA, "", onMessage = { _, _, _ -> }, onStateChanged = {})
+        val clientB = DesktopMessagingClient(
+            storeB, "", onMessage = { _, _, _ -> gotAtB.countDown() }, onStateChanged = {}
+        )
+
+        try {
+            clientA.start()
+            clientB.start()
+            val idB = clientA.pairFromPayload(clientB.myQrPayload()).getOrThrow()
+            val idA = clientB.pairFromPayload(clientA.myQrPayload()).getOrThrow()
+            clientA.setDirectAddress(idB, "127.0.0.1:${clientB.boundPort}")
+            clientB.setDirectAddress(idA, "127.0.0.1:${clientA.boundPort}")
+
+            // Typing: a bare pulse from A, with no message ever sent, must
+            // still make B report A as typing within the display window.
+            runBlocking { clientA.sendTypingSignal(idB) }
+            assertTrue("typing pulse never arrived", waitFor(5_000) { clientB.isTyping(idA) })
+
+            // Read receipt: B receives a message, marks it seen (what the UI
+            // does the moment the conversation is open), and tells A. A's own
+            // copy must flip from delivered to read once that comes back —
+            // the exact distinction the double-check UI relies on.
+            runBlocking { clientA.sendMessage(idB, "هل قرأتها؟") }
+            assertTrue("message never arrived at B", gotAtB.await(30, TimeUnit.SECONDS))
+
+            val newlySeen = storeB.markSeenLocallyAndGetNewIds(idA)
+            assertEquals(1, newlySeen.size)
+            runBlocking { assertTrue("receipt failed to send", clientB.sendReadReceipt(idA, newlySeen)) }
+
+            val readConfirmed = waitFor(15_000) {
+                storeA.messagesWith(idB).firstOrNull { it.outgoing }?.read == true
+            }
+            assertTrue("sender's copy was never marked read", readConfirmed)
+        } finally {
+            clientA.stop()
+            clientB.stop()
+        }
+    }
+
+    @Test
     fun `an unlocked store round-trips through the encrypted file`() {
         val dir = Files.createTempDirectory("sm-persist").toFile()
         val file = File(dir, "store.dat")

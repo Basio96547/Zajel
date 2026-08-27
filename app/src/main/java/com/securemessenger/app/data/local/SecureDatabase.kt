@@ -5,6 +5,7 @@ import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.securemessenger.app.data.model.*
 
@@ -26,9 +27,13 @@ import com.securemessenger.app.data.model.*
         EncryptedMessage::class,
         KeyBundle::class,
         RatchetSession::class,
-        OutboxEnvelope::class
+        OutboxEnvelope::class,
+        PendingSend::class,
+        SeenEnvelope::class,
+        IncomingConnectionRequest::class,
+        OutgoingConnectionRequest::class
     ],
-    version = 9,
+    version = 12,
     exportSchema = false
 )
 abstract class SecureDatabase : RoomDatabase() {
@@ -40,6 +45,10 @@ abstract class SecureDatabase : RoomDatabase() {
     abstract fun keyBundleDao(): KeyBundleDao
     abstract fun ratchetSessionDao(): RatchetSessionDao
     abstract fun outboxDao(): OutboxDao
+    abstract fun pendingSendDao(): PendingSendDao
+    abstract fun seenEnvelopeDao(): SeenEnvelopeDao
+    abstract fun incomingConnectionRequestDao(): IncomingConnectionRequestDao
+    abstract fun outgoingConnectionRequestDao(): OutgoingConnectionRequestDao
 
     companion object {
         // Named to match the calculator disguise — anyone poking at this
@@ -58,6 +67,53 @@ abstract class SecureDatabase : RoomDatabase() {
             byteBuffer.get(bytes)
             if (byteBuffer.hasArray()) java.util.Arrays.fill(byteBuffer.array(), 0.toByte())
             return bytes
+        }
+
+        /**
+         * Adds `contacts.pinnedAt` (nullable — SQLite defaults new columns on
+         * existing rows to NULL, which is exactly "not pinned"). Every other
+         * column is untouched, so existing contacts, sessions and message
+         * history survive. See SecureDatabaseMigrationTest.
+         */
+        val MIGRATION_10_11: Migration = object : Migration(10, 11) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE contacts ADD COLUMN pinnedAt INTEGER")
+            }
+        }
+
+        /**
+         * Adds the two connection-request tables backing the optional
+         * username-directory search/introduce flow. Both are brand new
+         * tables — nothing existing is touched, so every other row in the
+         * database survives untouched. See SecureDatabaseMigrationTest.
+         */
+        val MIGRATION_11_12: Migration = object : Migration(11, 12) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS incoming_connection_requests (
+                        senderIdentityPublicKeyHex TEXT NOT NULL PRIMARY KEY,
+                        senderUserId TEXT NOT NULL,
+                        senderUsername TEXT NOT NULL,
+                        senderSigningPublicKey BLOB NOT NULL,
+                        pairSecretEncrypted BLOB NOT NULL,
+                        directAddress TEXT,
+                        receivedAt INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS outgoing_connection_requests (
+                        recipientIdentityPublicKeyHex TEXT NOT NULL PRIMARY KEY,
+                        recipientUsername TEXT NOT NULL,
+                        recipientSigningPublicKey BLOB NOT NULL,
+                        mintedPairSecretEncrypted BLOB NOT NULL,
+                        sentAt INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+            }
         }
 
         @Volatile
@@ -92,10 +148,14 @@ abstract class SecureDatabase : RoomDatabase() {
                     openHelperFactory(factory)
                     // Security: Disable WAL for better security
                     setJournalMode(JournalMode.TRUNCATE)
-                    // A schema-version mismatch drops and recreates the tables
-                    // (this app's data is ephemeral and re-establishable — it is
-                    // never migrated). NOTE: this is about schema versioning, it
-                    // has nothing to do with encryption.
+                    // Known version steps get an explicit, data-preserving
+                    // migration — this app has no backup/export, so silently
+                    // dropping and recreating tables would be real, unrecoverable
+                    // data loss for anyone already using it. Destructive fallback
+                    // stays only as a last resort for a gap no migration covers
+                    // (e.g. a downgrade). NOTE: this is about schema versioning,
+                    // it has nothing to do with encryption.
+                    addMigrations(MIGRATION_10_11, MIGRATION_11_12)
                     fallbackToDestructiveMigration()
                     addCallback(object : Callback() {
                         override fun onOpen(db: SupportSQLiteDatabase) {

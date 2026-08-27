@@ -30,7 +30,20 @@ object MessagePadding {
             ((padded[1].toInt() and 0xFF) shl 16) or
             ((padded[2].toInt() and 0xFF) shl 8) or
             (padded[3].toInt() and 0xFF)
-        if (len < 0 || HEADER + len > padded.size) throw IllegalArgumentException("Invalid padding length")
+        // Compare len against (padded.size - HEADER), never (HEADER + len)
+        // against padded.size. padded.size is a real, already-allocated
+        // array length, so padded.size - HEADER cannot overflow (padded.size
+        // >= HEADER is already established above) — whereas len is a raw
+        // 4-byte header an attacker who has completed a session fully
+        // controls, and HEADER + len overflows Int for len near
+        // Int.MAX_VALUE. That overflow used to wrap the sum negative,
+        // slipping past this check, and then wrapped AGAIN inside
+        // copyOfRange's own (to - from) length computation, landing on a
+        // huge *positive* requested array size — an uncaught
+        // OutOfMemoryError (an Error, not an Exception, so no ordinary
+        // catch(Exception) around a decrypt/unpad call stops it) from a
+        // single crafted message.
+        if (len < 0 || len > padded.size - HEADER) throw IllegalArgumentException("Invalid padding length")
         return padded.copyOfRange(HEADER, HEADER + len)
     }
 

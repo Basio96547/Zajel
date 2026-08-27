@@ -6,13 +6,14 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -80,7 +81,12 @@ fun MainScreen(store: DesktopStore, client: DesktopMessagingClient) {
             }
             Divider()
             key(revision) {
-                val contacts = store.allContacts()
+                // Pinned first (most-recently-pinned first), then the rest by
+                // last message — the one place this list is ordered.
+                val contacts = store.allContacts().sortedWith(
+                    compareByDescending<DesktopStore.StoredContact> { it.pinnedAt != null }
+                        .thenByDescending { it.pinnedAt ?: store.messagesWith(it.id).lastOrNull()?.timestamp ?: 0L }
+                )
                 if (contacts.isEmpty()) {
                     Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
                         Text(
@@ -113,12 +119,31 @@ fun MainScreen(store: DesktopStore, client: DesktopMessagingClient) {
                                 }
                                 Spacer(Modifier.width(12.dp))
                                 Column(Modifier.weight(1f)) {
-                                    Text(contact.displayName, style = MaterialTheme.typography.bodyMedium)
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        if (contact.pinnedAt != null) {
+                                            Icon(
+                                                Icons.Default.PushPin,
+                                                contentDescription = "مثبّتة",
+                                                modifier = Modifier.size(12.dp),
+                                                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
+                                            )
+                                            Spacer(Modifier.width(4.dp))
+                                        }
+                                        Text(contact.displayName, style = MaterialTheme.typography.bodyMedium)
+                                    }
                                     Text(
                                         store.messagesWith(contact.id).lastOrNull()?.text?.take(34) ?: "—",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f),
                                         maxLines = 1
+                                    )
+                                }
+                                IconButton(onClick = { store.setPinned(contact.id, contact.pinnedAt == null) }) {
+                                    Icon(
+                                        Icons.Default.PushPin,
+                                        contentDescription = if (contact.pinnedAt != null) "إلغاء التثبيت" else "تثبيت",
+                                        tint = if (contact.pinnedAt != null) MaterialTheme.colorScheme.primary
+                                            else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
                                     )
                                 }
                             }
@@ -159,15 +184,28 @@ private fun ConversationPane(
     val scope = rememberCoroutineScope()
     var draft by remember(contactId) { mutableStateOf("") }
     var error by remember(contactId) { mutableStateOf<String?>(null) }
-    var sending by remember { mutableStateOf(false) }
+    // Keyed by contactId like draft/error above — without this, ConversationPane
+    // is called with no key(active) wrapper at its call site, so Compose
+    // reuses the same composable slot (and therefore the same remembered
+    // state) across a contact switch. sending staying true for a message
+    // still in flight to contact A then disabled the Send button for
+    // contact B too, with nothing actually in flight for B.
+    var sending by remember(contactId) { mutableStateOf(false) }
     var showAddress by remember { mutableStateOf(false) }
-    val listState = rememberLazyListState()
+    var lastTypingSentAt by remember(contactId) { mutableStateOf(0L) }
+    val listState = remember(contactId) { LazyListState() }
 
     val contact = store.contact(contactId) ?: return
     val messages = key(revision) { store.messagesWith(contactId) }
 
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) listState.animateScrollToItem(messages.lastIndex)
+        // We're actively viewing this conversation — mark any newly received
+        // messages seen and let the sender know, same as the phone.
+        val newlySeen = store.markSeenLocallyAndGetNewIds(contactId)
+        if (newlySeen.isNotEmpty()) {
+            withContext(Dispatchers.IO) { client.sendReadReceipt(contactId, newlySeen) }
+        }
     }
 
     fun send() {
@@ -195,7 +233,7 @@ private fun ConversationPane(
                 Text(contact.displayName, style = MaterialTheme.typography.titleMedium)
                 key(revision) {
                     Text(
-                        client.describeRoute(contactId),
+                        if (client.isTyping(contactId)) "يكتب الآن…" else client.describeRoute(contactId),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                     )
@@ -232,7 +270,15 @@ private fun ConversationPane(
                                 // Outgoing messages stay marked "جارٍ" until the
                                 // recipient's authenticated ack clears the outbox —
                                 // so a message that never arrives never looks sent.
-                                if (message.outgoing) append(if (message.delivered) " ✓" else " · جارٍ")
+                                // A second check only appears once their own read
+                                // receipt comes back, same as the phone's ticks.
+                                if (message.outgoing) append(
+                                    when {
+                                        message.read -> " ✓✓"
+                                        message.delivered -> " ✓"
+                                        else -> " · جارٍ"
+                                    }
+                                )
                             },
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
@@ -257,7 +303,16 @@ private fun ConversationPane(
         ) {
             OutlinedTextField(
                 value = draft,
-                onValueChange = { draft = it },
+                onValueChange = { text ->
+                    draft = text
+                    // Throttled to a light pulse rather than one per keystroke —
+                    // same 3s window the phone uses (ConversationViewModel).
+                    val now = System.currentTimeMillis()
+                    if (now - lastTypingSentAt > 3000) {
+                        lastTypingSentAt = now
+                        scope.launch { withContext(Dispatchers.IO) { client.sendTypingSignal(contactId) } }
+                    }
+                },
                 placeholder = { Text("اكتب رسالة…") },
                 modifier = Modifier.weight(1f),
                 maxLines = 4,
@@ -327,11 +382,24 @@ private fun PairingDialog(client: DesktopMessagingClient, onClose: () -> Unit) {
     val qr = remember(payload) { runCatching { QrCodec.render(payload, 520) }.getOrNull() }
     var pasted by remember { mutableStateOf("") }
     var message by remember { mutableStateOf<String?>(null) }
+    // Set when pairing was refused because the scanned key differs from one
+    // already pinned for this contact — see DesktopMessagingClient.KeyChangedException.
+    var pendingKeyChange by remember { mutableStateOf<DesktopMessagingClient.KeyChangedException?>(null) }
 
-    fun consume(text: String) {
-        client.pairFromPayload(text)
-            .onSuccess { message = "تمت إضافة جهة الاتصال ✓" }
-            .onFailure { message = "رمز غير صالح: ${it.message}" }
+    fun consume(text: String, allowKeyChange: Boolean = false) {
+        client.pairFromPayload(text, allowKeyChange)
+            .onSuccess {
+                message = "تمت إضافة جهة الاتصال ✓"
+                pendingKeyChange = null
+            }
+            .onFailure { e ->
+                if (e is DesktopMessagingClient.KeyChangedException) {
+                    message = null
+                    pendingKeyChange = e
+                } else {
+                    message = "رمز غير صالح: ${e.message}"
+                }
+            }
     }
 
     AlertDialog(
@@ -410,6 +478,37 @@ private fun PairingDialog(client: DesktopMessagingClient, onClose: () -> Unit) {
                 message?.let {
                     Spacer(Modifier.height(12.dp))
                     Text(it, style = MaterialTheme.typography.bodySmall)
+                }
+
+                pendingKeyChange?.let { change ->
+                    Spacer(Modifier.height(12.dp))
+                    Column(
+                        Modifier
+                            .fillMaxWidth()
+                            .background(
+                                MaterialTheme.colorScheme.errorContainer,
+                                RoundedCornerShape(8.dp)
+                            )
+                            .padding(12.dp)
+                    ) {
+                        Text(
+                            "مفتاح أمان جهة الاتصال \"${change.contactId.take(8)}\" مختلف عن المفتاح " +
+                                "المحفوظ لديك من قبل. قد يعني هذا أنّهم أعادوا تثبيت التطبيق على جهاز " +
+                                "جديد — أو أنّ شخصاً آخر يحاول انتحال شخصيتهم. تابع فقط إن كنت متأكداً " +
+                                "من هوية الطرف الآخر الآن.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            TextButton(onClick = {
+                                val payload = change.payload
+                                pendingKeyChange = null
+                                consume(payload, allowKeyChange = true)
+                            }) { Text("تابع على أي حال", color = MaterialTheme.colorScheme.error) }
+                            TextButton(onClick = { pendingKeyChange = null }) { Text("إلغاء") }
+                        }
+                    }
                 }
             }
         },

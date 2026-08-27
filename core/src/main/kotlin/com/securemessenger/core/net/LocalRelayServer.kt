@@ -19,6 +19,17 @@ private const val MAX_CONCURRENT_CONNECTIONS = 20
 private const val MAX_FRAME_CHARS = 12 * 1024 * 1024
 
 /**
+ * Per-connection frame budget — see onMessage. A real conversation (messages,
+ * receipts, typing, the odd challenge/bundle_announce) never comes close to
+ * this even in a burst; it exists purely to bound how fast an unauthenticated
+ * peer on the LAN can make us spend CPU (JSON parse, sealed-box open attempts)
+ * by holding one connection open and flooding it, which neither
+ * MAX_CONCURRENT_CONNECTIONS nor MAX_FRAME_CHARS does anything to stop.
+ */
+private const val MAX_FRAMES_PER_WINDOW = 30
+private const val RATE_WINDOW_MS = 1000L
+
+/**
  * This device's own relay — there is no external server at all. Every phone
  * runs one of these while the messenger is revealed, accepting direct
  * WebSocket connections from other instances of the app on the same network.
@@ -54,7 +65,28 @@ class LocalRelayServer(port: Int) : NanoWSD(port) {
                 openConnections.decrementAndGet()
             }
 
+            // Touched only from onMessage, which NanoWSD calls sequentially on
+            // this connection's own thread — no concurrent access, so no lock
+            // needed (same assumption every other per-connection callback here
+            // already relies on).
+            private var frameWindowStart = 0L
+            private var frameCountInWindow = 0
+
             override fun onMessage(message: WebSocketFrame) {
+                val now = System.currentTimeMillis()
+                if (now - frameWindowStart > RATE_WINDOW_MS) {
+                    frameWindowStart = now
+                    frameCountInWindow = 0
+                }
+                frameCountInWindow++
+                if (frameCountInWindow > MAX_FRAMES_PER_WINDOW) {
+                    Platform.log.warn(TAG, "rejecting connection — exceeded $MAX_FRAMES_PER_WINDOW frames within ${RATE_WINDOW_MS}ms")
+                    try {
+                        close(WebSocketFrame.CloseCode.PolicyViolation, "rate limit exceeded", false)
+                    } catch (_: IOException) {
+                    }
+                    return
+                }
                 val text = message.textPayload ?: return
                 if (text.length > MAX_FRAME_CHARS) {
                     Platform.log.warn(TAG, "rejecting oversized frame (${text.length} chars) and closing socket")

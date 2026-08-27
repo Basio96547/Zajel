@@ -154,8 +154,10 @@ class RelayRoundtripTest {
         val now = System.currentTimeMillis()
 
         val inbound = MailboxToken.inboundIds(secret, now)
-        assertEquals("should listen on previous, current and next window", 3, inbound.size)
-        assertEquals("all three windows must be distinct ids", 3, inbound.distinct().size)
+        // ±2 windows (5 total), not ±1 — see MailboxToken's class doc for why
+        // ±1 doesn't actually cover the relay's 48h retention in every phase.
+        assertEquals("should listen on 2 windows either side of the current one", 5, inbound.size)
+        assertEquals("all five windows must be distinct ids", 5, inbound.distinct().size)
         assertTrue("the id we send to must be one we also listen on", inbound.contains(MailboxToken.outboundId(secret, now)))
 
         // A different window is an unrelated-looking id, which is the whole point.

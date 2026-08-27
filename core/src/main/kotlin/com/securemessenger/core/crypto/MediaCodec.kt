@@ -51,9 +51,16 @@ object MediaCodec {
         return JSONArray(waveform.map { (it * 255f).toInt().coerceIn(0, 255) })
     }
 
+    // The app itself only ever emits 40 buckets (VoiceRecorder.WAVEFORM_BUCKETS)
+    // — this is deliberately far more generous than that, just a ceiling on
+    // what a peer-supplied "wf" array is allowed to claim, so it can't be
+    // used to force an arbitrarily large allocation/list.
+    private const val MAX_WAVEFORM_BUCKETS = 256
+
     private fun waveformFromJson(array: JSONArray?): List<Float> {
         if (array == null) return emptyList()
-        return (0 until array.length()).map { array.getInt(it) / 255f }
+        val count = minOf(array.length(), MAX_WAVEFORM_BUCKETS)
+        return (0 until count).map { array.getInt(it) / 255f }
     }
 
     /** What actually goes over the wire (as the ratchet's plaintext) for a media message. */

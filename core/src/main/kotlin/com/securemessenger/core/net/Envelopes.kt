@@ -48,6 +48,17 @@ object Envelopes {
     const val TYPE_CHALLENGE = "challenge"
     const val TYPE_BUNDLE_ANNOUNCE = "bundle_announce"
 
+    /**
+     * An unsolicited self-introduction, delivered via the directory
+     * service's introduction mailbox rather than a QR scan — see
+     * `MailboxToken.introMailboxId` and `DirectoryProtocol`. [TYPE_INTRO_ACCEPT]
+     * is the reply once the recipient chooses to accept; both carry the same
+     * [DirectoryProtocol.SelfIntroduction] shape, just addressed in opposite
+     * directions.
+     */
+    const val TYPE_INTRO_REQUEST = "intro_request"
+    const val TYPE_INTRO_ACCEPT = "intro_accept"
+
     /** Cover traffic. Deliberately has no handler anywhere — being ignored is its entire purpose. */
     const val TYPE_NOISE = "noise"
 

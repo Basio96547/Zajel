@@ -1,5 +1,6 @@
 package com.securemessenger.app.ui.navigation
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.tween
@@ -29,9 +30,11 @@ import com.securemessenger.app.security.RootDetector
 import com.securemessenger.app.service.MessengerService
 import com.securemessenger.app.ui.screens.calculator.CalculatorScreen
 import com.securemessenger.app.ui.screens.chat.ChatListScreen
+import com.securemessenger.app.ui.screens.chat.ConnectionRequestsScreen
 import com.securemessenger.app.ui.screens.chat.ContactDetailScreen
 import com.securemessenger.app.ui.screens.chat.ConversationScreen
 import com.securemessenger.app.ui.screens.chat.NewChatScreen
+import com.securemessenger.app.ui.screens.chat.UsernameSearchScreen
 import com.securemessenger.app.ui.screens.settings.ProfileScreen
 import com.securemessenger.app.ui.screens.settings.SettingsScreen
 import com.securemessenger.app.ui.screens.settings.StealthModeScreen
@@ -54,6 +57,8 @@ sealed class Screen(val route: String) {
     }
     object StealthMode : Screen("stealth_mode")
     object NewChat : Screen("new_chat")
+    object UsernameSearch : Screen("username_search")
+    object ConnectionRequests : Screen("connection_requests")
     object ContactDetail : Screen("contact_detail/{contactId}") {
         fun createRoute(contactId: String) = "contact_detail/$contactId"
     }
@@ -88,6 +93,28 @@ private fun AnimatedContentTransitionScope<NavBackStackEntry>.involvesDisguise()
 private fun AnimatedContentTransitionScope<NavBackStackEntry>.isTabSwitch(): Boolean =
     baseRoute(initialState) in TAB_ROUTES && baseRoute(targetState) in TAB_ROUTES
 
+/**
+ * Guards every screen that shows real messenger content: renders nothing
+ * (just the background behind it — see MainActivity's Surface) unless
+ * [DisguiseState.isRevealed] is actually true right now.
+ *
+ * This exists because Navigation-Compose's back stack survives process death
+ * (rememberNavController() participates in the SavedStateRegistry) while
+ * DisguiseState does not and correctly resets to hidden on a fresh process.
+ * If Android kills the process while the user is mid-conversation and later
+ * restores the Activity, the NavController can come back pointed at
+ * conversation/{id} before the LaunchedEffect above ever runs (that
+ * correction is reactive — it fires on a recomposition, not before the
+ * first one). Without this, the restored screen could compose real message
+ * content, even briefly, ahead of being redirected back to the calculator.
+ * With it, that same race just renders blank instead.
+ */
+@Composable
+private fun RevealedOnly(content: @Composable () -> Unit) {
+    val isRevealed by DisguiseState.isRevealed.collectAsState()
+    if (isRevealed) content()
+}
+
 @Composable
 fun AppNavigation() {
     val navController = rememberNavController()
@@ -113,6 +140,19 @@ fun AppNavigation() {
                 popUpTo(0) { inclusive = true }
             }
         }
+    }
+
+    // Pressing back from the chat list — the root of the revealed section —
+    // hides instantly instead of leaving MainActivity's onStop() debounce
+    // (HIDE_GRACE_PERIOD_MS, ~10s) to do it later, or waiting for the app to
+    // simply be closed and left in the background. This is deliberately the
+    // ONLY new "hide" trigger added rather than a visible button: back is the
+    // single most unremarkable exit gesture there is — to anyone watching, it
+    // looks exactly like closing an app, which is exactly what should appear
+    // to happen. Deeper screens (a conversation, settings…) are untouched;
+    // back there still just navigates up one level, as expected.
+    BackHandler(enabled = isRevealed && currentRoute == Screen.ChatList.route) {
+        DisguiseState.hide()
     }
 
     // "يشتغل ويطفى حسب الاستخدام": this device's own local relay + network
@@ -295,39 +335,66 @@ fun AppNavigation() {
         }
 
         composable(Screen.ChatList.route) {
-            ChatListScreen(
-                onConversationClick = { contactId ->
-                    navController.navigate(Screen.Conversation.createRoute(contactId))
-                },
-                onSettingsClick = { navController.navigate(Screen.Settings.route) },
-                onNewChatClick = { navController.navigate(Screen.NewChat.route) },
-                onProfileClick = { navController.navigate(Screen.Profile.route) }
-            )
+            RevealedOnly {
+                ChatListScreen(
+                    onConversationClick = { contactId ->
+                        navController.navigate(Screen.Conversation.createRoute(contactId))
+                    },
+                    onSettingsClick = { navController.navigate(Screen.Settings.route) },
+                    onNewChatClick = { navController.navigate(Screen.NewChat.route) },
+                    onProfileClick = { navController.navigate(Screen.Profile.route) }
+                )
+            }
         }
 
         composable(Screen.NewChat.route) {
-            NewChatScreen(
-                onBackClick = { navController.popBackStack() },
-                onContactAdded = { contactId ->
-                    navController.navigate(Screen.Conversation.createRoute(contactId)) {
-                        popUpTo(Screen.NewChat.route) { inclusive = true }
+            RevealedOnly {
+                NewChatScreen(
+                    onBackClick = { navController.popBackStack() },
+                    onContactAdded = { contactId ->
+                        navController.navigate(Screen.Conversation.createRoute(contactId)) {
+                            popUpTo(Screen.NewChat.route) { inclusive = true }
+                        }
+                    },
+                    onSearchByUsernameClick = { navController.navigate(Screen.UsernameSearch.route) },
+                    onConnectionRequestsClick = { navController.navigate(Screen.ConnectionRequests.route) }
+                )
+            }
+        }
+
+        composable(Screen.UsernameSearch.route) {
+            RevealedOnly {
+                UsernameSearchScreen(onBackClick = { navController.popBackStack() })
+            }
+        }
+
+        composable(Screen.ConnectionRequests.route) {
+            RevealedOnly {
+                ConnectionRequestsScreen(
+                    onBackClick = { navController.popBackStack() },
+                    onAccepted = { contactId ->
+                        navController.navigate(Screen.Conversation.createRoute(contactId)) {
+                            popUpTo(Screen.ChatList.route) { inclusive = false }
+                        }
                     }
-                }
-            )
+                )
+            }
         }
 
         composable(Screen.Conversation.route) { backStackEntry ->
             val contactId = backStackEntry.arguments?.getString("contactId") ?: return@composable
-            ConversationScreen(
-                contactId = contactId,
-                onBackClick = { navController.popBackStack() },
-                onVerificationClick = {
-                    navController.navigate(Screen.KeyVerification.createRoute(contactId))
-                },
-                onContactInfoClick = {
-                    navController.navigate(Screen.ContactDetail.createRoute(contactId))
-                }
-            )
+            RevealedOnly {
+                ConversationScreen(
+                    contactId = contactId,
+                    onBackClick = { navController.popBackStack() },
+                    onVerificationClick = {
+                        navController.navigate(Screen.KeyVerification.createRoute(contactId))
+                    },
+                    onContactInfoClick = {
+                        navController.navigate(Screen.ContactDetail.createRoute(contactId))
+                    }
+                )
+            }
         }
 
         composable(
@@ -335,38 +402,44 @@ fun AppNavigation() {
             arguments = listOf(navArgument("contactId") { type = NavType.StringType })
         ) { backStackEntry ->
             val contactId = backStackEntry.arguments?.getString("contactId") ?: return@composable
-            ContactDetailScreen(
-                contactId = contactId,
-                onBackClick = { navController.popBackStack() },
-                onVerifyClick = {
-                    navController.navigate(Screen.KeyVerification.createRoute(contactId))
-                }
-            )
+            RevealedOnly {
+                ContactDetailScreen(
+                    contactId = contactId,
+                    onBackClick = { navController.popBackStack() },
+                    onVerifyClick = {
+                        navController.navigate(Screen.KeyVerification.createRoute(contactId))
+                    }
+                )
+            }
         }
 
         composable(Screen.Settings.route) {
-            SettingsScreen(
-                onBackClick = { navController.popBackStack() },
-                onVerificationClick = { navController.navigate(Screen.KeyVerification.createRoute()) },
-                onStealthModeClick = { navController.navigate(Screen.StealthMode.route) },
-                onDataWiped = {
-                    navController.navigate(Screen.Setup.route) {
-                        popUpTo(0) { inclusive = true }
-                    }
-                },
-                onProfileClick = { navController.navigate(Screen.Profile.route) },
-                onNavChats = navToChats,
-                onNavContacts = navToContacts,
-                onNavProfile = navToProfile
-            )
+            RevealedOnly {
+                SettingsScreen(
+                    onBackClick = { navController.popBackStack() },
+                    onVerificationClick = { navController.navigate(Screen.KeyVerification.createRoute()) },
+                    onStealthModeClick = { navController.navigate(Screen.StealthMode.route) },
+                    onDataWiped = {
+                        navController.navigate(Screen.Setup.route) {
+                            popUpTo(0) { inclusive = true }
+                        }
+                    },
+                    onProfileClick = { navController.navigate(Screen.Profile.route) },
+                    onNavChats = navToChats,
+                    onNavContacts = navToContacts,
+                    onNavProfile = navToProfile
+                )
+            }
         }
 
         composable(Screen.Profile.route) {
-            ProfileScreen(
-                onBackClick = { navController.popBackStack() },
-                onVerifyClick = { navController.navigate(Screen.KeyVerification.createRoute()) },
-                onShowQrClick = { navController.navigate(Screen.NewChat.route) }
-            )
+            RevealedOnly {
+                ProfileScreen(
+                    onBackClick = { navController.popBackStack() },
+                    onVerifyClick = { navController.navigate(Screen.KeyVerification.createRoute()) },
+                    onShowQrClick = { navController.navigate(Screen.NewChat.route) }
+                )
+            }
         }
 
         composable(
@@ -377,19 +450,23 @@ fun AppNavigation() {
                 defaultValue = null
             })
         ) { backStackEntry ->
-            KeyVerificationScreen(
-                contactId = backStackEntry.arguments?.getString("contactId"),
-                onBackClick = { navController.popBackStack() }
-            )
+            RevealedOnly {
+                KeyVerificationScreen(
+                    contactId = backStackEntry.arguments?.getString("contactId"),
+                    onBackClick = { navController.popBackStack() }
+                )
+            }
         }
 
         composable(Screen.StealthMode.route) {
-            StealthModeScreen(
-                onBackClick = { navController.popBackStack() },
-                onEnableStealth = {
-                    navController.popBackStack()
-                }
-            )
+            RevealedOnly {
+                StealthModeScreen(
+                    onBackClick = { navController.popBackStack() },
+                    onEnableStealth = {
+                        navController.popBackStack()
+                    }
+                )
+            }
         }
     }
 
