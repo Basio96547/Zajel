@@ -5,7 +5,7 @@
 ابحث هنا أولاً بـ Grep قبل فتح أي ملف مصدر كامل. سطر `يُستخدم في:` تحت أي class/object/interface = تطابق استيراد FQN فعلي، أفضل-جهد وليس مضموناً 100%.
 ⚠ بجانب اسم ملف = يتجاوز 300 سطر.
 
-**133** ملف مفحوص، **2510** تعريفاً.
+**133** ملف مفحوص، **2512** تعريفاً.
 
 
 ## app/
@@ -217,21 +217,22 @@ data class OldEncryptedMessage ( @PrimaryKey val id: Long? = null, val sessionId
   - L172 `@Test fun theHomeScreenNoLongerOwnsAnyRootDestination ()`
   - L211 `@Test fun thePendingRequestsBannerIsAbsentWhenThereAreNone ()`
 
-### app/src/androidTest/java/com/securemessenger/app/ui/ScreenTourTest.kt (206 سطر)  [package com.securemessenger.app.ui]
-- L59 `@RunWith(AndroidJUnit4::class) class ScreenTourTest` — A walk through the app, one screen per test.
-  - L62 `val compose`
-  - L64 `@Test fun tourCalculator ()`
-  - L68 `@Test fun tourSetup ()`
-  - L72 `@Test fun tourSettings ()`
-  - L79 `@Test fun tourProfile ()`
-  - L83 `@Test fun tourNewChat ()`
-  - L87 `@Test fun tourUsernameSearch ()`
-  - L91 `@Test fun tourKeyVerification ()`
-  - L95 `@Test fun tourConnectionRequests ()`
-  - L99 `@Test fun tourContactDetail ()`
-  - L125 `@Test fun tourConversation ()` — The conversation — the app's most-used screen, and until now the only
-  - L165 `private val sampleConversation`
-  - L191 `private fun shoot (name: String, content: @Composable () -> Unit)`
+### app/src/androidTest/java/com/securemessenger/app/ui/ScreenTourTest.kt (244 سطر)  [package com.securemessenger.app.ui]
+- L66 `@RunWith(AndroidJUnit4::class) class ScreenTourTest` — A walk through the app, one screen per test.
+  - L69 `val compose`
+  - L71 `@Test fun tourCalculator ()`
+  - L75 `@Test fun tourSetup ()`
+  - L79 `@Test fun tourSettings ()`
+  - L86 `@Test fun tourProfile ()`
+  - L90 `@Test fun tourNewChat ()`
+  - L94 `@Test fun tourUsernameSearch ()`
+  - L108 `@Test fun tourBottomNavBar ()` — The restored bottom bar, in all three of its states.
+  - L129 `@Test fun tourKeyVerification ()`
+  - L133 `@Test fun tourConnectionRequests ()`
+  - L137 `@Test fun tourContactDetail ()`
+  - L163 `@Test fun tourConversation ()` — The conversation — the app's most-used screen, and until now the only
+  - L203 `private val sampleConversation`
+  - L229 `private fun shoot (name: String, content: @Composable () -> Unit)`
 
 ### app/src/androidTest/java/com/securemessenger/app/ui/screens/chat/QrImageTest.kt (189 سطر)  [package com.securemessenger.app.ui.screens.chat]
 - L20 `class QrImageTest` — Covers pairing by picture rather than by camera: the code has to survive
@@ -1231,7 +1232,7 @@ data class OutgoingConnectionRequest ( @PrimaryKey val recipientIdentityPublicKe
 - L3 `private val USERNAME_LIKE`
 - L10 `fun formatContactName (raw: String): String` — A stored contact name is either a claimed @username or (when we never
 
-### app/src/main/java/com/securemessenger/app/ui/GlassComponents.kt (256 سطر)  [package com.securemessenger.app.ui]
+### app/src/main/java/com/securemessenger/app/ui/GlassComponents.kt (266 سطر)  [package com.securemessenger.app.ui]
 - L52 `fun Modifier (colors: List<Color>): Modifier` — The page backdrop every glass screen sits on — now the drifting aurora the
 - L61 `fun Modifier` — The backdrop for onboarding and security moments (Setup, Loading, Stealth
 - L71 `fun Modifier (radius: Dp = 16.dp, strong: Boolean = false): Modifier` — The single reusable "glass card" surface — a translucent rounded panel
@@ -1240,7 +1241,7 @@ data class OutgoingConnectionRequest ( @PrimaryKey val recipientIdentityPublicKe
 - L128 `@Composable fun GlassTopBar ( title: String, modifier: Modifier = Modifier, onBack: (() -> Unit)? = null, actions: (@Composable RowScope.() -> Unit)? = null )` — Plain-text convenience overload of [GlassTopBar].
   - L134 `val mc`
 - L148 `data class GlassNavItem ( val label: String, val icon: ImageVector, /** e.g. pending connection-request count on "جهات الاتصال" — 0 shows no badge at all. */ val badgeCount: Int = 0 )`
-  يُستخدم في: app/src/main/java/com/securemessenger/app/ui/navigation/AppNavigation.kt
+  يُستخدم في: app/src/androidTest/java/com/securemessenger/app/ui/ScreenTourTest.kt, app/src/main/java/com/securemessenger/app/ui/navigation/AppNavigation.kt
 - L149 `val label : String,`
 - L150 `val icon : ImageVector,`
 - L152 `val badgeCount : Int` — e.g. pending connection-request count on "جهات الاتصال" — 0 shows no badge at all.
@@ -1754,27 +1755,28 @@ internal fun MessageInput ( value: String, onValueChange: (String) -> Unit, onSe
 private fun EmojiPanel (onEmojiClick: (String) -> Unit)`
   - L277 `val emojis`
 
-### app/src/main/java/com/securemessenger/app/ui/screens/chat/NewChatScreen.kt (512 سطر) ⚠  [package com.securemessenger.app.ui.screens.chat]
-- L57 `@Composable fun NewChatScreen ( /** Null on the tab root — a root has nowhere to go back to. */ onBackClick: (() -> Unit)? = null, onContactAdded: (String) -> Unit, onSearchByUsernameClick: () -> Unit = {}, onConnectionRequestsClick: () -> Unit = {}, connectionRequestsViewModel: ConnectionRequestsViewModel = viewModel() )` — No directory server to search anymore — adding someone is an in-person
-  - L65 `val repository`
-  - L66 `val mc`
-  - L67 `val context`
-  - L68 `val scope`
-  - L69 `val pendingRequests`
-  - L70 `val clipboard`
-  - L71 `var isLoading`
-  - L72 `var errorMessage`
-  - L76 `var statusMessage`
-  - L77 `var myUsername`
-  - L78 `var showShareDialog`
-  - L84 `var showCopyDialog`
-  - L89 `var pendingKeyChangeScan`
-  - L91 `var myQrPayload`
-  - L96 `var myPairSecretHex`
-  - L127 `val myQrBitmap`
-  - L131 `suspend fun pairFromPayload (scanned: String, allowKeyChange: Boolean = false)`
-  - L174 `val scanLauncher`
-  - L182 `val imagePickLauncher`
+### app/src/main/java/com/securemessenger/app/ui/screens/chat/NewChatScreen.kt (542 سطر) ⚠  [package com.securemessenger.app.ui.screens.chat]
+- L58 `@Composable fun NewChatScreen ( /** Null on the tab root — a root has nowhere to go back to. */ onBackClick: (() -> Unit)? = null, onContactAdded: (String) -> Unit, onSearchByUsernameClick: () -> Unit = {}, onConnectionRequestsClick: () -> Unit = {}, connectionRequestsViewModel: ConnectionRequestsViewModel = viewModel() )` — No directory server to search anymore — adding someone is an in-person
+  - L66 `val repository`
+  - L67 `val mc`
+  - L68 `val context`
+  - L69 `val scope`
+  - L70 `val pendingRequests`
+  - L71 `val clipboard`
+  - L72 `var isLoading`
+  - L73 `var errorMessage`
+  - L77 `var statusMessage`
+  - L78 `var myUsername`
+  - L79 `var showShareDialog`
+  - L85 `var showCopyDialog`
+  - L90 `var pendingKeyChangeScan`
+  - L92 `var myQrPayload`
+  - L97 `var myPairSecretHex`
+  - L104 `var qrLoadAttempted`
+  - L136 `val myQrBitmap`
+  - L140 `suspend fun pairFromPayload (scanned: String, allowKeyChange: Boolean = false)`
+  - L183 `val scanLauncher`
+  - L191 `val imagePickLauncher`
 
 ### app/src/main/java/com/securemessenger/app/ui/screens/chat/QrImage.kt (312 سطر) ⚠  [package com.securemessenger.app.ui.screens.chat]
 - L39 `object QrImage` — Rendering a pairing QR to an image, sharing it, and reading one back out of a
@@ -1968,7 +1970,7 @@ private fun ProfileStepPreview ()`
 private fun GeneratingStepPreview ()`
 - L413 `private fun Modifier`
 
-### app/src/main/java/com/securemessenger/app/ui/screens/verification/KeyVerificationScreen.kt (520 سطر) ⚠  [package com.securemessenger.app.ui.screens.verification]
+### app/src/main/java/com/securemessenger/app/ui/screens/verification/KeyVerificationScreen.kt (533 سطر) ⚠  [package com.securemessenger.app.ui.screens.verification]
 - L44 `@OptIn(ExperimentalMaterial3Api::class)
 @Composable fun KeyVerificationScreen ( contactId: String?, onBackClick: () -> Unit )`
   - L48 `var showMyQR`
@@ -1994,7 +1996,7 @@ private fun GeneratingStepPreview ()`
   - L181 `val canScan`
   - L194 `val qrPayload`
   - L204 `val myQRBitmap`
-- L497 `@Composable
+- L510 `@Composable
 private fun StatusPill ( icon: androidx.compose.ui.graphics.vector.ImageVector, tint: Color, title: String, subtitle: String )`
 
 ### app/src/main/java/com/securemessenger/app/ui/screens/verification/VerificationComponents.kt (29 سطر)  [package com.securemessenger.app.ui.screens.verification]

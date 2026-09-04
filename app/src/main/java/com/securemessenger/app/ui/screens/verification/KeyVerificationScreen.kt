@@ -391,17 +391,30 @@ fun KeyVerificationScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(14.dp))
-                        .background(MaterialTheme.colorScheme.primary)
+                        // Looks disabled when it is. Photographing this screen
+                        // on a device with no contacts showed a full-strength
+                        // primary-blue button that invites a press and then
+                        // ignores it — the enabled flag was honest and the
+                        // paint was not.
+                        .background(
+                            if (canScan) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
+                        )
                         .clickable(enabled = canScan) { scanOrChooseFirst() }
                         .padding(vertical = 13.dp),
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(Icons.Default.QrCodeScanner, contentDescription = null, tint = Color.White, modifier = Modifier.size(19.dp))
+                    val contentColor = if (canScan) Color.White else Color.White.copy(alpha = 0.6f)
+                    Icon(Icons.Default.QrCodeScanner, contentDescription = null, tint = contentColor, modifier = Modifier.size(19.dp))
                     Spacer(Modifier.width(8.dp))
                     Text(
-                        text = chosenContactName?.let { "مسح رمز «$it»" } ?: "مسح رمز جهة الاتصال",
-                        color = Color.White,
+                        text = when {
+                            chosenContactName != null -> "مسح رمز «$chosenContactName»"
+                            !canScan && contactsLoaded -> "لا توجد جهات اتصال بعد"
+                            else -> "مسح رمز جهة الاتصال"
+                        },
+                        color = contentColor,
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Medium,
                         maxLines = 1,

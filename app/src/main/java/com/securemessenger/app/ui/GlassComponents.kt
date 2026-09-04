@@ -190,7 +190,14 @@ fun GlassBottomNavBar(
             // indicator's fillMaxHeight() below resolves against the
             // unbounded height a bottomBar slot can pass down, which made the
             // whole bar balloon to cover the entire screen.
-            .height(64.dp)
+            //
+            // 72 rather than 64 because of the badge. BadgedBox draws its
+            // badge ABOVE the icon's own bounds without reserving room for it,
+            // and the frosted surface clips to its rounded shape — so at 64dp
+            // the pending-requests count rendered as a red half-disc with the
+            // digit sliced through the middle. Photographing the bar is the
+            // only reason that was ever noticed.
+            .height(72.dp)
             .liquidSurface(shape = RoundedCornerShape(26.dp), raised = true, elevation = 16.dp)
             .padding(vertical = 8.dp, horizontal = 6.dp)
     ) {
@@ -227,7 +234,10 @@ fun GlassBottomNavBar(
                         .weight(1f)
                         .clip(RoundedCornerShape(16.dp))
                         .clickable { onSelect(index) }
-                        .padding(vertical = 4.dp)
+                        // Asymmetric on purpose: the extra top padding is the
+                        // room the badge needs to sit inside the surface
+                        // rather than be clipped by its edge.
+                        .padding(top = 8.dp, bottom = 4.dp)
                 ) {
                     BadgedBox(badge = {
                         if (item.badgeCount > 0) {

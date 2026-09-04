@@ -1,11 +1,16 @@
 package com.securemessenger.app.ui
 
 import android.graphics.Bitmap
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Forum
+import androidx.compose.material.icons.filled.PersonAdd
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -18,6 +23,8 @@ import androidx.compose.ui.test.onRoot
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.securemessenger.app.ui.screens.calculator.CalculatorScreen
+import com.securemessenger.app.ui.GlassBottomNavBar
+import com.securemessenger.app.ui.GlassNavItem
 import com.securemessenger.app.ui.GlassTopBar
 import com.securemessenger.app.ui.glassBackground
 import com.securemessenger.app.ui.screens.chat.ConnectionRequestsScreen
@@ -86,6 +93,37 @@ class ScreenTourTest {
 
     @Test fun tourUsernameSearch() = shoot("tour-username-search") {
         UsernameSearchScreen(onBackClick = {})
+    }
+
+    /**
+     * The restored bottom bar, in all three of its states.
+     *
+     * It is composed in AppNavigation rather than inside any screen, so no
+     * existing test could ever have rendered it — the home-screen shots stop
+     * at ChatListContent. That is precisely the gap that let the first version
+     * of this bar ship with a selectedIndex pinned at 0 and an indicator that
+     * never moved: nothing ever looked at it. Photographing each selection
+     * makes the indicator's position something a person can check.
+     */
+    @Test fun tourBottomNavBar() = shoot("tour-bottom-nav") {
+        Column(
+            modifier = Modifier.fillMaxSize().glassBackground(listOf(Color(0xFF06080D))),
+            verticalArrangement = Arrangement.Center
+        ) {
+            val items = listOf(
+                GlassNavItem("المحادثات", Icons.Default.Forum),
+                GlassNavItem("جهات الاتصال", Icons.Default.PersonAdd, badgeCount = 2),
+                GlassNavItem("الإعدادات", Icons.Default.Settings)
+            )
+            repeat(3) { selected ->
+                GlassBottomNavBar(
+                    items = items,
+                    selectedIndex = selected,
+                    onSelect = {},
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
+                )
+            }
+        }
     }
 
     @Test fun tourKeyVerification() = shoot("tour-verification") {

@@ -17,6 +17,7 @@ import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -94,9 +95,16 @@ fun NewChatScreen(
     // inside the effect below, which is why nothing downstream could know the
     // difference between a code drawn on screen and one mailed to someone.
     var myPairSecretHex by remember { mutableStateOf<String?>(null) }
+    // "Finished" rather than "succeeded" — the same distinction the key
+    // verification screen had to learn. These reads return null rather than
+    // throwing when there is no profile to read, so a spinner keyed on
+    // "payload is still null" spins forever and tells the user a load is in
+    // progress that already ended. This screen is a tab root now, so it is far
+    // easier to land on in that state than it was as a pushed screen.
+    var qrLoadAttempted by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
-        val userId = repository.getUserId()
-        val publicKeyHex = repository.getPublicKeyHex()
+        val userId = try { repository.getUserId() } catch (e: Exception) { null }
+        val publicKeyHex = try { repository.getPublicKeyHex() } catch (e: Exception) { null }
         if (userId != null && publicKeyHex != null) {
             val username = AppSettings.getUsername(context)
             myUsername = username ?: userId.take(8)
@@ -123,6 +131,7 @@ fun NewChatScreen(
                 pairSecretHex = pairSecretHex
             )
         }
+        qrLoadAttempted = true
     }
     val myQrBitmap = remember(myQrPayload) { myQrPayload?.let { QrImage.render(it) } }
 
@@ -221,20 +230,41 @@ fun NewChatScreen(
                     if (myQrBitmap != null) {
                         Image(
                             bitmap = myQrBitmap.asImageBitmap(),
-                            contentDescription = "رمز QR الخاص بي",
+                            contentDescription = "رمزي",
                             modifier = Modifier.fillMaxSize()
                         )
-                    } else {
+                    } else if (!qrLoadAttempted) {
                         CircularProgressIndicator()
+                    } else {
+                        // Read finished, nothing to encode. A spinner here
+                        // would claim a load is still running that has already
+                        // ended, which is the slowest possible way to lie.
+                        Icon(
+                            imageVector = Icons.Default.ErrorOutline,
+                            contentDescription = null,
+                            modifier = Modifier.size(44.dp),
+                            tint = MaterialTheme.colorScheme.error
+                        )
                     }
                 }
                 Spacer(modifier = Modifier.height(20.dp))
-                Text(
-                    text = "⁦@$myUsername⁩",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Medium,
-                    color = mc.glassOnCard
-                )
+                // An empty username rendered as a bare "@" — a label with
+                // nothing to label.
+                if (myUsername.isNotBlank()) {
+                    Text(
+                        text = "⁦@$myUsername⁩",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Medium,
+                        color = mc.glassOnCard
+                    )
+                } else if (qrLoadAttempted) {
+                    Text(
+                        text = "تعذّر قراءة هويتك",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
                 Spacer(modifier = Modifier.height(20.dp))
                 // Conditional, because the flat claim stopped being true.
                 //
