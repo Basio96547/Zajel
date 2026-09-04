@@ -144,3 +144,112 @@ fun GlassTopBar(
         )
     }
 }
+
+data class GlassNavItem(
+    val label: String,
+    val icon: ImageVector,
+    /** e.g. pending connection-request count on "جهات الاتصال" — 0 shows no badge at all. */
+    val badgeCount: Int = 0
+)
+
+/**
+ * Floating frosted-pill bottom navigation bar — Telegram-style, glassy, with
+ * a sliding highlight and an icon/label tint crossfade so a tab switch
+ * itself visibly animates rather than hard-cutting.
+ *
+ * THIS IS THE SAME BAR THAT WAS DELETED, RESTORED DELIBERATELY, AND THE
+ * REASON IT WAS DELETED IS WORTH KEEPING WRITTEN DOWN. It was removed
+ * because it lied: three of its four entries pushed a new screen with its own
+ * back stack instead of switching tabs, `selectedIndex` was pinned at 0 so
+ * the sliding indicator never once moved, and its "جهات الاتصال" entry opened
+ * the exact destination the floating button beside it already owned.
+ *
+ * Every one of those was a wiring fault, not a fault in the bar. Deleting it
+ * removed the visible symptom and left the app with no navigation model at
+ * all: every screen became a push, "المحادثات → الإعدادات → الملف الشخصي →
+ * جهات الاتصال → البحث" was a reachable five-deep stack with no way home, and
+ * adding a contact from the profile screen left you, on back, inside your own
+ * profile. The bar comes back with [selectedIndex] actually derived from the
+ * current route, with each entry switching to a saved root rather than
+ * stacking one, and with the duplicate floating button gone from the home
+ * screen — see AppNavigation.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun GlassBottomNavBar(
+    items: List<GlassNavItem>,
+    selectedIndex: Int,
+    onSelect: (Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val mc = LocalMessengerColors.current
+    BoxWithConstraints(
+        modifier = modifier
+            .fillMaxWidth()
+            // Fixed height is required, not cosmetic — without it the
+            // indicator's fillMaxHeight() below resolves against the
+            // unbounded height a bottomBar slot can pass down, which made the
+            // whole bar balloon to cover the entire screen.
+            .height(64.dp)
+            .liquidSurface(shape = RoundedCornerShape(26.dp), raised = true, elevation = 16.dp)
+            .padding(vertical = 8.dp, horizontal = 6.dp)
+    ) {
+        val itemWidth = maxWidth / items.size
+        if (selectedIndex in items.indices) {
+            val indicatorOffset by animateDpAsState(
+                targetValue = itemWidth * selectedIndex,
+                animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+                label = "navIndicatorOffset"
+            )
+            Box(
+                modifier = Modifier
+                    .offset(x = indicatorOffset)
+                    .width(itemWidth)
+                    .fillMaxHeight()
+                    .padding(4.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.16f))
+            )
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceAround
+        ) {
+            items.forEachIndexed { index, item ->
+                val selected = index == selectedIndex
+                val tint by animateColorAsState(
+                    targetValue = if (selected) MaterialTheme.colorScheme.primary else mc.glassOnCard.copy(alpha = 0.55f),
+                    label = "navTint"
+                )
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(16.dp))
+                        .clickable { onSelect(index) }
+                        .padding(vertical = 4.dp)
+                ) {
+                    BadgedBox(badge = {
+                        if (item.badgeCount > 0) {
+                            Badge { Text(if (item.badgeCount > 99) "99+" else item.badgeCount.toString()) }
+                        }
+                    }) {
+                        Icon(
+                            imageVector = item.icon,
+                            contentDescription = item.label,
+                            tint = tint,
+                            modifier = Modifier.size(23.dp)
+                        )
+                    }
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        text = item.label,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = tint,
+                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
+                    )
+                }
+            }
+        }
+    }
+}

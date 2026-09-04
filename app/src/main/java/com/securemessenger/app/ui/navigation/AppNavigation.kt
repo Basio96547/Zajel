@@ -6,12 +6,23 @@ import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Forum
+import androidx.compose.material.icons.filled.PersonAdd
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.securemessenger.app.ui.screens.loading.LoadingScreen
 import androidx.fragment.app.FragmentActivity
 import androidx.navigation.NavBackStackEntry
@@ -28,6 +39,8 @@ import com.securemessenger.app.security.DevicePassphrase
 import com.securemessenger.app.security.DisguiseState
 import com.securemessenger.app.security.RootDetector
 import com.securemessenger.app.service.MessengerService
+import com.securemessenger.app.ui.GlassBottomNavBar
+import com.securemessenger.app.ui.GlassNavItem
 import com.securemessenger.app.ui.screens.calculator.CalculatorScreen
 import com.securemessenger.app.ui.screens.chat.ChatListScreen
 import com.securemessenger.app.ui.screens.chat.ConnectionRequestsScreen
@@ -40,6 +53,7 @@ import com.securemessenger.app.ui.screens.settings.SettingsScreen
 import com.securemessenger.app.ui.screens.settings.StealthModeScreen
 import com.securemessenger.app.ui.screens.setup.SetupScreen
 import com.securemessenger.app.ui.screens.verification.KeyVerificationScreen
+import com.securemessenger.app.ui.viewmodel.ConnectionRequestsViewModel
 import kotlinx.coroutines.launch
 
 sealed class Screen(val route: String) {
@@ -66,19 +80,38 @@ sealed class Screen(val route: String) {
 }
 
 /*
- * Three tiers of navigation motion:
+ * Two tiers of navigation motion:
  *  - Disguise moments (calculator/loading/setup) keep the original quiet
  *    150ms crossfade — the reveal/hide of the messenger must never look
  *    like a "special" transition to a shoulder-surfer.
- *  - Switching between the bottom-nav roots is lateral, not hierarchical,
- *    so it fades through with a subtle scale instead of sliding.
- *  - Drilling into a screen (open a conversation, contact info, key
- *    verification…) slides directionally with a parallax under-layer,
- *    Telegram/iOS-style. SlideDirection.Start/End are layout-direction
- *    aware, so the push comes from the correct edge in this RTL app.
+ *  - Everything else is drilling in (open a conversation, contact info,
+ *    settings, key verification…) and slides directionally with a parallax
+ *    under-layer, Telegram/iOS-style. SlideDirection.Start/End are
+ *    layout-direction aware, so the push comes from the correct edge in this
+ *    RTL app.
+ *
+ * There used to be a third tier: a lateral fade-with-scale for "switching
+ * between the bottom-nav roots". The bottom nav bar was deleted (it promised
+ * tab-switching it never performed — every entry pushed a new screen with its
+ * own back stack), but this rule outlived it, so chat list -> contacts, ->
+ * settings and -> profile still animated as sideways tab switches while
+ * wearing a back arrow and behaving like drill-ins. The motion now says what
+ * the navigation actually does.
  */
 private val DISGUISE_ROUTES = setOf("calculator", "loading", "setup")
-private val TAB_ROUTES = setOf("chat_list", "new_chat", "settings", "profile")
+
+/**
+ * The three roots of the revealed app, in bar order.
+ *
+ * A root is a place: it has no back arrow, it is reached only from the bar,
+ * and it is never stacked on top of another root. Everything not in this list
+ * is a drill-down that pushes and pops normally.
+ */
+private val ROOT_ROUTES = listOf(
+    Screen.ChatList.route,
+    Screen.NewChat.route,
+    Screen.Settings.route
+)
 
 private val NavEasing = CubicBezierEasing(0.05f, 0.7f, 0.1f, 1f) // Material emphasized-decelerate
 private const val SLIDE_MS = 350
@@ -89,9 +122,6 @@ private fun baseRoute(entry: NavBackStackEntry): String =
 
 private fun AnimatedContentTransitionScope<NavBackStackEntry>.involvesDisguise(): Boolean =
     baseRoute(initialState) in DISGUISE_ROUTES || baseRoute(targetState) in DISGUISE_ROUTES
-
-private fun AnimatedContentTransitionScope<NavBackStackEntry>.isTabSwitch(): Boolean =
-    baseRoute(initialState) in TAB_ROUTES && baseRoute(targetState) in TAB_ROUTES
 
 /**
  * Guards every screen that shows real messenger content: renders nothing
@@ -142,17 +172,38 @@ fun AppNavigation() {
         }
     }
 
-    // Pressing back from the chat list — the root of the revealed section —
-    // hides instantly instead of leaving MainActivity's onStop() debounce
-    // (HIDE_GRACE_PERIOD_MS, ~10s) to do it later, or waiting for the app to
-    // simply be closed and left in the background. This is deliberately the
-    // ONLY new "hide" trigger added rather than a visible button: back is the
-    // single most unremarkable exit gesture there is — to anyone watching, it
-    // looks exactly like closing an app, which is exactly what should appear
-    // to happen. Deeper screens (a conversation, settings…) are untouched;
-    // back there still just navigates up one level, as expected.
-    BackHandler(enabled = isRevealed && currentRoute == Screen.ChatList.route) {
-        DisguiseState.hide()
+    // Switch to a tab root, the way a tab is supposed to behave: pop back to
+    // the home root and put this one on top, reusing the entry that is
+    // already there rather than stacking a second copy, and restoring
+    // whatever scroll/state that tab had.
+    //
+    // popUpTo targets ChatList and NOT the graph's start destination, which
+    // is the calculator: popping to the real start would tear down the whole
+    // revealed section and drop the user back onto the disguise.
+    val selectTab: (String) -> Unit = { route ->
+        navController.navigate(route) {
+            popUpTo(Screen.ChatList.route) { saveState = true }
+            launchSingleTop = true
+            restoreState = true
+        }
+    }
+
+    // Back on the home tab hides the app; back on another tab returns to the
+    // home tab first.
+    //
+    // Hiding from the chat list is deliberately the only "hide" gesture
+    // rather than a visible button: back is the single most unremarkable exit
+    // there is — to anyone watching it looks exactly like closing an app,
+    // which is exactly what should appear to happen. But it only reads that
+    // way from home. Firing it from a tab the user merely wandered into would
+    // make settings and contacts into trapdoors that close the messenger, and
+    // force the full code + biometric unlock to get back.
+    //
+    // Drill-down screens (a conversation, contact info, verification…) are
+    // untouched: back there navigates up one level, as expected.
+    BackHandler(enabled = isRevealed && currentRoute in ROOT_ROUTES) {
+        if (currentRoute == Screen.ChatList.route) DisguiseState.hide()
+        else selectTab(Screen.ChatList.route)
     }
 
     // "يشتغل ويطفى حسب الاستخدام": this device's own local relay + network
@@ -172,23 +223,7 @@ fun AppNavigation() {
         }
     }
 
-    // Shared tab-jump actions for the glass bottom nav bar (present on
-    // ChatList and Settings, the two root screens). "الدردشات" pops back to
-    // the existing ChatList entry instead of stacking a fresh one on every
-    // tap; the others just launchSingleTop to avoid piling up duplicates
-    // when a user bounces between tabs repeatedly.
-    val navToChats: () -> Unit = {
-        navController.navigate(Screen.ChatList.route) {
-            popUpTo(Screen.ChatList.route) { inclusive = false }
-            launchSingleTop = true
-        }
-    }
-    val navToContacts: () -> Unit = {
-        navController.navigate(Screen.NewChat.route) { launchSingleTop = true }
-    }
-    val navToProfile: () -> Unit = {
-        navController.navigate(Screen.Profile.route) { launchSingleTop = true }
-    }
+    Box(modifier = Modifier.fillMaxSize()) {
 
     NavHost(
         navController = navController,
@@ -196,8 +231,6 @@ fun AppNavigation() {
         enterTransition = {
             when {
                 involvesDisguise() -> fadeIn(tween(CROSSFADE_MS))
-                isTabSwitch() -> fadeIn(tween(240)) +
-                    scaleIn(initialScale = 0.96f, animationSpec = tween(320, easing = NavEasing))
                 else -> slideIntoContainer(
                     towards = AnimatedContentTransitionScope.SlideDirection.Start,
                     animationSpec = tween(SLIDE_MS, easing = NavEasing)
@@ -207,7 +240,6 @@ fun AppNavigation() {
         exitTransition = {
             when {
                 involvesDisguise() -> fadeOut(tween(CROSSFADE_MS))
-                isTabSwitch() -> fadeOut(tween(200))
                 // The screen going under doesn't leave — it drifts a third of
                 // the way and gets covered, which is what reads as depth.
                 else -> slideOutOfContainer(
@@ -220,8 +252,6 @@ fun AppNavigation() {
         popEnterTransition = {
             when {
                 involvesDisguise() -> fadeIn(tween(CROSSFADE_MS))
-                isTabSwitch() -> fadeIn(tween(240)) +
-                    scaleIn(initialScale = 0.96f, animationSpec = tween(320, easing = NavEasing))
                 // Returns from the parallax position it was parked at.
                 else -> slideIntoContainer(
                     towards = AnimatedContentTransitionScope.SlideDirection.End,
@@ -233,7 +263,6 @@ fun AppNavigation() {
         popExitTransition = {
             when {
                 involvesDisguise() -> fadeOut(tween(CROSSFADE_MS))
-                isTabSwitch() -> fadeOut(tween(200))
                 else -> slideOutOfContainer(
                     towards = AnimatedContentTransitionScope.SlideDirection.End,
                     animationSpec = tween(SLIDE_MS, easing = NavEasing)
@@ -340,9 +369,9 @@ fun AppNavigation() {
                     onConversationClick = { contactId ->
                         navController.navigate(Screen.Conversation.createRoute(contactId))
                     },
-                    onSettingsClick = { navController.navigate(Screen.Settings.route) },
-                    onNewChatClick = { navController.navigate(Screen.NewChat.route) },
-                    onProfileClick = { navController.navigate(Screen.Profile.route) },
+                    // The empty state's call to action switches tabs rather
+                    // than stacking the pairing screen on top of home.
+                    onNewChatClick = { selectTab(Screen.NewChat.route) },
                     // Straight to the requests, not via NewChat. The home
                     // screen's pending-request count used to sit on a control
                     // that opened NewChat, one level away from the thing it
@@ -355,10 +384,19 @@ fun AppNavigation() {
         composable(Screen.NewChat.route) {
             RevealedOnly {
                 NewChatScreen(
-                    onBackClick = { navController.popBackStack() },
+                    // A tab root: no back arrow. Back is handled above and
+                    // returns to the home tab.
+                    onBackClick = null,
                     onContactAdded = { contactId ->
+                        // Lands the new conversation on the HOME stack, not on
+                        // whatever happened to be underneath the pairing
+                        // screen. This used to pop only NewChat itself, so
+                        // reaching it from the profile screen and adding
+                        // someone left the stack as [home, settings, profile,
+                        // conversation] — press back out of your brand-new
+                        // chat and you were standing in your own profile.
                         navController.navigate(Screen.Conversation.createRoute(contactId)) {
-                            popUpTo(Screen.NewChat.route) { inclusive = true }
+                            popUpTo(Screen.ChatList.route) { inclusive = false }
                         }
                     },
                     onSearchByUsernameClick = { navController.navigate(Screen.UsernameSearch.route) },
@@ -421,7 +459,8 @@ fun AppNavigation() {
         composable(Screen.Settings.route) {
             RevealedOnly {
                 SettingsScreen(
-                    onBackClick = { navController.popBackStack() },
+                    // A tab root: no back arrow, same as the other two.
+                    onBackClick = null,
                     onVerificationClick = { navController.navigate(Screen.KeyVerification.createRoute()) },
                     onStealthModeClick = { navController.navigate(Screen.StealthMode.route) },
                     onDataWiped = {
@@ -439,7 +478,11 @@ fun AppNavigation() {
                 ProfileScreen(
                     onBackClick = { navController.popBackStack() },
                     onVerifyClick = { navController.navigate(Screen.KeyVerification.createRoute()) },
-                    onShowQrClick = { navController.navigate(Screen.NewChat.route) }
+                    // Switches to the tab that owns your code instead of
+                    // pushing it on top of the profile — which is how a
+                    // conversation opened from here used to end up sitting
+                    // above the profile screen in the first place.
+                    onShowQrClick = { selectTab(Screen.NewChat.route) }
                 )
             }
         }
@@ -469,6 +512,30 @@ fun AppNavigation() {
                     }
                 )
             }
+        }
+    }
+
+        // The bar floats over the graph rather than insetting it, so the
+        // aurora keeps running edge to edge underneath it — the three roots
+        // reserve their own bottom room instead. Composed only on a root, and
+        // only while revealed: it must never flash over the calculator.
+        val rootIndex = ROOT_ROUTES.indexOf(currentRoute)
+        if (isRevealed && rootIndex >= 0) {
+            val requestsViewModel: ConnectionRequestsViewModel = viewModel()
+            val pending by requestsViewModel.incomingRequests.collectAsState()
+            GlassBottomNavBar(
+                items = listOf(
+                    GlassNavItem("المحادثات", Icons.Default.Forum),
+                    GlassNavItem("جهات الاتصال", Icons.Default.PersonAdd, badgeCount = pending.size),
+                    GlassNavItem("الإعدادات", Icons.Default.Settings)
+                ),
+                selectedIndex = rootIndex,
+                onSelect = { index -> selectTab(ROOT_ROUTES[index]) },
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .navigationBarsPadding()
+                    .padding(horizontal = 14.dp, vertical = 12.dp)
+            )
         }
     }
 

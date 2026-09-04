@@ -1,6 +1,7 @@
 package com.securemessenger.app.data.model
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
 /**
@@ -117,7 +118,15 @@ data class Session(
  * EncryptedMessage - stores encrypted messages locally.
  * Messages are encrypted both with Signal Protocol and at-rest encryption.
  */
-@Entity(tableName = "messages")
+@Entity(
+    tableName = "messages",
+    // The index that makes a conversation a conversation. Every read this app
+    // performs on this table is "the messages with one contact, newest first"
+    // or "the newest message per contact"; without an index both were full
+    // table scans, which is why the chat list was loading every message in the
+    // database into memory on every change.
+    indices = [Index(value = ["contactId", "timestamp"])]
+)
 data class EncryptedMessage(
     @PrimaryKey
     val id: Long? = null,
@@ -151,7 +160,38 @@ data class EncryptedMessage(
     // references survive) but renders as "حُذفت"; the text is wiped locally.
     val isDeleted: Boolean = false,
     // Non-null once the sender edits the text; UI shows a "معدّلة" marker.
-    val editedAt: Long? = null
+    val editedAt: Long? = null,
+    /**
+     * WHO THIS MESSAGE IS A CONVERSATION WITH — the app's missing concept,
+     * finally written down.
+     *
+     * There was no "conversation" anywhere in this model. The conversation
+     * screen keyed off [sessionId]; the chat list keyed off senderId /
+     * recipientId. Those two agreed only by the accident that every contact
+     * happens to have exactly one session — while the schema plainly expects
+     * otherwise (SessionDao.getCurrentSession is written "ORDER BY lastUsedAt
+     * DESC LIMIT 1"). A second session for one contact, from a re-pair after
+     * a key change, would have split the history: the list showing a last
+     * message the conversation screen could not display, and an unread count
+     * counted across all sessions that markAllReceivedAsRead(sessionId) could
+     * never clear.
+     *
+     * One key ends that. Both screens now read by contact, so history follows
+     * the person rather than the cryptographic session underneath them, and
+     * a re-keyed session keeps the thread intact.
+     *
+     * Derived, never passed: the default computes it from the fields above,
+     * so every existing construction site got it right without being touched
+     * and no future one can forget it.
+     *
+     * Nullable purely for migration safety. Adding a NOT NULL column with a
+     * default to a live table risks Room's schema validation disagreeing with
+     * SQLite over the default's spelling, and this app has no backup or export
+     * — a failed validation falls back to destructive migration, which here
+     * means every message a real user has. A plain nullable column cannot
+     * mismatch. The backfill in MIGRATION_12_13 leaves no NULLs behind.
+     */
+    val contactId: String? = if (direction == 0) senderId else recipientId
 )
 
 /**

@@ -129,9 +129,7 @@ class HomeScreenshotTest {
                     pendingRequestCount = 2,
                     onConversationClick = {},
                     onTogglePin = {},
-                    onSettingsClick = {},
                     onNewChatClick = {},
-                    onProfileClick = {},
                     onConnectionRequestsClick = {}
                 )
             }

@@ -7,6 +7,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -32,12 +33,16 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.securemessenger.app.security.AppSettings
 import com.securemessenger.app.ui.glassCard
+import com.securemessenger.app.ui.screens.chat.decodeSampledBitmap
 import com.securemessenger.app.ui.theme.LocalMessengerColors
 import com.securemessenger.app.ui.theme.MessengerTheme
 import com.securemessenger.app.ui.theme.SemanticColors
@@ -151,12 +156,14 @@ fun ProfileStep(
     onUsernameChange: (String) -> Unit,
     accessCode: String,
     onAccessCodeChange: (String) -> Unit,
+    avatarBytes: ByteArray?,
+    onPickAvatar: () -> Unit,
     onNext: () -> Unit
 ) {
     // No directory to check against anymore — just a local format check.
     // Nothing to reserve, so nothing can ever be "taken."
     val isValidFormat = username.isBlank() || USERNAME_REGEX.matches(username)
-    val isValidCode = accessCode.length in 4..10
+    val isValidCode = AppSettings.isTypeableCode(accessCode)
     val mc = LocalMessengerColors.current
 
     Column(
@@ -179,17 +186,36 @@ fun ProfileStep(
 
         Spacer(modifier = Modifier.height(24.dp))
 
+        // This circle used to be `.clickable { }` — an empty lambda under a
+        // camera glyph labelled "إضافة صورة". It looked like the first thing
+        // you do in this app, and it did nothing at all. It now opens the
+        // picker and shows what you chose; SetupScreen holds the bytes until
+        // step 3, where the profile it belongs to actually gets created.
         Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+            // Bounded decode, like every other image path in this app — a
+            // gallery pick can easily be a 12-megapixel photo.
+            val preview = remember(avatarBytes) {
+                avatarBytes?.let { decodeSampledBitmap(it, maxDimension = 300)?.asImageBitmap() }
+            }
             Box(
                 modifier = Modifier
                     .size(80.dp)
                     .clip(CircleShape)
                     .background(mc.glassCard)
                     .border(1.dp, mc.receivedMeta.copy(alpha = 0.4f), CircleShape)
-                    .clickable { },
+                    .clickable(onClick = onPickAvatar),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Default.Camera, contentDescription = "إضافة صورة", tint = mc.receivedMeta, modifier = Modifier.size(26.dp))
+                if (preview != null) {
+                    Image(
+                        bitmap = preview,
+                        contentDescription = "الصورة المختارة",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Icon(Icons.Default.Camera, contentDescription = "إضافة صورة", tint = mc.receivedMeta, modifier = Modifier.size(26.dp))
+                }
             }
         }
 
@@ -221,7 +247,10 @@ fun ProfileStep(
             value = accessCode,
             onValueChange = onAccessCodeChange,
             isError = accessCode.isNotEmpty() && !isValidCode,
-            supportingText = "رقم من 4 إلى 10 خانات — تكتبه في الحاسبة ثم = لفتح المراسل. لا يوجد رمز افتراضي، فاحفظه جيداً.",
+            supportingText = if (accessCode.startsWith("0"))
+                "لا يبدأ بصفر — الحاسبة لا تقبل صفراً في أول الرقم، فلن تستطيع كتابته لاحقاً."
+            else
+                "رقم من 4 إلى 10 خانات، لا يبدأ بصفر — تكتبه في الحاسبة ثم = لفتح المراسل. لا يوجد رمز افتراضي، فاحفظه جيداً.",
             letterSpaced = true,
             keyboardOptions = KeyboardOptions(
                 keyboardType = androidx.compose.ui.text.input.KeyboardType.NumberPassword,
@@ -368,6 +397,8 @@ private fun ProfileStepPreview() {
             onUsernameChange = { username = it },
             accessCode = accessCode,
             onAccessCodeChange = { accessCode = it },
+            avatarBytes = null,
+            onPickAvatar = {},
             onNext = {}
         )
     }

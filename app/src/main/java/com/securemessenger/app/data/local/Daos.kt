@@ -4,6 +4,12 @@ import androidx.room.*
 import com.securemessenger.app.data.model.*
 import kotlinx.coroutines.flow.Flow
 
+/** One conversation's unread tally, counted in SQL — see [MessageDao.observeUnreadCounts]. */
+data class UnreadCount(
+    val contactId: String,
+    val unreadCount: Int
+)
+
 /**
  * Data Access Object for user profile operations.
  */
@@ -111,11 +117,68 @@ interface SessionDao {
 @Dao
 interface MessageDao {
 
-    @Query("SELECT * FROM messages WHERE sessionId = :sessionId ORDER BY timestamp ASC")
-    fun getMessagesForSession(sessionId: String): Flow<List<EncryptedMessage>>
+    /**
+     * The newest [limit] messages of one conversation, oldest-first for
+     * display.
+     *
+     * Replaces `SELECT * FROM messages WHERE sessionId = ?`, which returned
+     * the entire thread — every message ever exchanged, re-emitted in full on
+     * every single write to the table, and then decrypted row by row. A window
+     * bounds both the query and the decryption that follows it; the caller
+     * grows [limit] when the user scrolls back.
+     *
+     * Ordered by (timestamp, id) at both ends so two messages sharing a
+     * millisecond still have one stable order, and the window boundary can't
+     * flicker between them.
+     */
+    @Query(
+        "SELECT * FROM (SELECT * FROM messages WHERE contactId = :contactId " +
+            "ORDER BY timestamp DESC, id DESC LIMIT :limit) ORDER BY timestamp ASC, id ASC"
+    )
+    fun getRecentMessagesForContact(contactId: String, limit: Int): Flow<List<EncryptedMessage>>
 
-    @Query("SELECT * FROM messages ORDER BY timestamp ASC")
-    fun getAllMessages(): Flow<List<EncryptedMessage>>
+    /** How many messages the conversation holds in total — tells the UI whether scrolling back has anything left to load. */
+    @Query("SELECT COUNT(*) FROM messages WHERE contactId = :contactId")
+    fun countMessagesForContact(contactId: String): Flow<Int>
+
+    /**
+     * Shared media in one conversation, newest first.
+     *
+     * The contact-details screen used to collect the ENTIRE thread and filter
+     * it in Kotlin to find the handful of media rows — the same unbounded load
+     * the conversation screen had, on a screen that only ever shows a grid of
+     * thumbnails. Filtering belongs in the query.
+     */
+    @Query("SELECT * FROM messages WHERE contactId = :contactId AND type != 0 AND isDeleted = 0 ORDER BY timestamp DESC")
+    fun observeMediaForContact(contactId: String): Flow<List<EncryptedMessage>>
+
+    /**
+     * One row per conversation: the latest message in each.
+     *
+     * This and [observeUnreadCounts] exist to replace `getAllMessages()`,
+     * which the chat list used to collect — the whole messages table, into
+     * memory, re-emitted on every write, then filtered once per contact, so
+     * the cost of drawing the list was contacts × messages and it grew
+     * forever. These two return one row per conversation and are served by the
+     * (contactId, timestamp) index.
+     *
+     * The subquery picks the row by id rather than relying on SQLite's
+     * bare-column-with-MAX() behaviour, which is real but is a dialect
+     * guarantee this app should not be resting its home screen on.
+     */
+    @Query(
+        "SELECT * FROM messages m WHERE m.id = (" +
+            "SELECT m2.id FROM messages m2 WHERE m2.contactId = m.contactId " +
+            "ORDER BY m2.timestamp DESC, m2.id DESC LIMIT 1)"
+    )
+    fun observeLatestMessagePerContact(): Flow<List<EncryptedMessage>>
+
+    /** Unread received messages per conversation, counted in SQL rather than by scanning every row in memory. */
+    @Query(
+        "SELECT contactId AS contactId, COUNT(*) AS unreadCount FROM messages " +
+            "WHERE direction = 0 AND isRead = 0 AND contactId IS NOT NULL GROUP BY contactId"
+    )
+    fun observeUnreadCounts(): Flow<List<UnreadCount>>
 
     @Query("SELECT * FROM messages WHERE id = :messageId")
     suspend fun getMessage(messageId: Long): EncryptedMessage?
@@ -126,11 +189,14 @@ interface MessageDao {
     @Insert
     suspend fun insertMessage(message: EncryptedMessage): Long
 
-    @Query("SELECT * FROM messages WHERE sessionId = :sessionId AND direction = 0 AND isRead = 0")
-    suspend fun getUnreadReceivedMessages(sessionId: String): List<EncryptedMessage>
+    // Read state follows the conversation, not the session underneath it: an
+    // unread count computed per contact could never be cleared by a
+    // per-session update once a contact had more than one session.
+    @Query("SELECT * FROM messages WHERE contactId = :contactId AND direction = 0 AND isRead = 0")
+    suspend fun getUnreadReceivedMessagesForContact(contactId: String): List<EncryptedMessage>
 
-    @Query("UPDATE messages SET isRead = 1 WHERE sessionId = :sessionId AND direction = 0 AND isRead = 0")
-    suspend fun markAllReceivedAsRead(sessionId: String)
+    @Query("UPDATE messages SET isRead = 1 WHERE contactId = :contactId AND direction = 0 AND isRead = 0")
+    suspend fun markAllReceivedAsReadForContact(contactId: String)
 
     // Deliberately scoped to :recipientId: only flips messages we actually sent
     // TO them, so a forged or replayed read receipt can never mark arbitrary
@@ -145,10 +211,14 @@ interface MessageDao {
     @Query("DELETE FROM messages WHERE isExpired = 1")
     suspend fun deleteExpiredMessages(): Int
 
-    @Query("SELECT * FROM messages WHERE sessionId IN (SELECT sessionId FROM sessions WHERE contactId = :contactId)")
+    // Straight off the conversation key now, instead of a subquery through
+    // sessions — which also means deleting a contact takes their whole
+    // history with it, including messages from a session that no longer
+    // exists. The old form would have left those rows orphaned in the table.
+    @Query("SELECT * FROM messages WHERE contactId = :contactId")
     suspend fun getMessagesForContactOnce(contactId: String): List<EncryptedMessage>
 
-    @Query("DELETE FROM messages WHERE sessionId IN (SELECT sessionId FROM sessions WHERE contactId = :contactId)")
+    @Query("DELETE FROM messages WHERE contactId = :contactId")
     suspend fun deleteMessagesForContact(contactId: String)
 
     // ---- social message-interaction ops (reactions / edit / delete) ----

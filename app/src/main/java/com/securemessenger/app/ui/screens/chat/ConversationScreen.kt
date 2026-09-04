@@ -211,9 +211,12 @@ fun ConversationScreen(
             GlassTopBar(
                 onBack = onBackClick,
                 actions = {
-                    IconButton(onClick = { viewModel.reportError("المكالمات غير متاحة في هذا الإصدار") }) {
-                        Icon(Icons.Default.Call, contentDescription = "اتصال")
-                    }
+                    // The call button is gone rather than fixed: its entire
+                    // implementation was to raise "المكالمات غير متاحة في هذا
+                    // الإصدار" — a control whose only function was to refuse.
+                    // Contact info had the same button wired to an empty
+                    // lambda; both are removed together, so the app no longer
+                    // offers calling in two places and provides it in none.
                     var menuExpanded by remember { mutableStateOf(false) }
                     Box {
                         IconButton(onClick = { menuExpanded = true }) {
@@ -356,6 +359,47 @@ fun ConversationScreen(
             } else messages
             val rows = remember(shownMessages) { buildRows(shownMessages) }
 
+            val hasMoreHistory by viewModel.hasMoreHistory.collectAsState()
+
+            // Search reads what is loaded, so opening it loads the rest.
+            LaunchedEffect(searchActive) {
+                if (searchActive) viewModel.loadEntireHistoryForSearch()
+            }
+
+            // Older history arrives when the top of what's loaded scrolls into
+            // view — and the reader has to keep their place when it does.
+            // Prepending rows shifts every index down, so a LazyColumn that
+            // remembers a position by index would jump the viewport back by
+            // exactly the number of messages just loaded. The anchor is the row
+            // that was at the top; after the list grows, we scroll back to it.
+            var anchorKey by remember { mutableStateOf<String?>(null) }
+            var anchorOffset by remember { mutableIntStateOf(0) }
+            // Armed only once the list has settled at the bottom, which is
+            // where a conversation opens. Until then the viewport is
+            // legitimately at index 0 — the top of the loaded window — and the
+            // watcher below would read that as "the reader scrolled back" and
+            // fetch more history immediately on every single open, defeating
+            // the window before it ever bounded anything. Set by the
+            // scroll-to-bottom effect further down.
+            var readyForPaging by remember { mutableStateOf(false) }
+            LaunchedEffect(listState, hasMoreHistory, rows, readyForPaging) {
+                if (!readyForPaging) return@LaunchedEffect
+                snapshotFlow { listState.firstVisibleItemIndex }.collect { index ->
+                    if (hasMoreHistory && anchorKey == null && index <= 2) {
+                        // index 0 is the encrypted banner, so rows lag by one.
+                        anchorKey = rows.getOrNull(index - 1)?.key
+                        anchorOffset = listState.firstVisibleItemScrollOffset
+                        viewModel.loadOlderMessages()
+                    }
+                }
+            }
+            LaunchedEffect(rows) {
+                val key = anchorKey ?: return@LaunchedEffect
+                val restored = rows.indexOfFirst { it.key == key }
+                if (restored >= 0) listState.scrollToItem(restored + 1, anchorOffset)
+                anchorKey = null
+            }
+
             // Whether the viewport is already showing the newest item — only
             // then does an incoming message auto-scroll; someone reading
             // scrollback shouldn't get yanked to the bottom.
@@ -386,6 +430,7 @@ fun ConversationScreen(
                 if (isNearBottom || lastIsMine) {
                     listState.animateScrollToItem(rows.size - 1)
                 }
+                readyForPaging = true
             }
 
             Box(modifier = Modifier.weight(1f)) {

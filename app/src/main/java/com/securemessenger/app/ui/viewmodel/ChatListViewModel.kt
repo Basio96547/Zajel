@@ -8,11 +8,13 @@ import com.securemessenger.app.data.model.Contact
 import com.securemessenger.app.data.model.EncryptedMessage
 import com.securemessenger.app.data.repository.SecureRepository
 import com.securemessenger.app.ui.formatContactName
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -47,18 +49,29 @@ class ChatListViewModel(
      * Neither the screen nor any other layer re-sorts this list.
      */
     val contacts: StateFlow<List<ContactUiModel>> =
-        combine(repository.getContacts(), repository.getAllMessages()) { contacts, messages ->
+        combine(
+            repository.getContacts(),
+            // One row per conversation, and one COUNT per conversation, both
+            // computed in SQL against the (contactId, timestamp) index.
+            //
+            // This used to collect repository.getAllMessages() — literally
+            // every message in the database, held in memory, re-emitted in
+            // full on every write to the table, then filtered once per contact.
+            // Drawing the home screen cost contacts × messages and grew with
+            // the history forever, on the main thread. Nothing about that was
+            // visible until a device had enough messages on it.
+            repository.observeLatestMessagePerContact(),
+            repository.observeUnreadCounts()
+        ) { contacts, latest, unreadCounts ->
             _isLoading.value = false
+            val lastByContact = latest.associateBy { it.contactId }
+            val unreadByContact = unreadCounts.associate { it.contactId to it.unreadCount }
             contacts.map { contact ->
-                val theirs = messages.filter {
-                    it.senderId == contact.id || it.recipientId == contact.id
-                }
-                val last = theirs.maxByOrNull { it.timestamp }
-                val unread = theirs.count { it.direction == 0 && !it.isRead && it.senderId == contact.id }
+                val last = lastByContact[contact.id]
                 contact.toUiModel(
                     lastMessage = last?.let { preview(it) } ?: "",
                     lastTimestamp = last?.timestamp ?: contact.addedAt,
-                    unreadCount = unread,
+                    unreadCount = unreadByContact[contact.id] ?: 0,
                     lastIsMine = last?.direction == 1,
                     lastIsRead = last?.isRead == true,
                     lastIsSelfDestruct = last?.expiresAt != null && last.isExpired == false
@@ -67,7 +80,13 @@ class ChatListViewModel(
                 compareByDescending<ContactUiModel> { it.pinnedAt != null }
                     .thenByDescending { it.pinnedAt ?: it.lastTimestamp }
             )
-        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+        }
+            // Contact names, avatars and the last-message preview are all
+            // Keystore-decrypted in the mapping above; none of it belongs on
+            // the main thread, which is where the collector for a stateIn in
+            // viewModelScope otherwise puts it.
+            .flowOn(Dispatchers.Default)
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     fun togglePin(contactId: String) {
         val currentlyPinned = contacts.value.firstOrNull { it.id == contactId }?.pinnedAt != null

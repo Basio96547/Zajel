@@ -8,6 +8,7 @@ import com.securemessenger.core.crypto.MediaCodec
 import com.securemessenger.core.crypto.PqKem
 import com.securemessenger.core.crypto.SignalProtocol
 import com.securemessenger.app.data.local.SecureDatabase
+import com.securemessenger.app.data.local.UnreadCount
 import com.securemessenger.app.data.model.*
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
@@ -37,6 +38,45 @@ enum class ContactPairResult {
     UNCHANGED,
     /** An existing contact, but the scanned key differs from the one already pinned — refused; see allowKeyChange. */
     KEY_CHANGED
+}
+
+/**
+ * What a scan handed to [SecureRepository.verifyScannedKey] turned out to be.
+ *
+ * Three outcomes, not two, because "I could not read that" and "that is the
+ * wrong person" are completely different things to tell somebody who is
+ * deciding whether they are being wiretapped.
+ */
+enum class KeyScanResult {
+    /** The scanned key is the one pinned for this contact — now marked verified. */
+    MATCH,
+    /** A readable identity key that is NOT this contact's. The one case that warrants alarm. */
+    MISMATCH,
+    /** Not an identity key at all — some other QR entirely. Says nothing about the contact. */
+    NOT_A_KEY
+}
+
+/**
+ * Pull an identity key out of either QR this app draws.
+ *
+ * Bare hex is the verification code; a JSON object with "k" is the pairing
+ * code, which carries the very same key. Anything else is not ours.
+ */
+private fun identityKeyHexFromScan(scanned: String): String? {
+    val raw = scanned.trim()
+    val hex = (
+        try {
+            org.json.JSONObject(raw).optString("k").takeIf { it.isNotBlank() }
+        } catch (e: Exception) {
+            null
+        } ?: raw
+        ).trim()
+    // An odd-length string would silently parse its last nibble as a whole
+    // byte and compare a key against a subtly different one, so length is
+    // checked rather than left to the parser.
+    if (hex.length < 2 || hex.length % 2 != 0) return null
+    if (!hex.all { it in '0'..'9' || it in 'a'..'f' || it in 'A'..'F' }) return null
+    return hex
 }
 
 /**
@@ -148,9 +188,12 @@ class SecureRepository(private val context: Context) {
         AndroidKeyStoreManager.decryptWithMasterKey(enc)
     }
 
-    suspend fun getCurrentSessionId(contactId: String): String? = withContext(Dispatchers.IO) {
-        database?.sessionDao()?.getCurrentSession(contactId)?.sessionId
-    }
+    // getCurrentSessionId() stood here. Its only callers were the conversation
+    // screen and contact details, both asking "which session do I read
+    // messages under" — a question neither of them should have been asking.
+    // Both read by contact now, so nothing needs to resolve a session just to
+    // display a conversation, and opening a screen no longer runs key
+    // agreement to obtain an id to query by.
 
     // ==================== Contacts ====================
 
@@ -276,22 +319,45 @@ class SecureRepository(private val context: Context) {
     }
 
     /**
-     * Compare a scanned QR payload (hex-encoded public key) against a
-     * contact's actual pinned public key — the real safety-number check.
-     * Purely local: no network/session needed, unlike the message pipeline.
+     * Compare a scanned QR payload against a contact's actual pinned public
+     * key — the real safety-number check. Purely local: no network/session
+     * needed, unlike the message pipeline.
+     *
+     * ACCEPTS BOTH OF THE APP'S QR CODES, because the app draws two and shows
+     * the user no way to tell them apart. The pairing screen renders a JSON
+     * payload; this verification screen renders a bare hex key. Both are
+     * called "رمز QR", both are black squares, and both are reached from the
+     * profile screen — one via "عرض رمز QR", the other via "رقم أمانك".
+     *
+     * That was not merely confusing, it was dangerous in the one direction
+     * that matters. This function used to return a plain Boolean, and any
+     * input it could not parse as hex came back `false`, which the screen
+     * rendered as "المفاتيح غير متطابقة — قد يكون هناك تنصت". So asking a
+     * friend for "your code", getting their *pairing* code, and scanning it
+     * here accused them of being wiretapped. In an app where that warning is
+     * supposed to mean "stop talking to this person", a false one is worse
+     * than no warning at all — it is the thing that teaches people to ignore
+     * the real one.
+     *
+     * A pairing payload carries the same identity key under "k", so the
+     * honest answer is not a better error message: it is to verify it. What
+     * remains genuinely unreadable (a URL, a Wi-Fi code, a QR from another
+     * app) is now [KeyScanResult.NOT_A_KEY] — a fact about the code scanned,
+     * not an accusation about the person.
      */
-    suspend fun verifyScannedKey(contactId: String, scannedPublicKeyHex: String): Boolean = withContext(Dispatchers.IO) {
-        val contact = getContact(contactId) ?: return@withContext false
-        val scannedBytes = try {
-            scannedPublicKeyHex.trim().chunked(2).map { it.toInt(16).toByte() }.toByteArray()
-        } catch (_: Exception) {
-            return@withContext false
-        }
+    suspend fun verifyScannedKey(contactId: String, scanned: String): KeyScanResult = withContext(Dispatchers.IO) {
+        val contact = getContact(contactId) ?: return@withContext KeyScanResult.NOT_A_KEY
+        val hex = identityKeyHexFromScan(scanned) ?: return@withContext KeyScanResult.NOT_A_KEY
+        val scannedBytes = runCatching {
+            hex.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
+        }.getOrNull() ?: return@withContext KeyScanResult.NOT_A_KEY
         val expected = LibsodiumWrapper.blake2b(contact.publicKey, length = 32)
-        val scanned = LibsodiumWrapper.blake2b(scannedBytes, length = 32)
-        val matches = expected.contentEquals(scanned)
+        val actual = LibsodiumWrapper.blake2b(scannedBytes, length = 32)
+        // The comparison itself is untouched: same hash, same pinned key,
+        // same meaning. Only what counts as a readable input got wider.
+        val matches = expected.contentEquals(actual)
         if (matches) verifyContact(contactId, scannedBytes)
-        matches
+        if (matches) KeyScanResult.MATCH else KeyScanResult.MISMATCH
     }
 
     suspend fun deleteContact(contactId: String) = withContext(Dispatchers.IO) {
@@ -422,12 +488,29 @@ class SecureRepository(private val context: Context) {
         message.copy(id = messageId)
     }
 
-    fun getMessages(sessionId: String): Flow<List<EncryptedMessage>> {
-        return requireDb().messageDao().getMessagesForSession(sessionId)
+    /** The newest [limit] messages with this contact, oldest-first. See MessageDao.getRecentMessagesForContact. */
+    fun getRecentMessages(contactId: String, limit: Int): Flow<List<EncryptedMessage>> {
+        return requireDb().messageDao().getRecentMessagesForContact(contactId, limit)
     }
 
-    fun getAllMessages(): Flow<List<EncryptedMessage>> {
-        return requireDb().messageDao().getAllMessages()
+    /** Total messages in the conversation — lets the UI know whether there is older history to load. */
+    fun countMessages(contactId: String): Flow<Int> {
+        return requireDb().messageDao().countMessagesForContact(contactId)
+    }
+
+    /** The latest message of every conversation — one row each, for the chat list. */
+    fun observeLatestMessagePerContact(): Flow<List<EncryptedMessage>> {
+        return requireDb().messageDao().observeLatestMessagePerContact()
+    }
+
+    /** Unread tallies per conversation, counted in SQL. */
+    fun observeUnreadCounts(): Flow<List<UnreadCount>> {
+        return requireDb().messageDao().observeUnreadCounts()
+    }
+
+    /** Shared media in one conversation, newest first — filtered in SQL, not by loading the thread. */
+    fun observeMedia(contactId: String): Flow<List<EncryptedMessage>> {
+        return requireDb().messageDao().observeMediaForContact(contactId)
     }
 
     /**
@@ -446,7 +529,9 @@ class SecureRepository(private val context: Context) {
         clientMessageId: String? = null,
         senderUsername: String? = null,
         replyToClientId: String? = null,
-        replySnippet: String? = null
+        replySnippet: String? = null,
+        /** The sender's claimed send time from the envelope — see [orderingTimestamp]. */
+        sentAt: Long? = null
     ): String? = withContext(Dispatchers.IO) {
         // Make sure we have a contact + prekeys so a session (and therefore a
         // stable sessionId shared with the conversation screen) can be created.
@@ -477,6 +562,11 @@ class SecureRepository(private val context: Context) {
             type = 0,
             ciphertext = ByteArray(0),
             iv = ByteArray(0),
+            timestamp = orderingTimestamp(sentAt, System.currentTimeMillis()),
+            // The self-destruct clock still runs from ARRIVAL, deliberately.
+            // A TTL is "this disappears N seconds after you get it"; measuring
+            // it from a send time that may be hours old would delete a message
+            // the recipient never had a chance to read.
             expiresAt = ttlSeconds?.let { System.currentTimeMillis() + it * 1000L },
             isRead = false,
             metadataEncrypted = AndroidKeyStoreManager.encryptWithMasterKey(plaintext),
@@ -656,6 +746,36 @@ class SecureRepository(private val context: Context) {
     companion object {
         /** Maximum raw (pre-encryption) file size accepted for a media message. */
         const val MAX_MEDIA_BYTES = 4 * 1024 * 1024
+
+        /** How long the blind relay holds an undelivered envelope — the oldest a genuine delay can be. */
+        private const val RELAY_RETENTION_MS = 48L * 60 * 60 * 1000
+
+        /** Ordinary disagreement between two phones' clocks. */
+        private const val MAX_CLOCK_SKEW_MS = 5L * 60 * 1000
+
+        /**
+         * Where an arriving message belongs in the thread.
+         *
+         * The sender's claimed send time is the right answer almost always,
+         * and it is what makes both devices show one order: a message sent at
+         * 09:00 and collected at 18:00 sat at 18:00 here and 09:00 there,
+         * because this side threw the claim away and stamped its own arrival.
+         *
+         * But it is a claim from another device, so it gets a window rather
+         * than trust. Too far ahead and a wrong clock parks the message at the
+         * bottom of the thread forever, below everything sent afterwards; too
+         * far behind and it is buried in history where the person it just
+         * arrived for will never notice it. Outside the window — older than
+         * the relay could possibly have held it, or in the future — the
+         * arrival time is the honest fallback. Inside it, the claim is used
+         * but still never allowed to be in the future.
+         */
+        fun orderingTimestamp(sentAt: Long?, arrivedAt: Long): Long {
+            if (sentAt == null || sentAt <= 0) return arrivedAt
+            if (sentAt < arrivedAt - RELAY_RETENTION_MS) return arrivedAt
+            if (sentAt > arrivedAt + MAX_CLOCK_SKEW_MS) return arrivedAt
+            return minOf(sentAt, arrivedAt)
+        }
     }
 
     private fun mediaDir(): File = File(context.filesDir, "media").apply { mkdirs() }
@@ -754,7 +874,9 @@ class SecureRepository(private val context: Context) {
         media: MediaCodec.WireMedia,
         ttlSeconds: Int? = null,
         clientMessageId: String? = null,
-        senderUsername: String? = null
+        senderUsername: String? = null,
+        /** The sender's claimed send time from the envelope — see [orderingTimestamp]. */
+        sentAt: Long? = null
     ): String? = withContext(Dispatchers.IO) {
         // MAX_MEDIA_BYTES is enforced on the SEND side (ConversationViewModel)
         // before a legitimate local pick/record ever reaches sendMediaMessage —
@@ -801,6 +923,8 @@ class SecureRepository(private val context: Context) {
             type = media.mediaType,
             ciphertext = ByteArray(0),
             iv = ByteArray(0),
+            timestamp = orderingTimestamp(sentAt, System.currentTimeMillis()),
+            // TTL still runs from arrival — see saveIncomingMessage.
             expiresAt = ttlSeconds?.let { System.currentTimeMillis() + it * 1000L },
             isRead = false,
             metadataEncrypted = AndroidKeyStoreManager.encryptWithMasterKey(localDescriptor),
@@ -836,10 +960,11 @@ class SecureRepository(private val context: Context) {
      * return the (non-null) clientMessageIds so the caller can notify the
      * sender with a read receipt.
      */
-    suspend fun markReceivedAsReadAndGetIds(sessionId: String): List<String> = withContext(Dispatchers.IO) {
-        val unread = database?.messageDao()?.getUnreadReceivedMessages(sessionId) ?: emptyList()
+    suspend fun markReceivedAsReadAndGetIds(contactId: String): List<String> = withContext(Dispatchers.IO) {
+        val dao = database?.messageDao() ?: return@withContext emptyList()
+        val unread = dao.getUnreadReceivedMessagesForContact(contactId)
         if (unread.isEmpty()) return@withContext emptyList()
-        database?.messageDao()?.markAllReceivedAsRead(sessionId)
+        dao.markAllReceivedAsReadForContact(contactId)
         unread.mapNotNull { it.clientMessageId }
     }
 

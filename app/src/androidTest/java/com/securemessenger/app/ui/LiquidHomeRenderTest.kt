@@ -10,6 +10,7 @@ import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -168,13 +169,18 @@ class LiquidHomeRenderTest {
     }
 
     @Test
-    fun everyDestinationTheBottomBarUsedToOwnIsStillReachable() {
-        // The bottom bar is gone: three of its four entries navigated away
-        // rather than switching tabs, and one of those duplicated the
-        // floating button exactly. Its destinations did not go with it, and
-        // this is the test that says so — settings and profile moved into the
-        // header, pending requests got a banner that opens the screen the
-        // badge was actually counting.
+    fun theHomeScreenNoLongerOwnsAnyRootDestination() {
+        // This test used to assert the opposite, and the reversal is the
+        // point. Settings and profile had been moved into the home header
+        // because the bottom bar was deleted; the bar is back with real tab
+        // behaviour, so a root destination is reached from the bar and from
+        // nowhere else. Two controls for one destination is exactly what got
+        // the bar deleted the first time, and it would be no better with the
+        // header playing the bar's old part.
+        //
+        // What home still owns is what belongs to home: opening a
+        // conversation, and the pending-requests banner that links to the
+        // screen its own count refers to.
         var opened: String? = null
         compose.setContent {
             MessengerTheme(darkTheme = true) {
@@ -182,23 +188,19 @@ class LiquidHomeRenderTest {
                     contacts = listOf(unreadContact),
                     isLoading = false,
                     pendingRequestCount = 2,
-                    onConversationClick = {},
+                    onConversationClick = { opened = "conversation" },
                     onTogglePin = {},
-                    onSettingsClick = { opened = "settings" },
                     onNewChatClick = { opened = "newChat" },
-                    onProfileClick = { opened = "profile" },
                     onConnectionRequestsClick = { opened = "requests" }
                 )
             }
         }
 
-        compose.onNodeWithContentDescription("الإعدادات").performClick()
-        compose.waitForIdle()
-        assertTrue("settings icon opened $opened", opened == "settings")
-
-        compose.onNodeWithContentDescription("ملفي").performClick()
-        compose.waitForIdle()
-        assertTrue("profile icon opened $opened", opened == "profile")
+        compose.onAllNodesWithContentDescription("الإعدادات").assertCountEquals(0)
+        compose.onAllNodesWithContentDescription("ملفي").assertCountEquals(0)
+        // The floating "محادثة جديدة" button went with them: its destination
+        // is the contacts tab, one row below where it used to sit.
+        compose.onAllNodesWithContentDescription("محادثة جديدة").assertCountEquals(0)
 
         compose.onNodeWithText("طلبا تواصل بانتظارك").performClick()
         compose.waitForIdle()
@@ -215,9 +217,7 @@ class LiquidHomeRenderTest {
                     pendingRequestCount = 0,
                     onConversationClick = {},
                     onTogglePin = {},
-                    onSettingsClick = {},
                     onNewChatClick = {},
-                    onProfileClick = {},
                     onConnectionRequestsClick = {}
                 )
             }

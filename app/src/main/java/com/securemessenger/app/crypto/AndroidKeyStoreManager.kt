@@ -27,23 +27,45 @@ object AndroidKeyStoreManager {
     }
 
     /**
+     * The key handle, held after the first lookup.
+     *
+     * THIS IS NOT A CACHE OF KEY MATERIAL. A Keystore [SecretKey] is an opaque
+     * handle to a key that never leaves secure hardware; holding it exposes
+     * nothing that calling getEntry() again would not, and every actual
+     * operation still goes through the Keystore.
+     *
+     * It exists because the old code looked the entry up on EVERY encrypt and
+     * decrypt, inside a @Synchronized method — so each call was an IPC to the
+     * keystore daemon taken under a process-wide lock. Every message rendered
+     * in a conversation costs one decrypt, so drawing a 500-message thread
+     * meant 500 acquisitions of that lock, each held across an IPC, on the
+     * main thread. Worse, the messaging client needs the same lock for every
+     * envelope it encrypts or decrypts: painting a conversation was directly
+     * blocking message processing, and vice versa.
+     *
+     * @Volatile plus the double check keeps the original guarantee intact:
+     * two concurrent first-run callers must not both decide the entry is
+     * missing and both generate one, because the second would replace the
+     * first at the same alias and permanently orphan everything already
+     * encrypted under it.
+     */
+    @Volatile
+    private var cachedMasterKey: SecretKey? = null
+
+    /**
      * Generate or retrieve the master key from Android Keystore.
      * This key is used to encrypt the actual encryption keys.
-     *
-     * @Synchronized: without it, two concurrent first-run callers (app boot
-     * racing a background service's own initialization, say) could both see
-     * no existing entry and both call generateMasterKey() — the second
-     * silently replaces the Keystore entry the first just created, since
-     * both target the same alias, permanently orphaning anything already
-     * encrypted under the first one.
      */
-    @Synchronized
     fun getOrCreateMasterKey(): SecretKey {
-        val existingKey = keyStore.getEntry(KEY_ALIAS, null) as? KeyStore.SecretKeyEntry
-        if (existingKey != null) {
-            return existingKey.secretKey
+        cachedMasterKey?.let { return it }
+        return synchronized(this) {
+            cachedMasterKey ?: run {
+                val existing = (keyStore.getEntry(KEY_ALIAS, null) as? KeyStore.SecretKeyEntry)?.secretKey
+                val key = existing ?: generateMasterKey(preferStrongBox = true)
+                cachedMasterKey = key
+                key
+            }
         }
-        return generateMasterKey(preferStrongBox = true)
     }
 
     /**
@@ -124,6 +146,13 @@ object AndroidKeyStoreManager {
      * demand by [getOrCreateMasterKey], so a fresh setup still works.
      */
     fun wipeKeys() {
+        // Drop the handle FIRST, and unconditionally. A wipe that deleted the
+        // Keystore entry while this process kept a live handle to it would
+        // leave the app able to go on decrypting — including after a duress
+        // wipe, which is the one moment nothing must survive. Clearing before
+        // the delete also means a failure below cannot leave a usable handle
+        // behind: the next call re-reads the Keystore and finds the truth.
+        cachedMasterKey = null
         try {
             keyStore.deleteEntry(KEY_ALIAS)
         } catch (e: Exception) {

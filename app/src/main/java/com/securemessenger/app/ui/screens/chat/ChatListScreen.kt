@@ -7,7 +7,6 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -71,9 +70,7 @@ import com.securemessenger.app.ui.viewmodel.ContactUiModel
 @Composable
 fun ChatListScreen(
     onConversationClick: (String) -> Unit,
-    onSettingsClick: () -> Unit,
     onNewChatClick: () -> Unit,
-    onProfileClick: () -> Unit = {},
     onConnectionRequestsClick: () -> Unit = {},
     viewModel: ChatListViewModel = viewModel(),
     connectionRequestsViewModel: ConnectionRequestsViewModel = viewModel()
@@ -88,9 +85,7 @@ fun ChatListScreen(
         pendingRequestCount = incomingRequests.size,
         onConversationClick = onConversationClick,
         onTogglePin = viewModel::togglePin,
-        onSettingsClick = onSettingsClick,
         onNewChatClick = onNewChatClick,
-        onProfileClick = onProfileClick,
         onConnectionRequestsClick = onConnectionRequestsClick
     )
 }
@@ -113,9 +108,7 @@ internal fun ChatListContent(
     pendingRequestCount: Int,
     onConversationClick: (String) -> Unit,
     onTogglePin: (String) -> Unit,
-    onSettingsClick: () -> Unit,
     onNewChatClick: () -> Unit,
-    onProfileClick: () -> Unit,
     onConnectionRequestsClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -216,9 +209,7 @@ internal fun ChatListContent(
                 Column(modifier = Modifier.statusBarsPadding()) {
                     HeaderTitle(
                         collapse = collapse,
-                        conversationCount = contacts.size,
-                        onSettingsClick = onSettingsClick,
-                        onProfileClick = onProfileClick
+                        conversationCount = contacts.size
                     )
                     SearchField(
                         value = searchQuery,
@@ -234,30 +225,21 @@ internal fun ChatListContent(
                 }
             }
 
-            // ---- plane 4: the one floating control ----
+            // Nothing floats here any more, and that is the point.
             //
-            // The bottom bar is gone. Three of its four entries navigated away
-            // to screens with their own back stacks, so the sliding indicator
-            // promised tab-switching it never delivered — `selectedIndex` was
-            // pinned at 0 and the indicator never once moved. Worse, its
-            // "جهات الاتصال" entry called onNewChatClick, the exact
-            // destination the floating button already owned: one screen, two
-            // controls, two different names, same corner.
+            // This corner held a "محادثة جديدة" button whose destination is
+            // the pairing screen — which is now the "جهات الاتصال" tab, one
+            // row below it. That duplication is the very thing that got the
+            // bottom bar deleted the first time ("one screen, two controls,
+            // two different names, same corner"); restoring the bar without
+            // removing the button would have just rebuilt the defect with the
+            // roles reversed. The settings and profile icons that had moved
+            // into the header are gone for the same reason: a root
+            // destination is reached from the bar, not from an ad-hoc icon on
+            // one screen's header.
             //
-            // Settings and profile are now icons in the header, pending
-            // requests have their own banner that links to the screen the
-            // badge was actually counting, and this is the only floating
-            // thing left.
-            if (contacts.isNotEmpty()) {
-                NewChatButton(
-                    collapsed = collapse > 0.35f,
-                    onClick = onNewChatClick,
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .navigationBarsPadding()
-                        .padding(end = 18.dp, bottom = 24.dp)
-                )
-            }
+            // The empty state keeps its own call to action — with no
+            // conversations there is nothing else on screen to say.
         }
     }
 }
@@ -266,9 +248,7 @@ internal fun ChatListContent(
 @Composable
 private fun HeaderTitle(
     collapse: Float,
-    conversationCount: Int,
-    onSettingsClick: () -> Unit,
-    onProfileClick: () -> Unit
+    conversationCount: Int
 ) {
     val palette = LocalLiquid.current
     val primary = MaterialTheme.colorScheme.primary
@@ -316,9 +296,6 @@ private fun HeaderTitle(
                 }
             }
         }
-        HeaderAction(Icons.Default.Person, "ملفي", onProfileClick)
-        Spacer(Modifier.width(2.dp))
-        HeaderAction(Icons.Default.Settings, "الإعدادات", onSettingsClick)
     }
 }
 
@@ -336,30 +313,6 @@ private fun conversationSubtitle(count: Int): String = when {
     count == 2 -> "محادثتان مشفّرتان"
     count <= 10 -> "$count محادثات مشفّرة"
     else -> "$count محادثة مشفّرة"
-}
-
-/** A header icon with a real 44dp touch target, whatever the glyph inside measures. */
-@Composable
-private fun HeaderAction(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    label: String,
-    onClick: () -> Unit
-) {
-    val palette = LocalLiquid.current
-    Box(
-        modifier = Modifier
-            .size(44.dp)
-            .clip(CircleShape)
-            .clickableNoRipple(onClick),
-        contentAlignment = Alignment.Center
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = label,
-            modifier = Modifier.size(21.dp),
-            tint = palette.onSurface.copy(alpha = 0.75f)
-        )
-    }
 }
 
 /**
@@ -542,39 +495,6 @@ private fun SearchField(
     }
 }
 
-/** Extended while you are at the top, a plain circle once you are reading. */
-@Composable
-private fun NewChatButton(collapsed: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    val primary = MaterialTheme.colorScheme.primary
-    Row(
-        modifier = modifier
-            .height(56.dp)
-            .liquidGlow(primary, radius = 10.dp, alpha = 0.30f)
-            .clip(RoundedCornerShape(20.dp))
-            .background(Brush.verticalGradient(listOf(primary, primary.copy(alpha = 0.86f))))
-            .clickableNoRipple(onClick)
-            .padding(horizontal = 17.dp)
-            .animateContentSize(animationSpec = tween(260, easing = FastOutSlowInEasing)),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            imageVector = Icons.Default.Add,
-            contentDescription = "محادثة جديدة",
-            tint = Color.White,
-            modifier = Modifier.size(24.dp)
-        )
-        if (!collapsed) {
-            Spacer(Modifier.width(8.dp))
-            Text(
-                "محادثة جديدة",
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.SemiBold,
-                color = Color.White
-            )
-        }
-    }
-}
-
 @Composable
 private fun EmptyState(onNewChatClick: () -> Unit, topPadding: androidx.compose.ui.unit.Dp) {
     val palette = LocalLiquid.current
@@ -637,7 +557,11 @@ private fun EmptyState(onNewChatClick: () -> Unit, topPadding: androidx.compose.
             ) {
                 Icon(Icons.Default.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(19.dp))
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("محادثة جديدة", color = Color.White, fontWeight = FontWeight.SemiBold)
+                // Says where it goes. It opens the pairing tab, which is
+                // named "جهات الاتصال" one row below — a button labelled
+                // "محادثة جديدة" that lands you on a QR code was the third
+                // name this one destination was being given.
+                Text("أضف جهة اتصال", color = Color.White, fontWeight = FontWeight.SemiBold)
             }
         }
     }

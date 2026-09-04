@@ -36,6 +36,30 @@ object AppSettings {
     // and there is deliberately NO built-in default — a code must be chosen at
     // setup, so the app never ships with a guessable unlock code.
 
+    /**
+     * The one rule both places that *choose* a code must agree on.
+     *
+     * A code is only ever entered one way: as digits on the calculator's
+     * keypad. That keypad cannot produce a leading zero — the display starts
+     * at "0" and the first digit replaces it, exactly as every real
+     * calculator behaves (see CalculatorScreen.onDigit). So a code beginning
+     * with 0 is accepted at setup, hashed, stored — and can then never be
+     * typed. The owner is locked out of their own messages permanently: a
+     * wipe would clear the code, but the wipe is behind the code, and
+     * [SecretCodeReceiver]'s re-entry path only re-arms Setup when NO code is
+     * set, which is exactly not this case.
+     *
+     * The length floor is here for the same "one rule" reason: SetupScreen
+     * demanded 4–10 digits while the Settings dialog offered 3–10, so the
+     * same secret had two different rules depending on which screen you set
+     * it from.
+     */
+    val CODE_LENGTH_RANGE = 4..10
+
+    /** True when [code] is a code the calculator can actually be used to enter. */
+    fun isTypeableCode(code: String): Boolean =
+        code.length in CODE_LENGTH_RANGE && code.all { it.isDigit() } && !code.startsWith("0")
+
     /** True once an unlock code has been chosen (the gate never matches while unset). */
     fun hasAccessCode(context: Context): Boolean =
         !SecurePreferences.getString(context, KEY_ACCESS_CODE, null).isNullOrBlank()
@@ -322,52 +346,130 @@ object AppSettings {
     // secret addresses; at that point it is bound to a real contact and dropped
     // from this list. Until then we have to listen on every outstanding one.
 
+    // TWO KINDS OF OUTSTANDING SECRET, AND ONLY ONE OF THEM IS CHEAP TO LOSE.
+    //
+    // A secret minted just to draw the QR on screen is disposable: the person
+    // scanning it is standing in front of you, and if they don't, the next
+    // one replaces it a moment later. Five of those, 24 hours each, was the
+    // whole model.
+    //
+    // A secret that left the device is a different object entirely. "مشاركة
+    // رمزي كصورة" and "نسخ رمزي كنص" exist so someone can pair with you
+    // *later*, from another room or another day — that is their only purpose.
+    // Under one shared budget of five, opening the pairing screen five more
+    // times silently evicted the code you had already sent out: your friend
+    // scans it, we are no longer listening on that mailbox, and their first
+    // message goes into a box nobody reads. Nothing tells either of you. The
+    // pairing looks like it worked, and stays local-network-only forever.
+    //
+    // So an exported secret gets its own budget and its own (longer, stated)
+    // lifetime, and a burst of on-screen displays can no longer push it out.
+    // The ceiling is still hard — ten outstanding secrets, fifty mailbox ids
+    // — because every one of them is a mailbox we poll.
     private const val MAX_PENDING_SECRETS = 5
+    private const val MAX_EXPORTED_SECRETS = 5
     private const val PENDING_SECRET_TTL_MS = 24 * 60 * 60 * 1000L
+
+    /** How long a shared/copied code keeps working — stated to the user, so it has to be a real number. */
+    const val EXPORTED_SECRET_VALIDITY_DAYS = 7
+    private const val EXPORTED_SECRET_TTL_MS = EXPORTED_SECRET_VALIDITY_DAYS * 24 * 60 * 60 * 1000L
+
+    internal data class PendingSecret(val hex: String, val issuedAt: Long, val exported: Boolean)
+
+    // The two budget rules below are pure functions of the current list, split
+    // out from the Context-taking wrappers on purpose: the defect they fix is
+    // an eviction nobody can see happen — no error, no log, just a friend
+    // whose messages never arrive — so the rule itself is worth testing
+    // without a device attached. Same reasoning as MediaSandbox.isPlausibleResult.
+
+    /** Newest first within each budget; the on-screen group is trimmed, the exported one is not touched. */
+    internal fun withNewSecret(
+        existing: List<PendingSecret>,
+        secretHex: String,
+        now: Long
+    ): List<PendingSecret> {
+        val others = existing.filter { it.hex != secretHex }
+        return listOf(PendingSecret(secretHex, now, exported = false)) +
+            others.filter { !it.exported }.take(MAX_PENDING_SECRETS - 1) +
+            others.filter { it.exported }.take(MAX_EXPORTED_SECRETS)
+    }
+
+    /** Moves one secret into the exported budget, re-stamped; a no-op if it is unknown or already there. */
+    internal fun withExported(
+        existing: List<PendingSecret>,
+        secretHex: String,
+        now: Long
+    ): List<PendingSecret> {
+        val target = existing.firstOrNull { it.hex == secretHex } ?: return existing
+        if (target.exported) return existing
+        val others = existing.filter { it.hex != secretHex }
+        return listOf(target.copy(issuedAt = now, exported = true)) +
+            others.filter { it.exported }.take(MAX_EXPORTED_SECRETS - 1) +
+            others.filter { !it.exported }.take(MAX_PENDING_SECRETS)
+    }
 
     /** Record a freshly-minted secret as "issued, not yet claimed". */
     fun addPendingPairSecret(context: Context, secretHex: String) {
-        val kept = pendingPairSecrets(context).filter { it != secretHex }
-        val now = System.currentTimeMillis()
-        val array = org.json.JSONArray()
-        array.put(org.json.JSONObject().put("s", secretHex).put("t", now))
-        // Newest first, oldest dropped once we exceed the cap.
-        kept.take(MAX_PENDING_SECRETS - 1).forEach { hex ->
-            array.put(org.json.JSONObject().put("s", hex).put("t", pendingIssuedAt(context, hex) ?: now))
-        }
-        SecurePreferences.putString(context, KEY_PENDING_PAIR_SECRETS, array.toString())
+        writePending(
+            context,
+            withNewSecret(readPending(context), secretHex, System.currentTimeMillis())
+        )
+    }
+
+    /**
+     * This code has left the device — as an image or as text — so somebody may
+     * scan it long after the screen that drew it is gone. Promotes it out of
+     * the disposable on-screen budget into the exported one, where a burst of
+     * later on-screen codes can no longer push it out.
+     */
+    fun markPairSecretExported(context: Context, secretHex: String) {
+        writePending(
+            context,
+            // Re-stamped: the clock a shared code is judged by starts when it
+            // was shared, not when the screen happened to draw it.
+            withExported(readPending(context), secretHex, System.currentTimeMillis())
+        )
     }
 
     /** Every still-valid issued secret, newest first. Expired entries are pruned on read. */
-    fun pendingPairSecrets(context: Context): List<String> = readPending(context).map { it.first }
+    fun pendingPairSecrets(context: Context): List<String> = readPending(context).map { it.hex }
 
-    private fun pendingIssuedAt(context: Context, hex: String): Long? =
-        readPending(context).firstOrNull { it.first == hex }?.second
-
-    private fun readPending(context: Context): List<Pair<String, Long>> {
+    private fun readPending(context: Context): List<PendingSecret> {
         val raw = SecurePreferences.getString(context, KEY_PENDING_PAIR_SECRETS, null) ?: return emptyList()
-        val cutoff = System.currentTimeMillis() - PENDING_SECRET_TTL_MS
+        val now = System.currentTimeMillis()
         return try {
             val array = org.json.JSONArray(raw)
             (0 until array.length()).mapNotNull { i ->
                 val obj = array.optJSONObject(i) ?: return@mapNotNull null
                 val hex = obj.optString("s").takeIf { it.isNotBlank() } ?: return@mapNotNull null
                 val issued = obj.optLong("t")
-                if (issued < cutoff) null else hex to issued
+                // Absent on entries written before exporting was tracked —
+                // those were all on-screen codes, so the default is right.
+                val exported = obj.optBoolean("x", false)
+                val ttl = if (exported) EXPORTED_SECRET_TTL_MS else PENDING_SECRET_TTL_MS
+                if (issued < now - ttl) null else PendingSecret(hex, issued, exported)
             }
         } catch (e: Exception) {
             emptyList()
         }
     }
 
-    /** The secret has been bound to a real contact — stop listening for it as an unclaimed one. */
-    fun removePendingPairSecret(context: Context, secretHex: String) {
-        val remaining = readPending(context).filter { it.first != secretHex }
+    private fun writePending(context: Context, entries: List<PendingSecret>) {
         val array = org.json.JSONArray()
-        remaining.forEach { (hex, issued) ->
-            array.put(org.json.JSONObject().put("s", hex).put("t", issued))
+        entries.forEach { entry ->
+            array.put(
+                org.json.JSONObject()
+                    .put("s", entry.hex)
+                    .put("t", entry.issuedAt)
+                    .put("x", entry.exported)
+            )
         }
         SecurePreferences.putString(context, KEY_PENDING_PAIR_SECRETS, array.toString())
+    }
+
+    /** The secret has been bound to a real contact — stop listening for it as an unclaimed one. */
+    fun removePendingPairSecret(context: Context, secretHex: String) {
+        writePending(context, readPending(context).filter { it.hex != secretHex })
     }
 
     // ==================== Background delivery ====================

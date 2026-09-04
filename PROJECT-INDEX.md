@@ -5,7 +5,7 @@
 ابحث هنا أولاً بـ Grep قبل فتح أي ملف مصدر كامل. سطر `يُستخدم في:` تحت أي class/object/interface = تطابق استيراد FQN فعلي، أفضل-جهد وليس مضموناً 100%.
 ⚠ بجانب اسم ملف = يتجاوز 300 سطر.
 
-**130** ملف مفحوص، **2418** تعريفاً.
+**133** ملف مفحوص، **2510** تعريفاً.
 
 
 ## app/
@@ -40,34 +40,60 @@
   - L16 `@Test fun x3dh_initiatorAndResponderDeriveSameRootKey ()`
   - L44 `@Test fun signalProtocol_encryptDecryptRoundtrip ()`
 
-### app/src/androidTest/java/com/securemessenger/app/data/local/SecureDatabaseMigrationTest.kt (247 سطر)  [package com.securemessenger.app.data.local]
-- L36 `@Entity(tableName =           )
+### app/src/androidTest/java/com/securemessenger/app/data/local/SecureDatabaseMigrationTest.kt (403 سطر) ⚠  [package com.securemessenger.app.data.local]
+- L37 `@Entity(tableName =           )
 data class OldContact ( @PrimaryKey val id: String, val publicKey: ByteArray, val signingPublicKey: ByteArray? = null, val displayNameEncrypted: ByteArray, val avatarHash: String? = null, val isVerified: Boolean = false, val verificationData: ByteArray? = null, val addedAt: Long = System.currentTimeMillis(), val lastSeenAt: Long? = null, val isBlocked: Boolean = false, val avatarEncrypted: ByteArray? = null, val nicknameEncrypted: ByteArray? = null, val isMuted: Boolean = false, val relaySendSecretEncrypted: ByteArray? = null, val relayRecvSecretEncrypted: ByteArray? = null )`
-- L37 `@PrimaryKey val id : String,`
-- L38 `val publicKey : ByteArray,`
-- L39 `val signingPublicKey : ByteArray?`
-- L40 `val displayNameEncrypted : ByteArray,`
-- L41 `val avatarHash : String?`
-- L42 `val isVerified : Boolean`
-- L43 `val verificationData : ByteArray?`
-- L44 `val addedAt : Long`
-- L45 `val lastSeenAt : Long?`
-- L46 `val isBlocked : Boolean`
-- L47 `val avatarEncrypted : ByteArray?`
-- L48 `val nicknameEncrypted : ByteArray?`
-- L49 `val isMuted : Boolean`
-- L50 `val relaySendSecretEncrypted : ByteArray?`
-- L51 `val relayRecvSecretEncrypted : ByteArray?`
-- L55 `@Dao interface OldContactDao`
-  - L57 `@Insert
+- L38 `@PrimaryKey val id : String,`
+- L39 `val publicKey : ByteArray,`
+- L40 `val signingPublicKey : ByteArray?`
+- L41 `val displayNameEncrypted : ByteArray,`
+- L42 `val avatarHash : String?`
+- L43 `val isVerified : Boolean`
+- L44 `val verificationData : ByteArray?`
+- L45 `val addedAt : Long`
+- L46 `val lastSeenAt : Long?`
+- L47 `val isBlocked : Boolean`
+- L48 `val avatarEncrypted : ByteArray?`
+- L49 `val nicknameEncrypted : ByteArray?`
+- L50 `val isMuted : Boolean`
+- L51 `val relaySendSecretEncrypted : ByteArray?`
+- L52 `val relayRecvSecretEncrypted : ByteArray?`
+- L56 `@Dao interface OldContactDao`
+  - L58 `@Insert
     suspend fun insert (contact: OldContact)`
-- L75 `abstract class OldSchemaDatabase : RoomDatabase()`
-  - L76 `abstract fun oldContactDao ()`
-- L94 `class SecureDatabaseMigrationTest` — Proves MIGRATION_10_11 (contacts.pinnedAt) preserves an existing contact
-  - L96 `private val passphrase`
-  - L99 `@Test fun migration10to11_preservesExistingContactAndDefaultsPinnedAtToNull ()`
-  - L170 `abstract class V11SchemaDatabase : RoomDatabase()`
-  - L181 `@Test fun migration11to12_preservesExistingContactAndCreatesConnectionRequestTables ()` — Proves MIGRATION_11_12 (the two connection-request tables) preserves
+- L72 `@Entity(tableName =           )
+data class OldEncryptedMessage ( @PrimaryKey val id: Long? = null, val sessionId: String, val senderId: String, val recipientId: String, val direction: Int, val type: Int, val ciphertext: ByteArray, val iv: ByteArray, val timestamp: Long = System.currentTimeMillis(), val expiresAt: Long? = null, val isRead: Boolean = false, val isExpired: Boolean = false, val metadataEncrypted: ByteArray? = null, val clientMessageId: String? = null, val reactionsJson: String? = null, val replyToClientId: String? = null, val replySnippetEncrypted: ByteArray? = null, val isDeleted: Boolean = false, val editedAt: Long? = null )`
+- L73 `@PrimaryKey val id : Long?`
+- L74 `val sessionId : String,`
+- L75 `val senderId : String,`
+- L76 `val recipientId : String,`
+- L77 `val direction : Int,`
+- L78 `val type : Int,`
+- L79 `val ciphertext : ByteArray,`
+- L80 `val iv : ByteArray,`
+- L81 `val timestamp : Long`
+- L82 `val expiresAt : Long?`
+- L83 `val isRead : Boolean`
+- L84 `val isExpired : Boolean`
+- L85 `val metadataEncrypted : ByteArray?`
+- L86 `val clientMessageId : String?`
+- L87 `val reactionsJson : String?`
+- L88 `val replyToClientId : String?`
+- L89 `val replySnippetEncrypted : ByteArray?`
+- L90 `val isDeleted : Boolean`
+- L91 `val editedAt : Long?`
+- L95 `@Dao interface OldMessageDao`
+  - L97 `@Insert
+    suspend fun insert (message: OldEncryptedMessage)`
+- L115 `abstract class OldSchemaDatabase : RoomDatabase()`
+  - L116 `abstract fun oldContactDao ()`
+- L134 `class SecureDatabaseMigrationTest` — Proves MIGRATION_10_11 (contacts.pinnedAt) preserves an existing contact
+  - L136 `private val passphrase`
+  - L139 `@Test fun migration10to11_preservesExistingContactAndDefaultsPinnedAtToNull ()`
+  - L210 `abstract class V11SchemaDatabase : RoomDatabase()`
+  - L234 `abstract class V12SchemaDatabase : RoomDatabase()`
+  - L248 `@Test fun migration11to12_preservesExistingContactAndCreatesConnectionRequestTables ()` — Proves MIGRATION_11_12 (the two connection-request tables) preserves
+  - L328 `@Test fun migration12to13_backfillsContactIdForBothDirections ()` — Proves MIGRATION_12_13 gives every existing message the right
 
 ### app/src/androidTest/java/com/securemessenger/app/media/MediaSandboxTest.kt (167 سطر)  [package com.securemessenger.app.media]
 - L31 `@RunWith(AndroidJUnit4::class) class MediaSandboxTest` — The tests ADR-0001 said could not be written without a device.
@@ -165,7 +191,7 @@ data class OldContact ( @PrimaryKey val id: String, val publicKey: ByteArray, va
   - L149 `@Test fun testCleartextTrafficIntentionallyAllowedForLocalP2P ()` — Cleartext IS intentionally allowed — there is no external server at
   - L165 `@Test fun testSecureRandomGeneration ()`
 
-### app/src/androidTest/java/com/securemessenger/app/ui/HomeScreenshotTest.kt (143 سطر)  [package com.securemessenger.app.ui]
+### app/src/androidTest/java/com/securemessenger/app/ui/HomeScreenshotTest.kt (141 سطر)  [package com.securemessenger.app.ui]
 - L39 `@RunWith(AndroidJUnit4::class) class HomeScreenshotTest` — Photographs the home screen so a human can judge it.
   - L42 `val compose`
   - L44 `private val sample`
@@ -179,17 +205,17 @@ data class OldContact ( @PrimaryKey val id: String, val publicKey: ByteArray, va
   - L122 `private fun capture (name: String, dark: Boolean, contacts: List<ContactUiModel>)`
 
 ### app/src/androidTest/java/com/securemessenger/app/ui/LiquidHomeRenderTest.kt (229 سطر)  [package com.securemessenger.app.ui]
-- L51 `@RunWith(AndroidJUnit4::class) class LiquidHomeRenderTest` — The redesigned home screen, rendered on a real device.
-  - L54 `val compose`
-  - L56 `private val unreadContact`
-  - L65 `private val pinnedContact`
-  - L78 `@Test fun chatRowRendersItsNamePreviewAndUnreadCount_inDark ()`
-  - L93 `@Test fun chatRowRenders_inLight ()`
-  - L107 `@Test fun aRowStillReportsTheClickTheScreenExistsToDeliver ()`
-  - L127 `@Test fun theEntranceAnimationLeavesTheRowVisible ()`
-  - L144 `@Test fun theAuroraAndItsSurfacesDrawWithoutFailing ()`
-  - L171 `@Test fun everyDestinationTheBottomBarUsedToOwnIsStillReachable ()`
-  - L209 `@Test fun thePendingRequestsBannerIsAbsentWhenThereAreNone ()`
+- L52 `@RunWith(AndroidJUnit4::class) class LiquidHomeRenderTest` — The redesigned home screen, rendered on a real device.
+  - L55 `val compose`
+  - L57 `private val unreadContact`
+  - L66 `private val pinnedContact`
+  - L79 `@Test fun chatRowRendersItsNamePreviewAndUnreadCount_inDark ()`
+  - L94 `@Test fun chatRowRenders_inLight ()`
+  - L108 `@Test fun aRowStillReportsTheClickTheScreenExistsToDeliver ()`
+  - L128 `@Test fun theEntranceAnimationLeavesTheRowVisible ()`
+  - L145 `@Test fun theAuroraAndItsSurfacesDrawWithoutFailing ()`
+  - L172 `@Test fun theHomeScreenNoLongerOwnsAnyRootDestination ()`
+  - L211 `@Test fun thePendingRequestsBannerIsAbsentWhenThereAreNone ()`
 
 ### app/src/androidTest/java/com/securemessenger/app/ui/ScreenTourTest.kt (206 سطر)  [package com.securemessenger.app.ui]
 - L59 `@RunWith(AndroidJUnit4::class) class ScreenTourTest` — A walk through the app, one screen per test.
@@ -218,7 +244,7 @@ data class OldContact ( @PrimaryKey val id: String, val publicKey: ByteArray, va
   - L163 `@Test fun localOnlyShareDropsTheRelaySecretAndKeepsTheRest ()`
   - L182 `@Test fun aPictureWithNoCodeInItReturnsNull ()`
 
-### app/src/main/java/com/securemessenger/app/SecureMessengerApp.kt (313 سطر) ⚠  [package com.securemessenger.app]
+### app/src/main/java/com/securemessenger/app/SecureMessengerApp.kt (348 سطر) ⚠  [package com.securemessenger.app]
 - L27 `class SecureMessengerApp : Application()`
   يُستخدم في: app/src/main/java/com/securemessenger/app/service/MessengerService.kt, app/src/main/java/com/securemessenger/app/ui/navigation/AppNavigation.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatCommon.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatListScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ContactDetailScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/NewChatScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/UsernameSearchScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/settings/ProfileScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/settings/SettingsScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/setup/SetupScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/verification/KeyVerificationScreen.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ChatListViewModel.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ConnectionRequestsViewModel.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ConversationViewModel.kt
   - L29 `val applicationScope`
@@ -230,178 +256,198 @@ data class OldContact ( @PrimaryKey val id: String, val publicKey: ByteArray, va
   - L56 `suspend fun awaitMessagingClient (timeoutMs: Long = 10_000): SecureMessagingClient?`
   - L59 `private var incomingJob : Job?`
   - L61 `suspend fun initializeMessagingClient ()`
-  - L155 `private suspend fun announceArrival (senderId: String, previewText: String?)`
-  - L176 `fun stopMessagingClient ()` — Stops this device's own local relay + network discovery entirely — the
-  - L190 `override fun onCreate ()`
-  - L264 `override fun attachBaseContext (base: Context)`
-  - L278 `private fun isMediaSandboxProcess (): Boolean`
+  - L180 `private suspend fun announceArrival (senderId: String, previewText: String?)`
+  - L211 `fun stopMessagingClient ()` — Stops this device's own local relay + network discovery entirely — the
+  - L225 `override fun onCreate ()`
+  - L299 `override fun attachBaseContext (base: Context)`
+  - L313 `private fun isMediaSandboxProcess (): Boolean`
 
-### app/src/main/java/com/securemessenger/app/crypto/AndroidKeyStoreManager.kt (135 سطر)  [package com.securemessenger.app.crypto]
+### app/src/main/java/com/securemessenger/app/crypto/AndroidKeyStoreManager.kt (164 سطر)  [package com.securemessenger.app.crypto]
 - L16 `object AndroidKeyStoreManager` — AndroidKeyStoreManager - manages keys stored in Android's secure keystore.
-  يُستخدم في: app/src/main/java/com/securemessenger/app/SecureMessengerApp.kt, app/src/main/java/com/securemessenger/app/data/repository/SecureRepository.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ContactDetailScreen.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ChatListViewModel.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ConversationViewModel.kt
+  يُستخدم في: app/src/main/java/com/securemessenger/app/SecureMessengerApp.kt, app/src/main/java/com/securemessenger/app/data/repository/SecureRepository.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ContactDetailScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/verification/KeyVerificationScreen.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ChatListViewModel.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ConversationViewModel.kt
   - L17 `private const val ANDROID_KEYSTORE`
   - L18 `private const val KEY_ALIAS`
   - L19 `private const val TRANSFORMATION`
   - L20 `private const val GCM_TAG_LENGTH`
   - L21 `private const val GCM_IV_LENGTH`
   - L23 `private val keyStore`
-  - L41 `@Synchronized fun getOrCreateMasterKey (): SecretKey` — Generate or retrieve the master key from Android Keystore.
-  - L57 `private fun generateMasterKey (preferStrongBox: Boolean): SecretKey`
-  - L89 `fun encryptWithMasterKey (plaintext: ByteArray): ByteArray` — Encrypt data using the master key with AES-GCM.
-  - L104 `fun decryptWithMasterKey (encryptedData: ByteArray): ByteArray` — Decrypt data encrypted with the master key.
-  - L126 `fun wipeKeys ()` — Delete the master key itself. Called at the very end of a full wipe: the
+  - L53 `@Volatile
+    private var cachedMasterKey : SecretKey?`
+  - L59 `fun getOrCreateMasterKey (): SecretKey` — Generate or retrieve the master key from Android Keystore.
+  - L79 `private fun generateMasterKey (preferStrongBox: Boolean): SecretKey`
+  - L111 `fun encryptWithMasterKey (plaintext: ByteArray): ByteArray` — Encrypt data using the master key with AES-GCM.
+  - L126 `fun decryptWithMasterKey (encryptedData: ByteArray): ByteArray` — Decrypt data encrypted with the master key.
+  - L148 `fun wipeKeys ()` — Delete the master key itself. Called at the very end of a full wipe: the
 
-### app/src/main/java/com/securemessenger/app/data/local/Daos.kt (328 سطر) ⚠  [package com.securemessenger.app.data.local]
-- L11 `@Dao interface UserProfileDao` — Data Access Object for user profile operations.
-  - L14 `@Query(                                    ) fun getProfile ()`
-  - L17 `@Query(                                    )
+### app/src/main/java/com/securemessenger/app/data/local/Daos.kt (398 سطر) ⚠  [package com.securemessenger.app.data.local]
+- L8 `data class UnreadCount ( val contactId: String, val unreadCount: Int )`
+  يُستخدم في: app/src/main/java/com/securemessenger/app/data/repository/SecureRepository.kt
+- L9 `val contactId : String,`
+- L10 `val unreadCount : Int`
+- L17 `@Dao interface UserProfileDao` — Data Access Object for user profile operations.
+  يُستخدم في: app/src/main/java/com/securemessenger/app/data/repository/SecureRepository.kt
+  - L20 `@Query(                                    ) fun getProfile ()`
+  - L23 `@Query(                                    )
     suspend fun getProfileOnce ()`
-  - L20 `@Insert(onConflict = OnConflictStrategy.REPLACE)
+  - L26 `@Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertProfile (profile: UserProfile)`
-  - L23 `@Query(                                                   )
+  - L29 `@Query(                                                   )
     suspend fun setAvatar (avatar: ByteArray?)`
-  - L26 `@Query(                                                      )
+  - L32 `@Query(                                                      )
     suspend fun setDisplayName (name: ByteArray?)`
-- L33 `@Dao interface ContactDao` — Data Access Object for contact operations.
-  - L36 `@Query(                                                      ) fun getAllContacts ()`
-  - L39 `@Query(                                              )
+- L39 `@Dao interface ContactDao` — Data Access Object for contact operations.
+  يُستخدم في: app/src/main/java/com/securemessenger/app/data/repository/SecureRepository.kt
+  - L42 `@Query(                                                      ) fun getAllContacts ()`
+  - L45 `@Query(                                              )
     suspend fun getContact (contactId: String)`
-  - L42 `@Insert(onConflict = OnConflictStrategy.REPLACE)
+  - L48 `@Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertContact (contact: Contact)`
-  - L45 `@Update
+  - L51 `@Update
     suspend fun updateContact (contact: Contact)`
-  - L48 `@Query(                                                                                            )
+  - L54 `@Query(                                                                                            )
     suspend fun setVerified (contactId: String, verified: Boolean, data: ByteArray?)`
-  - L51 `@Query(                                                                )
+  - L57 `@Query(                                                                )
     suspend fun setBlocked (contactId: String, blocked: Boolean)`
-  - L54 `@Query(                                                            )
+  - L60 `@Query(                                                            )
     suspend fun setMuted (contactId: String, muted: Boolean)`
-  - L57 `@Query(                                                                         )
+  - L63 `@Query(                                                                         )
     suspend fun setNickname (contactId: String, nickname: ByteArray?)`
-  - L60 `@Query(                                                                )
+  - L66 `@Query(                                                                )
     suspend fun setPinned (contactId: String, pinnedAt: Long?)`
-  - L63 `@Delete
+  - L69 `@Delete
     suspend fun deleteContact (contact: Contact)`
-  - L66 `@Query(                                            )
+  - L72 `@Query(                                            )
     suspend fun deleteContactById (contactId: String)`
-  - L69 `@Query(                                                                     )
+  - L75 `@Query(                                                                     )
     suspend fun setAvatar (contactId: String, avatar: ByteArray?)`
-- L76 `@Dao interface SessionDao` — Data Access Object for session operations.
-  - L79 `@Query(                                                                                      )
+- L82 `@Dao interface SessionDao` — Data Access Object for session operations.
+  يُستخدم في: app/src/main/java/com/securemessenger/app/data/repository/SecureRepository.kt
+  - L85 `@Query(                                                                                      )
     suspend fun getCurrentSession (contactId: String)`
-  - L82 `@Query(                                                     )
+  - L88 `@Query(                                                     )
     suspend fun getSessionById (sessionId: String)`
-  - L85 `@Insert
+  - L91 `@Insert
     suspend fun insertSession (session: Session)`
-  - L92 `suspend fun updateSessionState ( sessionId: String, rootKey: ByteArray, sendKey: ByteArray, receiveKey: ByteArray?, dhPublic: ByteArray, dhSecret: ByteArray, sendCounter: Int, receiveCounter: Int, timestamp: Long )`
-  - L105 `@Query(                                                   )
+  - L98 `suspend fun updateSessionState ( sessionId: String, rootKey: ByteArray, sendKey: ByteArray, receiveKey: ByteArray?, dhPublic: ByteArray, dhSecret: ByteArray, sendCounter: Int, receiveCounter: Int, timestamp: Long )`
+  - L111 `@Query(                                                   )
     suspend fun deleteAllSessionsForContact (contactId: String)`
-- L112 `@Dao interface MessageDao` — Data Access Object for message operations.
-  - L115 `@Query(                                                                            ) fun getMessagesForSession (sessionId: String)`
-  - L118 `@Query(                                               ) fun getAllMessages ()`
-  - L121 `@Query(                                              )
+- L118 `@Dao interface MessageDao` — Data Access Object for message operations.
+  يُستخدم في: app/src/main/java/com/securemessenger/app/data/repository/SecureRepository.kt
+  - L138 `fun getRecentMessagesForContact (contactId: String, limit: Int)`
+  - L142 `@Query(                                                            ) fun countMessagesForContact (contactId: String)`
+  - L153 `@Query(                                                                                                             ) fun observeMediaForContact (contactId: String)` — Shared media in one conversation, newest first.
+  - L174 `fun observeLatestMessagePerContact ()`
+  - L181 `fun observeUnreadCounts ()`
+  - L184 `@Query(                                              )
     suspend fun getMessage (messageId: Long)`
-  - L124 `@Query(                                                                                                    )
+  - L187 `@Query(                                                                                                    )
     suspend fun getExpiredMessages (currentTime: Long = System.currentTimeMillis())`
-  - L127 `@Insert
+  - L190 `@Insert
     suspend fun insertMessage (message: EncryptedMessage)`
-  - L130 `@Query(                                                                                      )
-    suspend fun getUnreadReceivedMessages (sessionId: String)`
-  - L133 `@Query(                                                                                              )
-    suspend fun markAllReceivedAsRead (sessionId: String)`
-  - L140 `@Query(                                                                                                                              )
+  - L196 `@Query(                                                                                      )
+    suspend fun getUnreadReceivedMessagesForContact (contactId: String)`
+  - L199 `@Query(                                                                                              )
+    suspend fun markAllReceivedAsReadForContact (contactId: String)`
+  - L206 `@Query(                                                                                                                              )
     suspend fun markSentMessagesReadByClientIdsForRecipient (clientMessageIds: List<String>, recipientId: String)`
-  - L143 `@Query(                                                                                     )
+  - L209 `@Query(                                                                                     )
     suspend fun markAllExpiredMessages (currentTime: Long = System.currentTimeMillis())`
-  - L146 `@Query(                                          )
+  - L212 `@Query(                                          )
     suspend fun deleteExpiredMessages ()`
-  - L149 `@Query(                                                                                                         )
+  - L219 `@Query(                                                     )
     suspend fun getMessagesForContactOnce (contactId: String)`
-  - L152 `@Query(                                                                                                       )
+  - L222 `@Query(                                                   )
     suspend fun deleteMessagesForContact (contactId: String)`
-  - L157 `@Query(                                                                  )
+  - L227 `@Query(                                                                  )
     suspend fun getMessageByClientId (clientId: String)`
-  - L160 `@Query(                                                                                      )
+  - L230 `@Query(                                                                                      )
     suspend fun updateReactions (clientId: String, reactionsJson: String?)`
-  - L165 `@Query(                                                                                                                 )
+  - L235 `@Query(                                                                                                                 )
     suspend fun markDeletedByClientId (clientId: String)`
-  - L168 `@Query(                                                                                                                   )
+  - L238 `@Query(                                                                                                                   )
     suspend fun applyEdit (clientId: String, newTextEncrypted: ByteArray, editedAt: Long)`
-  - L171 `@Query(                                            )
+  - L241 `@Query(                                            )
     suspend fun deleteById (messageId: Long)`
-- L178 `@Dao interface KeyBundleDao` — Data Access Object for key bundle operations.
-  - L181 `@Query(                                                                                                                  )
+- L248 `@Dao interface KeyBundleDao` — Data Access Object for key bundle operations.
+  يُستخدم في: app/src/main/java/com/securemessenger/app/data/repository/SecureRepository.kt
+  - L251 `@Query(                                                                                                                  )
     suspend fun getOurUnusedPreKeys ()`
-  - L184 `@Query(                                                                                                      )
+  - L254 `@Query(                                                                                                      )
     suspend fun getOurLastPreKeyId ()`
-  - L187 `@Query(                                                                                                        )
+  - L257 `@Query(                                                                                                        )
     suspend fun getOurPreKeyById (preKeyId: Int)`
-  - L190 `@Query(                                                                               )
+  - L260 `@Query(                                                                               )
     suspend fun getUnusedRemotePreKey (contactId: String)`
-  - L193 `@Query(                                                        )
+  - L263 `@Query(                                                        )
     suspend fun getAllPreKeysForContact (contactId: String)`
-  - L196 `@Insert
+  - L266 `@Insert
     suspend fun insertKeyBundle (keyBundle: KeyBundle)`
-  - L199 `@Query(                                                                                                        )
+  - L269 `@Query(                                                                                                        )
     suspend fun markOurPreKeyAsUsed (preKeyId: Int)`
-  - L202 `@Query(                                                      )
+  - L272 `@Query(                                                      )
     suspend fun deleteAllPreKeysForContact (contactId: String)`
-- L209 `@Dao interface OutboxDao` — Data Access Object for the durable outgoing-envelope queue.
-  - L212 `@Query(                                             )
+- L279 `@Dao interface OutboxDao` — Data Access Object for the durable outgoing-envelope queue.
+  يُستخدم في: app/src/main/java/com/securemessenger/app/data/repository/SecureRepository.kt
+  - L282 `@Query(                                             )
     suspend fun getAll ()`
-  - L215 `@Query(                                             ) fun observeAll ()`
-  - L218 `@Insert(onConflict = OnConflictStrategy.REPLACE)
+  - L285 `@Query(                                             ) fun observeAll ()`
+  - L288 `@Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert (envelope: OutboxEnvelope)`
-  - L221 `@Query(                                   )
+  - L291 `@Query(                                   )
     suspend fun deleteById (id: String)`
-  - L224 `@Query(                    )
+  - L294 `@Query(                    )
     suspend fun deleteAll ()`
-- L232 `@Dao interface PendingSendDao` — Data Access Object for messages that failed before reaching the outbox
-  - L235 `@Query(                                                    )
+- L302 `@Dao interface PendingSendDao` — Data Access Object for messages that failed before reaching the outbox
+  يُستخدم في: app/src/main/java/com/securemessenger/app/data/repository/SecureRepository.kt
+  - L305 `@Query(                                                    )
     suspend fun getAll ()`
-  - L238 `@Query(                                                    ) fun observeAll ()`
-  - L241 `@Query(                                                                                   )
+  - L308 `@Query(                                                    ) fun observeAll ()`
+  - L311 `@Query(                                                                                   )
     suspend fun getForContact (contactId: String)`
-  - L244 `@Insert(onConflict = OnConflictStrategy.REPLACE)
+  - L314 `@Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert (pending: PendingSend)`
-  - L247 `@Query(                                                       )
+  - L317 `@Query(                                                       )
     suspend fun deleteById (id: String)`
-  - L250 `@Query(                                                          )
+  - L320 `@Query(                                                          )
     suspend fun deleteAllForContact (contactId: String)`
-- L258 `@Dao interface SeenEnvelopeDao` — Data Access Object for the persisted twin of the in-memory envelope-dedup
-  - L261 `@Query(                                                               )
+- L328 `@Dao interface SeenEnvelopeDao` — Data Access Object for the persisted twin of the in-memory envelope-dedup
+  يُستخدم في: app/src/main/java/com/securemessenger/app/data/repository/SecureRepository.kt
+  - L331 `@Query(                                                               )
     suspend fun get (key: String)`
-  - L264 `@Insert(onConflict = OnConflictStrategy.REPLACE)
+  - L334 `@Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert (envelope: SeenEnvelope)`
-  - L267 `@Query(                                                   )
+  - L337 `@Query(                                                   )
     suspend fun pruneOlderThan (cutoff: Long)`
-- L274 `@Dao interface RatchetSessionDao` — Data Access Object for persisted Double-Ratchet sessions.
-  - L277 `@Query(                                                             )
+- L344 `@Dao interface RatchetSessionDao` — Data Access Object for persisted Double-Ratchet sessions.
+  يُستخدم في: app/src/main/java/com/securemessenger/app/data/repository/SecureRepository.kt
+  - L347 `@Query(                                                             )
     suspend fun get (contactId: String)`
-  - L280 `@Insert(onConflict = OnConflictStrategy.REPLACE)
+  - L350 `@Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert (session: RatchetSession)`
-  - L283 `@Query(                                                           )
+  - L353 `@Query(                                                           )
     suspend fun delete (contactId: String)`
-  - L286 `@Query(                              )
+  - L356 `@Query(                              )
     suspend fun deleteAll ()`
-- L294 `@Dao interface IncomingConnectionRequestDao` — Data Access Object for self-introductions received via the username
-  - L297 `@Query(                                                                     ) fun observeAll ()`
-  - L300 `@Query(                                                                                       )
+- L364 `@Dao interface IncomingConnectionRequestDao` — Data Access Object for self-introductions received via the username
+  يُستخدم في: app/src/main/java/com/securemessenger/app/data/repository/SecureRepository.kt
+  - L367 `@Query(                                                                     ) fun observeAll ()`
+  - L370 `@Query(                                                                                       )
     suspend fun get (keyHex: String)`
-  - L303 `@Insert(onConflict = OnConflictStrategy.REPLACE)
+  - L373 `@Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert (request: IncomingConnectionRequest)`
-  - L306 `@Query(                                                                                     )
+  - L376 `@Query(                                                                                     )
     suspend fun deleteByKey (keyHex: String)`
-- L314 `@Dao interface OutgoingConnectionRequestDao` — Data Access Object for self-introductions we sent via the username
-  - L317 `@Query(                                                                 ) fun observeAll ()`
-  - L320 `@Query(                                                                                          )
+- L384 `@Dao interface OutgoingConnectionRequestDao` — Data Access Object for self-introductions we sent via the username
+  يُستخدم في: app/src/main/java/com/securemessenger/app/data/repository/SecureRepository.kt
+  - L387 `@Query(                                                                 ) fun observeAll ()`
+  - L390 `@Query(                                                                                          )
     suspend fun get (keyHex: String)`
-  - L323 `@Insert(onConflict = OnConflictStrategy.REPLACE)
+  - L393 `@Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert (request: OutgoingConnectionRequest)`
-  - L326 `@Query(                                                                                        )
+  - L396 `@Query(                                                                                        )
     suspend fun deleteByKey (keyHex: String)`
 
-### app/src/main/java/com/securemessenger/app/data/local/SecureDatabase.kt (199 سطر)  [package com.securemessenger.app.data.local]
+### app/src/main/java/com/securemessenger/app/data/local/SecureDatabase.kt (233 سطر)  [package com.securemessenger.app.data.local]
 - L39 `abstract class SecureDatabase : RoomDatabase()`
   يُستخدم في: app/src/androidTest/java/com/securemessenger/app/network/AckAuthenticationTest.kt, app/src/main/java/com/securemessenger/app/data/repository/SecureRepository.kt
   - L41 `abstract fun userProfileDao ()`
@@ -416,272 +462,279 @@ data class OldContact ( @PrimaryKey val id: String, val publicKey: ByteArray, va
   - L50 `abstract fun incomingConnectionRequestDao ()`
   - L51 `abstract fun outgoingConnectionRequestDao ()`
 
-### app/src/main/java/com/securemessenger/app/data/model/Entities.kt (321 سطر) ⚠  [package com.securemessenger.app.data.model]
-- L11 `@Entity(tableName =               )
+### app/src/main/java/com/securemessenger/app/data/model/Entities.kt (361 سطر) ⚠  [package com.securemessenger.app.data.model]
+- L12 `@Entity(tableName =               )
 data class UserProfile ( @PrimaryKey val id: String = generateSecureId(), val publicKey: ByteArray, // Identity public key (not encrypted, needed for key exchange) val secretKeyEncrypted: ByteArray, // Identity secret key (encrypted with master key) val signedPreKeyId: Int, val signedPreKeyPublic: ByteArray, val signedPreKeySecretEncrypted: ByteArray, // Post-quantum ML-KEM keypair for the hybrid handshake. val mlkemPublicKey: ByteArray = ByteArray(0), val mlkemSecretEncrypted: ByteArray = ByteArray(0), // Ed25519 signing keypair — signs this profile's signed prekey so a // recipient (or a compromised relay in between) can't swap it unnoticed. // Separate from `publicKey` above, which is an X25519 key used for DH and // can't be used to verify a signature. val signingPublicKey: ByteArray = ByteArray(0), val signingSecretKeyEncrypted: ByteArray = ByteArray(0), val createdAt: Long = System.currentTimeMillis(), val lastBackupAt: Long? = null, // Own profile photo, Keystore-encrypted like a contact's avatarEncrypted. // Never uploaded anywhere — there is no profile-photo-sync protocol. val avatarEncrypted: ByteArray? = null, // The friendly name typed during Setup — shown to me on my own Profile // card. Local-only, like the avatar: contacts still only ever learn my // username (there is no profile-broadcast protocol to push this to them). val displayNameEncrypted: ByteArray? = null )`
   يُستخدم في: app/src/androidTest/java/com/securemessenger/app/data/local/SecureDatabaseMigrationTest.kt, app/src/main/java/com/securemessenger/app/network/SecureMessagingClient.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ContactDetailComponents.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ContactDetailScreen.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ChatListViewModel.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ConversationViewModel.kt
-- L13 `@PrimaryKey val id : String`
-- L14 `val publicKey`
-- L15 `val secretKeyEncrypted`
-- L16 `val signedPreKeyId : Int,`
-- L17 `val signedPreKeyPublic : ByteArray,`
-- L18 `val signedPreKeySecretEncrypted : ByteArray,`
-- L20 `val mlkemPublicKey : ByteArray`
-- L21 `val mlkemSecretEncrypted : ByteArray`
-- L26 `val signingPublicKey : ByteArray`
-- L27 `val signingSecretKeyEncrypted : ByteArray`
-- L28 `val createdAt : Long`
-- L29 `val lastBackupAt : Long?`
-- L32 `val avatarEncrypted : ByteArray?`
-- L36 `val displayNameEncrypted : ByteArray?`
-- L53 `@Entity(tableName =           )
+- L14 `@PrimaryKey val id : String`
+- L15 `val publicKey`
+- L16 `val secretKeyEncrypted`
+- L17 `val signedPreKeyId : Int,`
+- L18 `val signedPreKeyPublic : ByteArray,`
+- L19 `val signedPreKeySecretEncrypted : ByteArray,`
+- L21 `val mlkemPublicKey : ByteArray`
+- L22 `val mlkemSecretEncrypted : ByteArray`
+- L27 `val signingPublicKey : ByteArray`
+- L28 `val signingSecretKeyEncrypted : ByteArray`
+- L29 `val createdAt : Long`
+- L30 `val lastBackupAt : Long?`
+- L33 `val avatarEncrypted : ByteArray?`
+- L37 `val displayNameEncrypted : ByteArray?`
+- L54 `@Entity(tableName =           )
 data class Contact ( @PrimaryKey val id: String, // Contact's user ID val publicKey: ByteArray, // Identity public key // Signing (Ed25519) public key, pinned the first time we learn it (trust- // on-first-use) — later signed-prekey fetches are verified against this // same key, so a relay can't swap in a different signer unnoticed. val signingPublicKey: ByteArray? = null, val displayNameEncrypted: ByteArray, // Encrypted display name val avatarHash: String? = null, // Hash of avatar (not the avatar itself for privacy) val isVerified: Boolean = false, // Whether their key has been verified val verificationData: ByteArray? = null, // QR code verification data val addedAt: Long = System.currentTimeMillis(), val lastSeenAt: Long? = null, val isBlocked: Boolean = false, // Small (downscaled) avatar photo, Keystore-encrypted like displayNameEncrypted — // never leaves the device, never touches the relay. Null = show the gradient // initials avatar instead. val avatarEncrypted: ByteArray? = null, // Local-only display override; if set, shown instead of displayNameEncrypted // everywhere in the UI (the real name is still used for key/session lookups). val nicknameEncrypted: ByteArray? = null, val isMuted: Boolean = false, // Relay pair secrets. Each is 32 bytes that reached the other device by // being photographed off a QR code, never over a network, and each carries // exactly one direction of traffic (see MailboxToken). // // Scanned off THEIR QR — we deposit into the mailbox it addresses. Null for // contacts paired before relay support, or from an older QR: those have no // relay path at all and stay local-network-only. val relaySendSecretEncrypted: ByteArray? = null, // Minted by US and photographed by them — we listen on the mailbox it // addresses. Null until their first relay message actually lands in one of // our outstanding minted secrets, which is what tells us which one they // took; bound to this contact at that moment and never changed after. val relayRecvSecretEncrypted: ByteArray? = null, // Purely local — there is no multi-device concept for one identity here, // so there is nothing to sync. Non-null = pinned, and doubles as the sort // key among several pinned chats (most-recently-pinned first). val pinnedAt: Long? = null )`
   يُستخدم في: app/src/androidTest/java/com/securemessenger/app/data/local/SecureDatabaseMigrationTest.kt, app/src/main/java/com/securemessenger/app/network/SecureMessagingClient.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ContactDetailComponents.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ContactDetailScreen.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ChatListViewModel.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ConversationViewModel.kt
-- L55 `@PrimaryKey val id`
-- L56 `val publicKey`
-- L60 `val signingPublicKey : ByteArray?`
-- L61 `val displayNameEncrypted`
-- L62 `val avatarHash : String?`
-- L63 `val isVerified : Boolean`
-- L64 `val verificationData : ByteArray?`
-- L65 `val addedAt : Long`
-- L66 `val lastSeenAt : Long?`
-- L67 `val isBlocked : Boolean`
-- L71 `val avatarEncrypted : ByteArray?`
-- L74 `val nicknameEncrypted : ByteArray?`
-- L75 `val isMuted : Boolean`
-- L83 `val relaySendSecretEncrypted : ByteArray?`
-- L88 `val relayRecvSecretEncrypted : ByteArray?`
-- L92 `val pinnedAt : Long?`
-- L100 `@Entity(tableName =           )
+- L56 `@PrimaryKey val id`
+- L57 `val publicKey`
+- L61 `val signingPublicKey : ByteArray?`
+- L62 `val displayNameEncrypted`
+- L63 `val avatarHash : String?`
+- L64 `val isVerified : Boolean`
+- L65 `val verificationData : ByteArray?`
+- L66 `val addedAt : Long`
+- L67 `val lastSeenAt : Long?`
+- L68 `val isBlocked : Boolean`
+- L72 `val avatarEncrypted : ByteArray?`
+- L75 `val nicknameEncrypted : ByteArray?`
+- L76 `val isMuted : Boolean`
+- L84 `val relaySendSecretEncrypted : ByteArray?`
+- L89 `val relayRecvSecretEncrypted : ByteArray?`
+- L93 `val pinnedAt : Long?`
+- L101 `@Entity(tableName =           )
 data class Session ( @PrimaryKey val id: Long? = null, val contactId: String, // Foreign key to contacts.id val sessionId: String, // Unique session identifier val rootKeyEncrypted: ByteArray, // Encrypted root key val chainKeySendEncrypted: ByteArray, // Encrypted send chain key val chainKeyReceiveEncrypted: ByteArray?, // Encrypted receive chain key val dhRatchetPublic: ByteArray, val dhRatchetSecretEncrypted: ByteArray, val sendChainCounter: Int, val receiveChainCounter: Int, val createdAt: Long = System.currentTimeMillis(), val lastUsedAt: Long = System.currentTimeMillis() )`
   يُستخدم في: app/src/androidTest/java/com/securemessenger/app/data/local/SecureDatabaseMigrationTest.kt, app/src/main/java/com/securemessenger/app/network/SecureMessagingClient.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ContactDetailComponents.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ContactDetailScreen.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ChatListViewModel.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ConversationViewModel.kt
-- L102 `@PrimaryKey val id : Long?`
-- L103 `val contactId`
-- L104 `val sessionId`
-- L105 `val rootKeyEncrypted`
-- L106 `val chainKeySendEncrypted`
-- L107 `val chainKeyReceiveEncrypted`
-- L108 `val dhRatchetPublic : ByteArray,`
-- L109 `val dhRatchetSecretEncrypted : ByteArray,`
-- L110 `val sendChainCounter : Int,`
-- L111 `val receiveChainCounter : Int,`
-- L112 `val createdAt : Long`
-- L113 `val lastUsedAt : Long`
-- L121 `@Entity(tableName =           )
-data class EncryptedMessage ( @PrimaryKey val id: Long? = null, val sessionId: String, // Foreign key to sessions.sessionId val senderId: String, val recipientId: String, val direction: Int, // 0 = received, 1 = sent val type: Int, // 0 = text, 1 = image, 2 = system val ciphertext: ByteArray, // Signal Protocol encrypted content val iv: ByteArray, // Initialization vector val timestamp: Long = System.currentTimeMillis(), val expiresAt: Long? = null, // Self-destruct timestamp (null = never expires) val isRead: Boolean = false, val isExpired: Boolean = false, val metadataEncrypted: ByteArray? = null, // Additional encrypted metadata // Shared between sender and recipient so a read receipt (which travels by // this id) can mark the *sender's* copy of the message as read. val clientMessageId: String? = null, // --- Social message-interaction fields (all local; the whole row is // SQLCipher-encrypted, and any sensitive text here is additionally // Keystore-encrypted, matching how metadataEncrypted is handled). --- // Emoji reactions as a small JSON object {"me":"👍","them":"❤️"}; either // side may be absent. Just emoji, not sensitive content, so plaintext. val reactionsJson: String? = null, // If this message is a reply, the clientMessageId it replies to, plus a // short Keystore-encrypted snippet of that message cached for display so // we never have to decrypt/scan the whole thread to render the quote. val replyToClientId: String? = null, val replySnippetEncrypted: ByteArray? = null, // Delete-for-everyone tombstone: the row stays (so the ordering/quote // references survive) but renders as "حُذفت"; the text is wiped locally. val isDeleted: Boolean = false, // Non-null once the sender edits the text; UI shows a "معدّلة" marker. val editedAt: Long? = null )`
+- L103 `@PrimaryKey val id : Long?`
+- L104 `val contactId`
+- L105 `val sessionId`
+- L106 `val rootKeyEncrypted`
+- L107 `val chainKeySendEncrypted`
+- L108 `val chainKeyReceiveEncrypted`
+- L109 `val dhRatchetPublic : ByteArray,`
+- L110 `val dhRatchetSecretEncrypted : ByteArray,`
+- L111 `val sendChainCounter : Int,`
+- L112 `val receiveChainCounter : Int,`
+- L113 `val createdAt : Long`
+- L114 `val lastUsedAt : Long`
+- L130 `data class EncryptedMessage ( @PrimaryKey val id: Long? = null, val sessionId: String, // Foreign key to sessions.sessionId val senderId: String, val recipientId: String, val direction: Int, // 0 = received, 1 = sent val type: Int, // 0 = text, 1 = image, 2 = system val ciphertext: ByteArray, // Signal Protocol encrypted content val iv: ByteArray, // Initialization vector val timestamp: Long = System.currentTimeMillis(), val expiresAt: Long? = null, // Self-destruct timestamp (null = never expires) val isRead: Boolean = false, val isExpired: Boolean = false, val metadataEncrypted: ByteArray? = null, // Additional encrypted metadata // Shared between sender and recipient so a read receipt (which travels by // this id) can mark the *sender's* copy of the message as read. val clientMessageId: String? = null, // --- Social message-interaction fields (all local; the whole row is // SQLCipher-encrypted, and any sensitive text here is additionally // Keystore-encrypted, matching how metadataEncrypted is handled). --- // Emoji reactions as a small JSON object {"me":"👍","them":"❤️"}; either // side may be absent. Just emoji, not sensitive content, so plaintext. val reactionsJson: String? = null, // If this message is a reply, the clientMessageId it replies to, plus a // short Keystore-encrypted snippet of that message cached for display so // we never have to decrypt/scan the whole thread to render the quote. val replyToClientId: String? = null, val replySnippetEncrypted: ByteArray? = null, // Delete-for-everyone tombstone: the row stays (so the ordering/quote // references survive) but renders as "حُذفت"; the text is wiped locally. val isDeleted: Boolean = false, // Non-null once the sender edits the text; UI shows a "معدّلة" marker. val editedAt: Long? = null, /** * WHO THIS MESSAGE IS A CONVERSATION WITH — the app's missing concept, * finally written down. * * There was no "conversation" anywhere in this model. The conversation * screen keyed off [sessionId]; the chat list keyed off senderId / * recipientId. Those two agreed only by the accident that every contact * happens to have exactly one session — while the schema plainly expects * otherwise (SessionDao.getCurrentSession is written "ORDER BY lastUsedAt * DESC LIMIT 1"). A second session for one contact, from a re-pair after * a key change, would have split the history: the list showing a last * message the conversation screen could not display, and an unread count * counted across all sessions that markAllReceivedAsRead(sessionId) could * never clear. * * One key ends that. Both screens now read by contact, so history follows * the person rather than the cryptographic session underneath them, and * a re-keyed session keeps the thread intact. * * Derived, never passed: the default computes it from the fields above, * so every existing construction site got it right without being touched * and no future one can forget it. * * Nullable purely for migration safety. Adding a NOT NULL column with a * default to a live table risks Room's schema validation disagreeing with * SQLite over the default's spelling, and this app has no backup or export * — a failed validation falls back to destructive migration, which here * means every message a real user has. A plain nullable column cannot * mismatch. The backfill in MIGRATION_12_13 leaves no NULLs behind. */ val contactId: String? = if (direction == 0) senderId else recipientId )`
   يُستخدم في: app/src/androidTest/java/com/securemessenger/app/data/local/SecureDatabaseMigrationTest.kt, app/src/main/java/com/securemessenger/app/network/SecureMessagingClient.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ContactDetailComponents.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ContactDetailScreen.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ChatListViewModel.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ConversationViewModel.kt
-- L123 `@PrimaryKey val id : Long?`
-- L124 `val sessionId`
-- L125 `val senderId : String,`
-- L126 `val recipientId : String,`
-- L127 `val direction`
-- L128 `val type`
-- L129 `val ciphertext`
-- L130 `val iv`
-- L131 `val timestamp : Long`
-- L132 `val expiresAt : Long?`
-- L133 `val isRead : Boolean`
-- L134 `val isExpired : Boolean`
-- L135 `val metadataEncrypted : ByteArray?`
-- L138 `val clientMessageId : String?`
-- L144 `val reactionsJson : String?`
-- L148 `val replyToClientId : String?`
-- L149 `val replySnippetEncrypted : ByteArray?`
-- L152 `val isDeleted : Boolean`
-- L154 `val editedAt : Long?`
-- L163 `@Entity(tableName =                   )
+- L132 `@PrimaryKey val id : Long?`
+- L133 `val sessionId`
+- L134 `val senderId : String,`
+- L135 `val recipientId : String,`
+- L136 `val direction`
+- L137 `val type`
+- L138 `val ciphertext`
+- L139 `val iv`
+- L140 `val timestamp : Long`
+- L141 `val expiresAt : Long?`
+- L142 `val isRead : Boolean`
+- L143 `val isExpired : Boolean`
+- L144 `val metadataEncrypted : ByteArray?`
+- L147 `val clientMessageId : String?`
+- L153 `val reactionsJson : String?`
+- L157 `val replyToClientId : String?`
+- L158 `val replySnippetEncrypted : ByteArray?`
+- L161 `val isDeleted : Boolean`
+- L163 `val editedAt : Long?`
+- L194 `val contactId : String?` — WHO THIS MESSAGE IS A CONVERSATION WITH — the app's missing concept,
+- L203 `@Entity(tableName =                   )
 data class RatchetSession ( @PrimaryKey val contactId: String, val rootKeyEnc: ByteArray, val chainKeySendEnc: ByteArray, val chainKeyReceiveEnc: ByteArray?, val dhRatchetPublic: ByteArray, val dhRatchetSecretEnc: ByteArray, val theirRatchetPublic: ByteArray?, val sendChainCounter: Int, val receiveChainCounter: Int, val previousSendChainLength: Int, val initiatorEphemeralPublic: ByteArray?, val isInitiator: Boolean, val responderEphemeralHex: String?, val initiatorOtkId: Int?, val skippedKeysEnc: ByteArray?, val updatedAt: Long = System.currentTimeMillis() )`
   يُستخدم في: app/src/androidTest/java/com/securemessenger/app/data/local/SecureDatabaseMigrationTest.kt, app/src/main/java/com/securemessenger/app/network/SecureMessagingClient.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ContactDetailComponents.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ContactDetailScreen.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ChatListViewModel.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ConversationViewModel.kt
-- L165 `@PrimaryKey val contactId : String,`
-- L166 `val rootKeyEnc : ByteArray,`
-- L167 `val chainKeySendEnc : ByteArray,`
-- L168 `val chainKeyReceiveEnc : ByteArray?,`
-- L169 `val dhRatchetPublic : ByteArray,`
-- L170 `val dhRatchetSecretEnc : ByteArray,`
-- L171 `val theirRatchetPublic : ByteArray?,`
-- L172 `val sendChainCounter : Int,`
-- L173 `val receiveChainCounter : Int,`
-- L174 `val previousSendChainLength : Int,`
-- L175 `val initiatorEphemeralPublic : ByteArray?,`
-- L176 `val isInitiator : Boolean,`
-- L177 `val responderEphemeralHex : String?,`
-- L178 `val initiatorOtkId : Int?,`
-- L179 `val skippedKeysEnc : ByteArray?,`
-- L180 `val updatedAt : Long`
-- L192 `@Entity(tableName =         )
+- L205 `@PrimaryKey val contactId : String,`
+- L206 `val rootKeyEnc : ByteArray,`
+- L207 `val chainKeySendEnc : ByteArray,`
+- L208 `val chainKeyReceiveEnc : ByteArray?,`
+- L209 `val dhRatchetPublic : ByteArray,`
+- L210 `val dhRatchetSecretEnc : ByteArray,`
+- L211 `val theirRatchetPublic : ByteArray?,`
+- L212 `val sendChainCounter : Int,`
+- L213 `val receiveChainCounter : Int,`
+- L214 `val previousSendChainLength : Int,`
+- L215 `val initiatorEphemeralPublic : ByteArray?,`
+- L216 `val isInitiator : Boolean,`
+- L217 `val responderEphemeralHex : String?,`
+- L218 `val initiatorOtkId : Int?,`
+- L219 `val skippedKeysEnc : ByteArray?,`
+- L220 `val updatedAt : Long`
+- L232 `@Entity(tableName =         )
 data class OutboxEnvelope ( @PrimaryKey val id: String, val recipientId: String, val envelope: String, val createdAt: Long = System.currentTimeMillis(), // Set only for plain chat messages (null for read receipts/control ops) so // the UI can show a "sending…" clock for exactly this message until the // relay's ack removes the row. val clientMessageId: String? = null )`
   يُستخدم في: app/src/androidTest/java/com/securemessenger/app/data/local/SecureDatabaseMigrationTest.kt, app/src/main/java/com/securemessenger/app/network/SecureMessagingClient.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ContactDetailComponents.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ContactDetailScreen.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ChatListViewModel.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ConversationViewModel.kt
-- L194 `@PrimaryKey val id : String,`
-- L195 `val recipientId : String,`
-- L196 `val envelope : String,`
-- L197 `val createdAt : Long`
-- L201 `val clientMessageId : String?`
-- L215 `@Entity(tableName =                )
+- L234 `@PrimaryKey val id : String,`
+- L235 `val recipientId : String,`
+- L236 `val envelope : String,`
+- L237 `val createdAt : Long`
+- L241 `val clientMessageId : String?`
+- L255 `@Entity(tableName =                )
 data class PendingSend ( @PrimaryKey val clientMessageId: String, val recipientId: String, val plaintextEncrypted: ByteArray, val ttlSeconds: Int? = null, val createdAt: Long = System.currentTimeMillis() )`
   يُستخدم في: app/src/androidTest/java/com/securemessenger/app/data/local/SecureDatabaseMigrationTest.kt, app/src/main/java/com/securemessenger/app/network/SecureMessagingClient.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ContactDetailComponents.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ContactDetailScreen.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ChatListViewModel.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ConversationViewModel.kt
-- L217 `@PrimaryKey val clientMessageId : String,`
-- L218 `val recipientId : String,`
-- L219 `val plaintextEncrypted : ByteArray,`
-- L220 `val ttlSeconds : Int?`
-- L221 `val createdAt : Long`
-- L236 `@Entity(tableName =                 )
+- L257 `@PrimaryKey val clientMessageId : String,`
+- L258 `val recipientId : String,`
+- L259 `val plaintextEncrypted : ByteArray,`
+- L260 `val ttlSeconds : Int?`
+- L261 `val createdAt : Long`
+- L276 `@Entity(tableName =                 )
 data class SeenEnvelope ( @PrimaryKey val envelopeKey: String, val ackToken: String, val seenAt: Long = System.currentTimeMillis() )`
   يُستخدم في: app/src/androidTest/java/com/securemessenger/app/data/local/SecureDatabaseMigrationTest.kt, app/src/main/java/com/securemessenger/app/network/SecureMessagingClient.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ContactDetailComponents.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ContactDetailScreen.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ChatListViewModel.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ConversationViewModel.kt
-- L238 `@PrimaryKey val envelopeKey : String,`
-- L239 `val ackToken : String,`
-- L240 `val seenAt : Long`
-- L248 `@Entity(tableName =              )
+- L278 `@PrimaryKey val envelopeKey : String,`
+- L279 `val ackToken : String,`
+- L280 `val seenAt : Long`
+- L288 `@Entity(tableName =              )
 data class KeyBundle ( @PrimaryKey val id: Long? = null, val contactId: String, // Foreign key to contacts.id (null for our own prekeys) val preKeyId: Int, val publicKey: ByteArray, val secretKeyEncrypted: ByteArray?, // null for remote prekeys val isOneTime: Boolean = true, val isUsed: Boolean = false, val createdAt: Long = System.currentTimeMillis() )`
   يُستخدم في: app/src/androidTest/java/com/securemessenger/app/data/local/SecureDatabaseMigrationTest.kt, app/src/main/java/com/securemessenger/app/network/SecureMessagingClient.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ContactDetailComponents.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ContactDetailScreen.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ChatListViewModel.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ConversationViewModel.kt
-- L250 `@PrimaryKey val id : Long?`
-- L251 `val contactId`
-- L252 `val preKeyId : Int,`
-- L253 `val publicKey : ByteArray,`
-- L254 `val secretKeyEncrypted`
-- L255 `val isOneTime : Boolean`
-- L256 `val isUsed : Boolean`
-- L257 `val createdAt : Long`
-- L280 `@Entity(tableName =                               )
+- L290 `@PrimaryKey val id : Long?`
+- L291 `val contactId`
+- L292 `val preKeyId : Int,`
+- L293 `val publicKey : ByteArray,`
+- L294 `val secretKeyEncrypted`
+- L295 `val isOneTime : Boolean`
+- L296 `val isUsed : Boolean`
+- L297 `val createdAt : Long`
+- L320 `@Entity(tableName =                               )
 data class IncomingConnectionRequest ( @PrimaryKey val senderIdentityPublicKeyHex: String, val senderUserId: String, val senderUsername: String, val senderSigningPublicKey: ByteArray, // The pair secret THEY minted for us to listen on — real secret // material, Keystore-encrypted like Contact.relaySendSecretEncrypted. val pairSecretEncrypted: ByteArray, val directAddress: String? = null, val receivedAt: Long = System.currentTimeMillis() )`
   يُستخدم في: app/src/androidTest/java/com/securemessenger/app/data/local/SecureDatabaseMigrationTest.kt, app/src/main/java/com/securemessenger/app/network/SecureMessagingClient.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ContactDetailComponents.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ContactDetailScreen.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ChatListViewModel.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ConversationViewModel.kt
-- L282 `@PrimaryKey val senderIdentityPublicKeyHex : String,`
-- L283 `val senderUserId : String,`
-- L284 `val senderUsername : String,`
-- L285 `val senderSigningPublicKey : ByteArray,`
-- L288 `val pairSecretEncrypted : ByteArray,`
-- L289 `val directAddress : String?`
-- L290 `val receivedAt : Long`
-- L311 `@Entity(tableName =                               )
+- L322 `@PrimaryKey val senderIdentityPublicKeyHex : String,`
+- L323 `val senderUserId : String,`
+- L324 `val senderUsername : String,`
+- L325 `val senderSigningPublicKey : ByteArray,`
+- L328 `val pairSecretEncrypted : ByteArray,`
+- L329 `val directAddress : String?`
+- L330 `val receivedAt : Long`
+- L351 `@Entity(tableName =                               )
 data class OutgoingConnectionRequest ( @PrimaryKey val recipientIdentityPublicKeyHex: String, val recipientUsername: String, val recipientSigningPublicKey: ByteArray, // The pair secret WE minted for them to listen on. Keystore-encrypted // like every other pair secret at rest. val mintedPairSecretEncrypted: ByteArray, val sentAt: Long = System.currentTimeMillis() )`
   يُستخدم في: app/src/androidTest/java/com/securemessenger/app/data/local/SecureDatabaseMigrationTest.kt, app/src/main/java/com/securemessenger/app/network/SecureMessagingClient.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ContactDetailComponents.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ContactDetailScreen.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ChatListViewModel.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ConversationViewModel.kt
-- L313 `@PrimaryKey val recipientIdentityPublicKeyHex : String,`
-- L314 `val recipientUsername : String,`
-- L315 `val recipientSigningPublicKey : ByteArray,`
-- L318 `val mintedPairSecretEncrypted : ByteArray,`
-- L319 `val sentAt : Long`
+- L353 `@PrimaryKey val recipientIdentityPublicKeyHex : String,`
+- L354 `val recipientUsername : String,`
+- L355 `val recipientSigningPublicKey : ByteArray,`
+- L358 `val mintedPairSecretEncrypted : ByteArray,`
+- L359 `val sentAt : Long`
 
-### app/src/main/java/com/securemessenger/app/data/repository/SecureRepository.kt (1425 سطر) ⚠  [package com.securemessenger.app.data.repository]
-- L25 `data class LoadedRatchetSession ( val protocol: SignalProtocol, val isInitiator: Boolean, val responderEphemeralHex: String?, val initiatorOtkId: Int? )`
-  يُستخدم في: app/src/androidTest/java/com/securemessenger/app/network/AckAuthenticationTest.kt, app/src/main/java/com/securemessenger/app/SecureMessengerApp.kt, app/src/main/java/com/securemessenger/app/network/RelayClient.kt, app/src/main/java/com/securemessenger/app/network/SecureMessagingClient.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/UsernameSearchScreen.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ChatListViewModel.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ConnectionRequestsViewModel.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ConversationViewModel.kt
-- L26 `val protocol : SignalProtocol,`
-- L27 `val isInitiator : Boolean,`
-- L28 `val responderEphemeralHex : String?,`
-- L29 `val initiatorOtkId : Int?`
-- L33 `enum class ContactPairResult`
-  يُستخدم في: app/src/androidTest/java/com/securemessenger/app/network/AckAuthenticationTest.kt, app/src/main/java/com/securemessenger/app/SecureMessengerApp.kt, app/src/main/java/com/securemessenger/app/network/RelayClient.kt, app/src/main/java/com/securemessenger/app/network/SecureMessagingClient.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/UsernameSearchScreen.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ChatListViewModel.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ConnectionRequestsViewModel.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ConversationViewModel.kt
-- L46 `class SecureRepository (private val context: Context)` — SecureRepository - manages all data operations with encryption/decryption.
-  يُستخدم في: app/src/androidTest/java/com/securemessenger/app/network/AckAuthenticationTest.kt, app/src/main/java/com/securemessenger/app/SecureMessengerApp.kt, app/src/main/java/com/securemessenger/app/network/RelayClient.kt, app/src/main/java/com/securemessenger/app/network/SecureMessagingClient.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/UsernameSearchScreen.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ChatListViewModel.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ConnectionRequestsViewModel.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ConversationViewModel.kt
-  - L48 `private var database : SecureDatabase?`
-  - L49 `private var dbPassphrase : CharArray?`
-  - L51 `private fun requireDb (): SecureDatabase`
-  - L57 `suspend fun initialize (passphrase: CharArray)`
-  - L67 `fun close ()` — Close the database and wipe the passphrase from memory.
-  - L79 `suspend fun createProfile (): UserProfile`
-  - L111 `suspend fun getProfile (): UserProfile?`
-  - L115 `suspend fun getIdentityKeyPair (): SignalProtocol.IdentityKeyPair?`
-  - L122 `suspend fun getSignedPreKeyPair (): SignalProtocol.PreKeyPair?`
-  - L130 `suspend fun getMlkemPublicKey (): ByteArray?`
-  - L135 `suspend fun getMlkemSecret (): ByteArray?`
-  - L141 `suspend fun getSigningPublicKey (): ByteArray?`
-  - L146 `suspend fun getSigningSecretKey (): ByteArray?`
-  - L151 `suspend fun getCurrentSessionId (contactId: String): String?`
-  - L157 `suspend fun addContact (contact: Contact)`
-  - L161 `fun getContacts (): Flow<List<Contact>>`
-  - L166 `suspend fun getAllContactsOnce (): List<Contact>`
-  - L170 `suspend fun getContact (contactId: String): Contact?`
-  - L180 `suspend fun setContactAvatar (contactId: String, rawImageBytes: ByteArray?)`
-  - L185 `suspend fun getContactAvatar (contactId: String): ByteArray?`
-  - L194 `suspend fun setMyAvatar (rawImageBytes: ByteArray?)`
-  - L199 `suspend fun setMyDisplayName (name: String)`
-  - L206 `suspend fun getMyDisplayName (): String?`
-  - L216 `fun getMyAvatarFlow (): Flow<ByteArray?>` — Reactive so a Profile screen updates the instant the photo changes.
-  - L224 `private fun downscaleAvatar (rawImageBytes: ByteArray, maxDimension: Int = 256): ByteArray`
-  - L241 `suspend fun verifyContact (contactId: String, verificationData: ByteArray)`
-  - L245 `suspend fun blockContact (contactId: String)`
-  - L249 `suspend fun unblockContact (contactId: String)`
-  - L253 `suspend fun setContactMuted (contactId: String, muted: Boolean)`
-  - L258 `suspend fun setContactPinned (contactId: String, pinned: Boolean)`
-  - L262 `suspend fun setContactNickname (contactId: String, nickname: String?)`
-  - L269 `suspend fun getContactNickname (contactId: String): String?`
-  - L283 `suspend fun verifyScannedKey (contactId: String, scannedPublicKeyHex: String): Boolean`
-  - L297 `suspend fun deleteContact (contactId: String)`
-  - L309 `suspend fun createSession (contactId: String, protocol: SignalProtocol): String`
-  - L336 `suspend fun loadSession (sessionId: String): SignalProtocol?`
-  - L369 `suspend fun saveSessionState (sessionId: String, protocol: SignalProtocol)`
-  - L394 `suspend fun sendMessage ( sessionId: String, senderId: String, recipientId: String, plaintext: ByteArray, ttlSeconds: Int? = null ): EncryptedMessage`
-  - L425 `fun getMessages (sessionId: String): Flow<List<EncryptedMessage>>`
-  - L429 `fun getAllMessages (): Flow<List<EncryptedMessage>>`
-  - L441 `suspend fun saveIncomingMessage ( senderId: String, senderIdentityKey: ByteArray?, plaintext: ByteArray, ttlSeconds: Int? = null, clientMessageId: String? = null, senderUsername: String? = null, replyToClientId: String? = null, replySnippet: String? = null ): String?`
-  - L497 `data class SentInteraction (val wirePayload: ByteArray, val message: EncryptedMessage? = null)`
-  - L500 `suspend fun snippetOf (clientMessageId: String): String`
-  - L506 `suspend fun sendReplyMessage ( contactId: String, text: String, replyToClientId: String, ttlSeconds: Int? = null ): SentInteraction`
-  - L542 `suspend fun reactToMessage (targetClientId: String, emoji: String): ByteArray`
-  - L551 `suspend fun editMessage (targetClientId: String, newText: String): ByteArray`
-  - L561 `suspend fun deleteForEveryone (targetClientId: String): ByteArray`
-  - L568 `suspend fun deleteForMe (messageId: Long)`
-  - L579 `suspend fun applyIncomingControl (control: ChatPayloads.Control, senderId: String)`
-  - L625 `private fun parseReactions (json: String?): MutableMap<String, String>`
-  - L637 `private fun serializeReactions (map: Map<String, String>): String?`
-  - L645 `fun decryptReplySnippet (message: EncryptedMessage): String?` — Decrypt a reply's cached snippet for display (empty if none/failed).
-  - L661 `private fun mediaDir (): File`
-  - L663 `private fun saveMediaFile (ref: String, bytes: ByteArray)`
-  - L667 `private fun readMediaFile (ref: String): ByteArray?`
-  - L679 `private fun deleteMediaBlobFor (message: EncryptedMessage)`
-  - L700 `fun purgeDecryptedMediaCache ()` — Delete every plaintext file ever written to cacheDir/decrypted_media —
-  - L704 `data class SentMedia (val message: EncryptedMessage, val wirePayload: ByteArray)`
-  - L712 `suspend fun sendMediaMessage ( contactId: String, fileBytes: ByteArray, mimeType: String, fileName: String, mediaType: Int, ttlSeconds: Int? = null, waveform: List<Float> = emptyList(), caption: String? = null ): SentMedia`
-  - L751 `suspend fun saveIncomingMediaMessage ( senderId: String, senderIdentityKey: ByteArray?, media: MediaCodec.WireMedia, ttlSeconds: Int? = null, clientMessageId: String? = null, senderUsername: String? = null ): String?`
-  - L815 `fun decryptMediaDescriptor (message: EncryptedMessage): MediaCodec.LocalMedia?` — Decrypt the (small) local descriptor for a media message row.
-  - L825 `suspend fun loadDecryptedMediaBytes (local: MediaCodec.LocalMedia): ByteArray?`
-  - L839 `suspend fun markReceivedAsReadAndGetIds (sessionId: String): List<String>`
-  - L851 `suspend fun markMessagesReadByClientIds (clientMessageIds: List<String>, senderId: String)`
-  - L857 `fun decryptDisplayText (message: EncryptedMessage): String`
-  - L875 `suspend fun getUserId (): String?`
-  - L879 `suspend fun getOrCreateSessionForContact (contactId: String): String`
-  - L920 `suspend fun sendMessageToContact ( contactId: String, plaintext: String, ttlSeconds: Int? = null ): EncryptedMessage`
-  - L930 `suspend fun storeContactPrekeys ( contactId: String, identityKey: ByteArray, signedPreKey: ByteArray, oneTimePreKey: ByteArray? = null, signingPublicKey: ByteArray? = null )`
-  - L981 `suspend fun getPublicKeyFingerprint (): String?`
-  - L997 `suspend fun getPublicKeyHex (): String?`
-  - L1017 `suspend fun addContactWithPublicKey ( contactId: String, publicKeyHex: String, displayName: String, relaySendSecret: ByteArray? = null, allowKeyChange: Boolean = false ): ContactPairResult`
-  - L1060 `suspend fun getRelaySendSecret (contactId: String): ByteArray?`
-  - L1064 `suspend fun getRelayRecvSecret (contactId: String): ByteArray?`
-  - L1067 `private suspend fun decryptContactSecret (encrypted: ByteArray?): ByteArray?`
-  - L1085 `suspend fun bindRelayRecvSecret (contactId: String, secret: ByteArray)`
-  - L1103 `fun getIncomingConnectionRequests (): Flow<List<IncomingConnectionRequest>>`
-  - L1106 `suspend fun getIncomingConnectionRequest (senderIdentityPublicKeyHex: String): IncomingConnectionRequest?`
-  - L1111 `suspend fun saveIncomingConnectionRequest ( senderIdentityPublicKeyHex: String, senderUserId: String, senderUsername: String, senderSigningPublicKey: ByteArray, pairSecret: ByteArray, directAddress: String? )`
-  - L1131 `suspend fun deleteIncomingConnectionRequest (senderIdentityPublicKeyHex: String)`
-  - L1135 `fun getOutgoingConnectionRequests (): Flow<List<OutgoingConnectionRequest>>`
-  - L1138 `suspend fun getOutgoingConnectionRequest (recipientIdentityPublicKeyHex: String): OutgoingConnectionRequest?`
-  - L1143 `suspend fun saveOutgoingConnectionRequest ( recipientIdentityPublicKeyHex: String, recipientUsername: String, recipientSigningPublicKey: ByteArray, mintedPairSecret: ByteArray )`
-  - L1159 `suspend fun deleteOutgoingConnectionRequest (recipientIdentityPublicKeyHex: String)`
-  - L1163 `private fun hexToBytes (hex: String): ByteArray`
-  - L1171 `suspend fun deleteExpiredMessages (): Int`
-  - L1182 `suspend fun generatePreKeys (count: Int = 100): List<KeyBundle>`
-  - L1207 `suspend fun getUnusedPreKeys (): List<KeyBundle>`
-  - L1215 `suspend fun getOurPreKeySecret (preKeyId: Int): ByteArray?`
-  - L1220 `suspend fun markPreKeyAsUsed (preKeyId: Int)`
-  - L1230 `suspend fun saveRatchetSession ( contactId: String, protocol: SignalProtocol, isInitiator: Boolean, responderEphemeralHex: String?, initiatorOtkId: Int? )`
-  - L1267 `suspend fun loadRatchetSession (contactId: String): LoadedRatchetSession?`
-  - L1303 `suspend fun saveOutboxEnvelope (id: String, recipientId: String, envelope: String, clientMessageId: String? = null)`
-  - L1309 `suspend fun deleteOutboxEnvelope (id: String)`
-  - L1313 `suspend fun getAllOutboxEnvelopes (): List<OutboxEnvelope>`
-  - L1318 `fun observePendingClientMessageIds (): Flow<Set<String>>` — clientMessageId set of every message still awaiting the relay's ack, or still pending a resend — drives the "sending…" tick.
-  - L1327 `data class DecryptedPendingSend ( val clientMessageId: String, val recipientId: String, val plaintext: ByteArray, val ttlSeconds: Int? )`
-  - L1328 `val clientMessageId : String,`
-  - L1329 `val recipientId : String,`
-  - L1330 `val plaintext : ByteArray,`
-  - L1331 `val ttlSeconds : Int?`
-  - L1334 `private fun PendingSend ()`
-  - L1341 `suspend fun savePendingSend (clientMessageId: String, recipientId: String, plaintext: ByteArray, ttlSeconds: Int?)`
-  - L1353 `suspend fun deletePendingSend (clientMessageId: String)`
-  - L1357 `suspend fun getAllPendingSends (): List<DecryptedPendingSend>`
-  - L1361 `suspend fun getPendingSendsForContact (contactId: String): List<DecryptedPendingSend>`
-  - L1368 `suspend fun getSeenEnvelopeAckToken (key: String): String?`
-  - L1373 `suspend fun rememberSeenEnvelope (key: String, ackToken: String)`
-  - L1377 `suspend fun pruneSeenEnvelopesOlderThan (maxAgeMs: Long)`
-  - L1383 `suspend fun wipeAllData ()`
+### app/src/main/java/com/securemessenger/app/data/repository/SecureRepository.kt (1550 سطر) ⚠  [package com.securemessenger.app.data.repository]
+- L26 `data class LoadedRatchetSession ( val protocol: SignalProtocol, val isInitiator: Boolean, val responderEphemeralHex: String?, val initiatorOtkId: Int? )`
+  يُستخدم في: app/src/androidTest/java/com/securemessenger/app/network/AckAuthenticationTest.kt, app/src/main/java/com/securemessenger/app/SecureMessengerApp.kt, app/src/main/java/com/securemessenger/app/network/RelayClient.kt, app/src/main/java/com/securemessenger/app/network/SecureMessagingClient.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/UsernameSearchScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/verification/KeyVerificationScreen.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ChatListViewModel.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ConnectionRequestsViewModel.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ConversationViewModel.kt
+- L27 `val protocol : SignalProtocol,`
+- L28 `val isInitiator : Boolean,`
+- L29 `val responderEphemeralHex : String?,`
+- L30 `val initiatorOtkId : Int?`
+- L34 `enum class ContactPairResult`
+  يُستخدم في: app/src/androidTest/java/com/securemessenger/app/network/AckAuthenticationTest.kt, app/src/main/java/com/securemessenger/app/SecureMessengerApp.kt, app/src/main/java/com/securemessenger/app/network/RelayClient.kt, app/src/main/java/com/securemessenger/app/network/SecureMessagingClient.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/UsernameSearchScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/verification/KeyVerificationScreen.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ChatListViewModel.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ConnectionRequestsViewModel.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ConversationViewModel.kt
+- L50 `enum class KeyScanResult`
+  يُستخدم في: app/src/androidTest/java/com/securemessenger/app/network/AckAuthenticationTest.kt, app/src/main/java/com/securemessenger/app/SecureMessengerApp.kt, app/src/main/java/com/securemessenger/app/network/RelayClient.kt, app/src/main/java/com/securemessenger/app/network/SecureMessagingClient.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/UsernameSearchScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/verification/KeyVerificationScreen.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ChatListViewModel.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ConnectionRequestsViewModel.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ConversationViewModel.kt
+- L65 `private fun identityKeyHexFromScan (scanned: String): String?`
+  - L66 `val raw`
+  - L67 `val hex`
+- L86 `class SecureRepository (private val context: Context)` — SecureRepository - manages all data operations with encryption/decryption.
+  يُستخدم في: app/src/androidTest/java/com/securemessenger/app/network/AckAuthenticationTest.kt, app/src/main/java/com/securemessenger/app/SecureMessengerApp.kt, app/src/main/java/com/securemessenger/app/network/RelayClient.kt, app/src/main/java/com/securemessenger/app/network/SecureMessagingClient.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/UsernameSearchScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/verification/KeyVerificationScreen.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ChatListViewModel.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ConnectionRequestsViewModel.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ConversationViewModel.kt
+  - L88 `private var database : SecureDatabase?`
+  - L89 `private var dbPassphrase : CharArray?`
+  - L91 `private fun requireDb (): SecureDatabase`
+  - L97 `suspend fun initialize (passphrase: CharArray)`
+  - L107 `fun close ()` — Close the database and wipe the passphrase from memory.
+  - L119 `suspend fun createProfile (): UserProfile`
+  - L151 `suspend fun getProfile (): UserProfile?`
+  - L155 `suspend fun getIdentityKeyPair (): SignalProtocol.IdentityKeyPair?`
+  - L162 `suspend fun getSignedPreKeyPair (): SignalProtocol.PreKeyPair?`
+  - L170 `suspend fun getMlkemPublicKey (): ByteArray?`
+  - L175 `suspend fun getMlkemSecret (): ByteArray?`
+  - L181 `suspend fun getSigningPublicKey (): ByteArray?`
+  - L186 `suspend fun getSigningSecretKey (): ByteArray?`
+  - L200 `suspend fun addContact (contact: Contact)`
+  - L204 `fun getContacts (): Flow<List<Contact>>`
+  - L209 `suspend fun getAllContactsOnce (): List<Contact>`
+  - L213 `suspend fun getContact (contactId: String): Contact?`
+  - L223 `suspend fun setContactAvatar (contactId: String, rawImageBytes: ByteArray?)`
+  - L228 `suspend fun getContactAvatar (contactId: String): ByteArray?`
+  - L237 `suspend fun setMyAvatar (rawImageBytes: ByteArray?)`
+  - L242 `suspend fun setMyDisplayName (name: String)`
+  - L249 `suspend fun getMyDisplayName (): String?`
+  - L259 `fun getMyAvatarFlow (): Flow<ByteArray?>` — Reactive so a Profile screen updates the instant the photo changes.
+  - L267 `private fun downscaleAvatar (rawImageBytes: ByteArray, maxDimension: Int = 256): ByteArray`
+  - L284 `suspend fun verifyContact (contactId: String, verificationData: ByteArray)`
+  - L288 `suspend fun blockContact (contactId: String)`
+  - L292 `suspend fun unblockContact (contactId: String)`
+  - L296 `suspend fun setContactMuted (contactId: String, muted: Boolean)`
+  - L301 `suspend fun setContactPinned (contactId: String, pinned: Boolean)`
+  - L305 `suspend fun setContactNickname (contactId: String, nickname: String?)`
+  - L312 `suspend fun getContactNickname (contactId: String): String?`
+  - L348 `suspend fun verifyScannedKey (contactId: String, scanned: String): KeyScanResult`
+  - L363 `suspend fun deleteContact (contactId: String)`
+  - L375 `suspend fun createSession (contactId: String, protocol: SignalProtocol): String`
+  - L402 `suspend fun loadSession (sessionId: String): SignalProtocol?`
+  - L435 `suspend fun saveSessionState (sessionId: String, protocol: SignalProtocol)`
+  - L460 `suspend fun sendMessage ( sessionId: String, senderId: String, recipientId: String, plaintext: ByteArray, ttlSeconds: Int? = null ): EncryptedMessage`
+  - L492 `fun getRecentMessages (contactId: String, limit: Int): Flow<List<EncryptedMessage>>` — The newest [limit] messages with this contact, oldest-first. See MessageDao.getRecentMessagesForContact.
+  - L497 `fun countMessages (contactId: String): Flow<Int>` — Total messages in the conversation — lets the UI know whether there is older history to load.
+  - L502 `fun observeLatestMessagePerContact (): Flow<List<EncryptedMessage>>` — The latest message of every conversation — one row each, for the chat list.
+  - L507 `fun observeUnreadCounts (): Flow<List<UnreadCount>>` — Unread tallies per conversation, counted in SQL.
+  - L512 `fun observeMedia (contactId: String): Flow<List<EncryptedMessage>>` — Shared media in one conversation, newest first — filtered in SQL, not by loading the thread.
+  - L524 `suspend fun saveIncomingMessage ( senderId: String, senderIdentityKey: ByteArray?, plaintext: ByteArray, ttlSeconds: Int? = null, clientMessageId: String? = null, senderUsername: String? = null, replyToClientId: String? = null, replySnippet: String? = null, /** The sender's claimed send time from the envelope — see [orderingTimestamp]. */ sentAt: Long? = null ): String?`
+  - L587 `data class SentInteraction (val wirePayload: ByteArray, val message: EncryptedMessage? = null)`
+  - L590 `suspend fun snippetOf (clientMessageId: String): String`
+  - L596 `suspend fun sendReplyMessage ( contactId: String, text: String, replyToClientId: String, ttlSeconds: Int? = null ): SentInteraction`
+  - L632 `suspend fun reactToMessage (targetClientId: String, emoji: String): ByteArray`
+  - L641 `suspend fun editMessage (targetClientId: String, newText: String): ByteArray`
+  - L651 `suspend fun deleteForEveryone (targetClientId: String): ByteArray`
+  - L658 `suspend fun deleteForMe (messageId: Long)`
+  - L669 `suspend fun applyIncomingControl (control: ChatPayloads.Control, senderId: String)`
+  - L715 `private fun parseReactions (json: String?): MutableMap<String, String>`
+  - L727 `private fun serializeReactions (map: Map<String, String>): String?`
+  - L735 `fun decryptReplySnippet (message: EncryptedMessage): String?` — Decrypt a reply's cached snippet for display (empty if none/failed).
+  - L781 `private fun mediaDir (): File`
+  - L783 `private fun saveMediaFile (ref: String, bytes: ByteArray)`
+  - L787 `private fun readMediaFile (ref: String): ByteArray?`
+  - L799 `private fun deleteMediaBlobFor (message: EncryptedMessage)`
+  - L820 `fun purgeDecryptedMediaCache ()` — Delete every plaintext file ever written to cacheDir/decrypted_media —
+  - L824 `data class SentMedia (val message: EncryptedMessage, val wirePayload: ByteArray)`
+  - L832 `suspend fun sendMediaMessage ( contactId: String, fileBytes: ByteArray, mimeType: String, fileName: String, mediaType: Int, ttlSeconds: Int? = null, waveform: List<Float> = emptyList(), caption: String? = null ): SentMedia`
+  - L871 `suspend fun saveIncomingMediaMessage ( senderId: String, senderIdentityKey: ByteArray?, media: MediaCodec.WireMedia, ttlSeconds: Int? = null, clientMessageId: String? = null, senderUsername: String? = null, /** The sender's claimed send time from the envelope — see [orderingTimestamp]. */ sentAt: Long? = null ): String?`
+  - L939 `fun decryptMediaDescriptor (message: EncryptedMessage): MediaCodec.LocalMedia?` — Decrypt the (small) local descriptor for a media message row.
+  - L949 `suspend fun loadDecryptedMediaBytes (local: MediaCodec.LocalMedia): ByteArray?`
+  - L963 `suspend fun markReceivedAsReadAndGetIds (contactId: String): List<String>`
+  - L976 `suspend fun markMessagesReadByClientIds (clientMessageIds: List<String>, senderId: String)`
+  - L982 `fun decryptDisplayText (message: EncryptedMessage): String`
+  - L1000 `suspend fun getUserId (): String?`
+  - L1004 `suspend fun getOrCreateSessionForContact (contactId: String): String`
+  - L1045 `suspend fun sendMessageToContact ( contactId: String, plaintext: String, ttlSeconds: Int? = null ): EncryptedMessage`
+  - L1055 `suspend fun storeContactPrekeys ( contactId: String, identityKey: ByteArray, signedPreKey: ByteArray, oneTimePreKey: ByteArray? = null, signingPublicKey: ByteArray? = null )`
+  - L1106 `suspend fun getPublicKeyFingerprint (): String?`
+  - L1122 `suspend fun getPublicKeyHex (): String?`
+  - L1142 `suspend fun addContactWithPublicKey ( contactId: String, publicKeyHex: String, displayName: String, relaySendSecret: ByteArray? = null, allowKeyChange: Boolean = false ): ContactPairResult`
+  - L1185 `suspend fun getRelaySendSecret (contactId: String): ByteArray?`
+  - L1189 `suspend fun getRelayRecvSecret (contactId: String): ByteArray?`
+  - L1192 `private suspend fun decryptContactSecret (encrypted: ByteArray?): ByteArray?`
+  - L1210 `suspend fun bindRelayRecvSecret (contactId: String, secret: ByteArray)`
+  - L1228 `fun getIncomingConnectionRequests (): Flow<List<IncomingConnectionRequest>>`
+  - L1231 `suspend fun getIncomingConnectionRequest (senderIdentityPublicKeyHex: String): IncomingConnectionRequest?`
+  - L1236 `suspend fun saveIncomingConnectionRequest ( senderIdentityPublicKeyHex: String, senderUserId: String, senderUsername: String, senderSigningPublicKey: ByteArray, pairSecret: ByteArray, directAddress: String? )`
+  - L1256 `suspend fun deleteIncomingConnectionRequest (senderIdentityPublicKeyHex: String)`
+  - L1260 `fun getOutgoingConnectionRequests (): Flow<List<OutgoingConnectionRequest>>`
+  - L1263 `suspend fun getOutgoingConnectionRequest (recipientIdentityPublicKeyHex: String): OutgoingConnectionRequest?`
+  - L1268 `suspend fun saveOutgoingConnectionRequest ( recipientIdentityPublicKeyHex: String, recipientUsername: String, recipientSigningPublicKey: ByteArray, mintedPairSecret: ByteArray )`
+  - L1284 `suspend fun deleteOutgoingConnectionRequest (recipientIdentityPublicKeyHex: String)`
+  - L1288 `private fun hexToBytes (hex: String): ByteArray`
+  - L1296 `suspend fun deleteExpiredMessages (): Int`
+  - L1307 `suspend fun generatePreKeys (count: Int = 100): List<KeyBundle>`
+  - L1332 `suspend fun getUnusedPreKeys (): List<KeyBundle>`
+  - L1340 `suspend fun getOurPreKeySecret (preKeyId: Int): ByteArray?`
+  - L1345 `suspend fun markPreKeyAsUsed (preKeyId: Int)`
+  - L1355 `suspend fun saveRatchetSession ( contactId: String, protocol: SignalProtocol, isInitiator: Boolean, responderEphemeralHex: String?, initiatorOtkId: Int? )`
+  - L1392 `suspend fun loadRatchetSession (contactId: String): LoadedRatchetSession?`
+  - L1428 `suspend fun saveOutboxEnvelope (id: String, recipientId: String, envelope: String, clientMessageId: String? = null)`
+  - L1434 `suspend fun deleteOutboxEnvelope (id: String)`
+  - L1438 `suspend fun getAllOutboxEnvelopes (): List<OutboxEnvelope>`
+  - L1443 `fun observePendingClientMessageIds (): Flow<Set<String>>` — clientMessageId set of every message still awaiting the relay's ack, or still pending a resend — drives the "sending…" tick.
+  - L1452 `data class DecryptedPendingSend ( val clientMessageId: String, val recipientId: String, val plaintext: ByteArray, val ttlSeconds: Int? )`
+  - L1453 `val clientMessageId : String,`
+  - L1454 `val recipientId : String,`
+  - L1455 `val plaintext : ByteArray,`
+  - L1456 `val ttlSeconds : Int?`
+  - L1459 `private fun PendingSend ()`
+  - L1466 `suspend fun savePendingSend (clientMessageId: String, recipientId: String, plaintext: ByteArray, ttlSeconds: Int?)`
+  - L1478 `suspend fun deletePendingSend (clientMessageId: String)`
+  - L1482 `suspend fun getAllPendingSends (): List<DecryptedPendingSend>`
+  - L1486 `suspend fun getPendingSendsForContact (contactId: String): List<DecryptedPendingSend>`
+  - L1493 `suspend fun getSeenEnvelopeAckToken (key: String): String?`
+  - L1498 `suspend fun rememberSeenEnvelope (key: String, ackToken: String)`
+  - L1502 `suspend fun pruneSeenEnvelopesOlderThan (maxAgeMs: Long)`
+  - L1508 `suspend fun wipeAllData ()`
 
 ### app/src/main/java/com/securemessenger/app/media/ByteArrayMediaDataSource.kt (33 سطر)  [package com.securemessenger.app.media]
 - L10 `class ByteArrayMediaDataSource (private val data: ByteArray) : MediaDataSource()` — Lets MediaPlayer read decrypted audio/video straight from a byte array —
@@ -797,7 +850,7 @@ data class OutgoingConnectionRequest ( @PrimaryKey val recipientIdentityPublicKe
   - L374 `private suspend fun post (path: String, body: String): String?`
   - L398 `private fun randomBetween (minMs: Long, maxMs: Long): Long`
 
-### app/src/main/java/com/securemessenger/app/network/SecureMessagingClient.kt (2109 سطر) ⚠  [package com.securemessenger.app.network]
+### app/src/main/java/com/securemessenger/app/network/SecureMessagingClient.kt (2128 سطر) ⚠  [package com.securemessenger.app.network]
 - L51 `private const val TAG`
 - L54 `const val LOCAL_RELAY_PORT`
 - L57 `private const val TOKEN_ROTATION_MS`
@@ -904,55 +957,56 @@ data class OutgoingConnectionRequest ( @PrimaryKey val recipientIdentityPublicKe
   - L1380 `suspend fun sendTypingSignal (recipientId: String): Boolean`
   - L1399 `private suspend fun handleTypingEnvelope (outer: JSONObject)`
   - L1405 `private suspend fun handleMessageEnvelope (outer: JSONObject): String?`
-  - L1449 `private suspend fun cachedOrPersisted (contactId: String): SignalProtocol?`
-  - L1460 `private suspend fun persistSession (contactId: String)`
-  - L1486 `private suspend fun selectSessionForIncoming (senderId: String, json: JSONObject): SignalProtocol?`
-  - L1513 `private suspend fun createResponderSession (senderId: String, json: JSONObject): SignalProtocol`
-  - L1570 `private suspend fun getOrCreateInitiatorSession (contactId: String): SignalProtocol`
-  - L1628 `private suspend fun fetchPrekeyBundle (contactId: String): PrekeyBundle`
-  - L1680 `private suspend fun handleChallenge (outer: JSONObject, reply: (String) -> Unit)`
-  - L1723 `private suspend fun handleBundleAnnounce (outer: JSONObject)`
-  - L1754 `private fun parseBundleJson (json: JSONObject, expectedNonce: ByteArray?): PrekeyBundle?`
-  - L1771 `private suspend fun buildMyBundleAnnounce (nonce: ByteArray): JSONObject`
-  - L1822 `suspend fun pairWithScannedContact ( scannedUserId: String, identityKeyHex: String, displayName: String, pairSecretHex: String? = null, directAddress: String? = null, allowKeyChange: Boolean = false ): com.securemessenger.app.data.repository.ContactPairResult?`
-  - L1873 `sealed class ConnectionRequestResult`
-  - L1891 `suspend fun lookupUsername (username: String): DirectoryClient.LookupResult.Found?`
-  - L1903 `suspend fun sendConnectionRequest (username: String): ConnectionRequestResult`
-  - L1965 `suspend fun acceptConnectionRequest (senderIdentityPublicKeyHex: String): Boolean`
-  - L2030 `suspend fun rejectConnectionRequest (senderIdentityPublicKeyHex: String)`
-  - L2034 `private suspend fun getIdentityKeyPair (): SignalProtocol.IdentityKeyPair?`
-  - L2038 `private suspend fun getSignedPreKey (): SignalProtocol.PreKeyPair?`
-  - L2042 `private suspend fun getOneTimePreKeys (): List<SignalProtocol.PreKeyPair>`
-  - L2051 `private suspend fun getContactIdentityKey (contactId: String): ByteArray?`
-- L2060 `data class TransportStatus ( /** A direct socket to them is open right now. */ val isConnected: Boolean, /** Their discovery token is currently visible on this network (mDNS worked). */ val isDiscovered: Boolean, /** "host:port" we can dial even when mDNS finds nothing, or null if we've never had one. */ val rememberedAddress: String?, /** Relaying is on and we hold an outbound pair secret for them — so off-LAN delivery is possible. */ val hasRelayPath: Boolean )`
+  - L1461 `private suspend fun cachedOrPersisted (contactId: String): SignalProtocol?`
+  - L1472 `private suspend fun persistSession (contactId: String)`
+  - L1498 `private suspend fun selectSessionForIncoming (senderId: String, json: JSONObject): SignalProtocol?`
+  - L1525 `private suspend fun createResponderSession (senderId: String, json: JSONObject): SignalProtocol`
+  - L1582 `private suspend fun getOrCreateInitiatorSession (contactId: String): SignalProtocol`
+  - L1640 `private suspend fun fetchPrekeyBundle (contactId: String): PrekeyBundle`
+  - L1692 `private suspend fun handleChallenge (outer: JSONObject, reply: (String) -> Unit)`
+  - L1735 `private suspend fun handleBundleAnnounce (outer: JSONObject)`
+  - L1766 `private fun parseBundleJson (json: JSONObject, expectedNonce: ByteArray?): PrekeyBundle?`
+  - L1783 `private suspend fun buildMyBundleAnnounce (nonce: ByteArray): JSONObject`
+  - L1834 `suspend fun pairWithScannedContact ( scannedUserId: String, identityKeyHex: String, displayName: String, pairSecretHex: String? = null, directAddress: String? = null, allowKeyChange: Boolean = false ): com.securemessenger.app.data.repository.ContactPairResult?`
+  - L1885 `sealed class ConnectionRequestResult`
+  - L1903 `suspend fun lookupUsername (username: String): DirectoryClient.LookupResult.Found?`
+  - L1915 `suspend fun sendConnectionRequest (username: String): ConnectionRequestResult`
+  - L1977 `suspend fun acceptConnectionRequest (senderIdentityPublicKeyHex: String): Boolean`
+  - L2042 `suspend fun rejectConnectionRequest (senderIdentityPublicKeyHex: String)`
+  - L2046 `private suspend fun getIdentityKeyPair (): SignalProtocol.IdentityKeyPair?`
+  - L2050 `private suspend fun getSignedPreKey (): SignalProtocol.PreKeyPair?`
+  - L2054 `private suspend fun getOneTimePreKeys (): List<SignalProtocol.PreKeyPair>`
+  - L2063 `private suspend fun getContactIdentityKey (contactId: String): ByteArray?`
+- L2072 `data class TransportStatus ( /** A direct socket to them is open right now. */ val isConnected: Boolean, /** Their discovery token is currently visible on this network (mDNS worked). */ val isDiscovered: Boolean, /** "host:port" we can dial even when mDNS finds nothing, or null if we've never had one. */ val rememberedAddress: String?, /** Relaying is on and we hold an outbound pair secret for them — so off-LAN delivery is possible. */ val hasRelayPath: Boolean )`
   يُستخدم في: app/src/main/java/com/securemessenger/app/SecureMessengerApp.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatCommon.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatListScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/UsernameSearchScreen.kt
-- L2062 `val isConnected : Boolean,` — A direct socket to them is open right now.
-- L2064 `val isDiscovered : Boolean,` — Their discovery token is currently visible on this network (mDNS worked).
-- L2066 `val rememberedAddress : String?,` — "host:port" we can dial even when mDNS finds nothing, or null if we've never had one.
-- L2068 `val hasRelayPath : Boolean` — Relaying is on and we hold an outbound pair secret for them — so off-LAN delivery is possible.
-  - L2071 `val hasNoRouteAtAll : Boolean` — True when there is no way at all to get a message to them; the outbox will queue forever.
-  - L2075 `fun describe (): String` — A short Arabic description of the current situation, suitable for showing directly.
-- L2086 `sealed class ConnectionState`
+- L2074 `val isConnected : Boolean,` — A direct socket to them is open right now.
+- L2076 `val isDiscovered : Boolean,` — Their discovery token is currently visible on this network (mDNS worked).
+- L2078 `val rememberedAddress : String?,` — "host:port" we can dial even when mDNS finds nothing, or null if we've never had one.
+- L2080 `val hasRelayPath : Boolean` — Relaying is on and we hold an outbound pair secret for them — so off-LAN delivery is possible.
+  - L2083 `val hasNoRouteAtAll : Boolean` — True when there is no way at all to get a message to them; the outbox will queue forever.
+  - L2087 `fun describe (): String` — A short Arabic description of the current situation, suitable for showing directly.
+- L2098 `sealed class ConnectionState`
   يُستخدم في: app/src/main/java/com/securemessenger/app/SecureMessengerApp.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatCommon.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatListScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/UsernameSearchScreen.kt
-  - L2087 `object Connecting`
-  - L2088 `object Connected`
-  - L2089 `object Disconnected`
-  - L2090 `data class Error (val message: String) : ConnectionState()`
-- L2093 `data class MessageReceived ( val senderId: String, val plaintext: ByteArray, val senderIdentityKey: ByteArray? = null, val ttlSeconds: Int? = null, val messageId: String? = null )`
+  - L2099 `object Connecting`
+  - L2100 `object Connected`
+  - L2101 `object Disconnected`
+  - L2102 `data class Error (val message: String) : ConnectionState()`
+- L2105 `data class MessageReceived ( val senderId: String, val plaintext: ByteArray, val senderIdentityKey: ByteArray? = null, val ttlSeconds: Int? = null, val messageId: String? = null, /** * The sender's own send time, straight out of the sealed envelope. Null on * an envelope that carried none. It is a claim by the other device, not a * fact — [SecureRepository.orderingTimestamp] decides how far it is * allowed to move a message. */ val sentAt: Long? = null )`
   يُستخدم في: app/src/main/java/com/securemessenger/app/SecureMessengerApp.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatCommon.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatListScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/UsernameSearchScreen.kt
-- L2094 `val senderId : String,`
-- L2095 `val plaintext : ByteArray,`
-- L2096 `val senderIdentityKey : ByteArray?`
-- L2097 `val ttlSeconds : Int?`
-- L2098 `val messageId : String?`
-- L2101 `data class PrekeyBundle ( val identityKey: ByteArray, val signedPreKey: ByteArray, val signingPublicKey: ByteArray? = null, val oneTimePreKey: ByteArray?, val oneTimePreKeyId: Int? = null, val mlkemPublicKey: ByteArray? = null )`
+- L2106 `val senderId : String,`
+- L2107 `val plaintext : ByteArray,`
+- L2108 `val senderIdentityKey : ByteArray?`
+- L2109 `val ttlSeconds : Int?`
+- L2110 `val messageId : String?`
+- L2117 `val sentAt : Long?` — The sender's own send time, straight out of the sealed envelope. Null on
+- L2120 `data class PrekeyBundle ( val identityKey: ByteArray, val signedPreKey: ByteArray, val signingPublicKey: ByteArray? = null, val oneTimePreKey: ByteArray?, val oneTimePreKeyId: Int? = null, val mlkemPublicKey: ByteArray? = null )`
   يُستخدم في: app/src/main/java/com/securemessenger/app/SecureMessengerApp.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatCommon.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatListScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/UsernameSearchScreen.kt
-- L2102 `val identityKey : ByteArray,`
-- L2103 `val signedPreKey : ByteArray,`
-- L2104 `val signingPublicKey : ByteArray?`
-- L2105 `val oneTimePreKey : ByteArray?,`
-- L2106 `val oneTimePreKeyId : Int?`
-- L2107 `val mlkemPublicKey : ByteArray?`
+- L2121 `val identityKey : ByteArray,`
+- L2122 `val signedPreKey : ByteArray,`
+- L2123 `val signingPublicKey : ByteArray?`
+- L2124 `val oneTimePreKey : ByteArray?,`
+- L2125 `val oneTimePreKeyId : Int?`
+- L2126 `val mlkemPublicKey : ByteArray?`
 
 ### app/src/main/java/com/securemessenger/app/network/local/LanNetworkBinder.kt (147 سطر)  [package com.securemessenger.app.network.local]
 - L13 `private const val TAG`
@@ -993,9 +1047,9 @@ data class OutgoingConnectionRequest ( @PrimaryKey val recipientIdentityPublicKe
 - L17 `class SecretCodeReceiver : BroadcastReceiver()` — Stealth-mode re-entry. When the user dials the secret code (*#*#73287#*#*),
   - L18 `override fun onReceive (context: Context, intent: Intent)`
 
-### app/src/main/java/com/securemessenger/app/security/AppSettings.kt (478 سطر) ⚠  [package com.securemessenger.app.security]
+### app/src/main/java/com/securemessenger/app/security/AppSettings.kt (580 سطر) ⚠  [package com.securemessenger.app.security]
 - L14 `object AppSettings` — AppSettings - central, persistent store for user-facing app options.
-  يُستخدم في: app/src/main/java/com/securemessenger/app/network/RelayClient.kt, app/src/main/java/com/securemessenger/app/network/SecureMessagingClient.kt, app/src/main/java/com/securemessenger/app/receiver/SecretCodeReceiver.kt, app/src/main/java/com/securemessenger/app/service/MessengerService.kt, app/src/main/java/com/securemessenger/app/service/StealthExitTileService.kt, app/src/main/java/com/securemessenger/app/ui/MainActivity.kt, app/src/main/java/com/securemessenger/app/ui/navigation/AppNavigation.kt, app/src/main/java/com/securemessenger/app/ui/screens/calculator/CalculatorScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/NewChatScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/settings/ProfileScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/settings/SettingsScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/settings/StealthModeScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/setup/SetupScreen.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ConversationViewModel.kt
+  يُستخدم في: app/src/main/java/com/securemessenger/app/network/RelayClient.kt, app/src/main/java/com/securemessenger/app/network/SecureMessagingClient.kt, app/src/main/java/com/securemessenger/app/receiver/SecretCodeReceiver.kt, app/src/main/java/com/securemessenger/app/service/MessengerService.kt, app/src/main/java/com/securemessenger/app/service/StealthExitTileService.kt, app/src/main/java/com/securemessenger/app/ui/MainActivity.kt, app/src/main/java/com/securemessenger/app/ui/navigation/AppNavigation.kt, app/src/main/java/com/securemessenger/app/ui/screens/calculator/CalculatorScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/NewChatScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/settings/ProfileScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/settings/SettingsScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/settings/StealthModeScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/setup/SetupScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/setup/SetupSteps.kt, app/src/main/java/com/securemessenger/app/ui/screens/verification/KeyVerificationScreen.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ConversationViewModel.kt
   - L16 `private const val KEY_AUTODESTRUCT`
   - L17 `private const val KEY_AUTODESTRUCT_SECONDS`
   - L18 `private const val KEY_STEALTH`
@@ -1011,66 +1065,75 @@ data class OutgoingConnectionRequest ( @PrimaryKey val recipientIdentityPublicKe
   - L28 `private const val KEY_BACKGROUND_DELIVERY`
   - L29 `private const val KEY_NOTIFICATION_MODE`
   - L31 `const val DEFAULT_AUTODESTRUCT_SECONDS`
-  - L40 `fun hasAccessCode (context: Context): Boolean` — True once an unlock code has been chosen (the gate never matches while unset).
-  - L43 `fun setAccessCode (context: Context, code: String)`
-  - L53 `fun verifyAccessCode (context: Context, input: String): Boolean` — Constant-time check of a typed number against the stored access code.
-  - L65 `fun hasDuressCode (context: Context): Boolean` — An optional, separate digit sequence: typed on the calculator instead of
-  - L68 `fun setDuressCode (context: Context, code: String?)`
-  - L73 `fun verifyDuressCode (context: Context, input: String): Boolean`
-  - L96 `private const val BOOTSTRAP_PREFS_NAME`
-  - L97 `private const val KEY_BOOTSTRAP_ARMED`
-  - L99 `private fun bootstrapPrefs (context: Context)`
-  - L103 `fun isBootstrapArmed (context: Context): Boolean` — True while the fresh-install bootstrap path should still work. Defaults true (a never-before-seen install has no reason to be locked out of Setup).
-  - L107 `fun disarmBootstrap (context: Context)` — Called the moment a real access code is chosen (see setAccessCode) — the bootstrap path has done its one job.
-  - L117 `fun rearmBootstrap (context: Context)` — Re-opens the bootstrap path. Only ever called from [SecretCodeReceiver],
-  - L131 `private const val KEY_CODE_MISS_STREAK`
-  - L132 `private const val KEY_CODE_LOCKED_UNTIL`
-  - L134 `fun codeMissStreak (context: Context): Int`
-  - L137 `fun setCodeMissStreak (context: Context, streak: Int)`
-  - L141 `fun codeCheckLockedUntil (context: Context): Long` — Epoch millis until which further code checks are paused — the calculator itself keeps working normally throughout.
-  - L144 `fun setCodeCheckLockedUntil (context: Context, until: Long)`
-  - L149 `private fun hashCode (code: String): String`
-  - L161 `private val DUMMY_SALT`
-  - L163 `private fun verifyStoredCode ( context: Context, key: String, input: String, migrate: (String) -> Unit ): Boolean`
-  - L204 `fun isAutoDestructEnabled (context: Context): Boolean`
-  - L207 `fun setAutoDestructEnabled (context: Context, enabled: Boolean)`
-  - L210 `fun getAutoDestructSeconds (context: Context): Int`
-  - L213 `fun setAutoDestructSeconds (context: Context, seconds: Int)`
-  - L220 `fun messageTtlSeconds (context: Context): Int?` — The TTL (in seconds) to apply to a newly sent message, or null if
-  - L225 `fun isStealthEnabled (context: Context): Boolean`
-  - L228 `fun setStealthEnabled (context: Context, enabled: Boolean)`
-  - L233 `fun getUsername (context: Context): String?`
-  - L236 `fun setUsername (context: Context, username: String)`
-  - L239 `fun clearUsername (context: Context)`
-  - L252 `fun isUsernameClaimedRemotely (context: Context): Boolean` — Whether our local username has actually been claimed on the directory
-  - L255 `fun setUsernameClaimedRemotely (context: Context, claimed: Boolean)`
-  - L261 `val autoDestructLabels : List<String>` — Ordered list of the labels shown in the settings dropdown.
-  - L264 `private val labelToSeconds : Map<String, Int>`
-  - L271 `fun labelToSeconds (label: String): Int`
-  - L274 `fun secondsToLabel (seconds: Int): String`
-  - L279 `enum class ThemeMode`
-  - L283 `private val _themeMode`
-  - L289 `val themeMode`
-  - L291 `fun setThemeMode (context: Context, mode: ThemeMode)`
-  - L304 `fun isCoverTrafficEnabled (context: Context): Boolean` — Cover traffic: send indistinguishable dummy messages at random intervals
-  - L307 `fun setCoverTrafficEnabled (context: Context, enabled: Boolean)`
-  - L311 `fun isRelayEnabled (context: Context): Boolean` — Whether to fall back to the blind relay at all when a contact isn't on the local network.
-  - L314 `fun setRelayEnabled (context: Context, enabled: Boolean)`
-  - L325 `private const val MAX_PENDING_SECRETS`
-  - L326 `private const val PENDING_SECRET_TTL_MS`
-  - L329 `fun addPendingPairSecret (context: Context, secretHex: String)` — Record a freshly-minted secret as "issued, not yet claimed".
-  - L342 `fun pendingPairSecrets (context: Context): List<String>` — Every still-valid issued secret, newest first. Expired entries are pruned on read.
-  - L344 `private fun pendingIssuedAt (context: Context, hex: String): Long?`
-  - L347 `private fun readPending (context: Context): List<Pair<String, Long>>`
-  - L364 `fun removePendingPairSecret (context: Context, secretHex: String)` — The secret has been bound to a real contact — stop listening for it as an unclaimed one.
-  - L391 `fun isBackgroundDeliveryEnabled (context: Context): Boolean`
-  - L394 `fun setBackgroundDeliveryEnabled (context: Context, enabled: Boolean)`
-  - L404 `enum class NotificationMode`
-  - L413 `fun notificationMode (context: Context): NotificationMode`
-  - L420 `fun setNotificationMode (context: Context, mode: NotificationMode)`
-  - L450 `private fun readDirectAddresses (context: Context): MutableMap<String, String>`
-  - L463 `fun directAddress (context: Context, contactId: String): String?` — The remembered address for [contactId], or null if we've never had one.
-  - L471 `fun setDirectAddress (context: Context, contactId: String, hostPort: String?)` — Remember (or clear, with a null/blank [hostPort]) where this contact can
+  - L57 `val CODE_LENGTH_RANGE` — The one rule both places that *choose* a code must agree on.
+  - L60 `fun isTypeableCode (code: String): Boolean` — True when [code] is a code the calculator can actually be used to enter.
+  - L64 `fun hasAccessCode (context: Context): Boolean` — True once an unlock code has been chosen (the gate never matches while unset).
+  - L67 `fun setAccessCode (context: Context, code: String)`
+  - L77 `fun verifyAccessCode (context: Context, input: String): Boolean` — Constant-time check of a typed number against the stored access code.
+  - L89 `fun hasDuressCode (context: Context): Boolean` — An optional, separate digit sequence: typed on the calculator instead of
+  - L92 `fun setDuressCode (context: Context, code: String?)`
+  - L97 `fun verifyDuressCode (context: Context, input: String): Boolean`
+  - L120 `private const val BOOTSTRAP_PREFS_NAME`
+  - L121 `private const val KEY_BOOTSTRAP_ARMED`
+  - L123 `private fun bootstrapPrefs (context: Context)`
+  - L127 `fun isBootstrapArmed (context: Context): Boolean` — True while the fresh-install bootstrap path should still work. Defaults true (a never-before-seen install has no reason to be locked out of Setup).
+  - L131 `fun disarmBootstrap (context: Context)` — Called the moment a real access code is chosen (see setAccessCode) — the bootstrap path has done its one job.
+  - L141 `fun rearmBootstrap (context: Context)` — Re-opens the bootstrap path. Only ever called from [SecretCodeReceiver],
+  - L155 `private const val KEY_CODE_MISS_STREAK`
+  - L156 `private const val KEY_CODE_LOCKED_UNTIL`
+  - L158 `fun codeMissStreak (context: Context): Int`
+  - L161 `fun setCodeMissStreak (context: Context, streak: Int)`
+  - L165 `fun codeCheckLockedUntil (context: Context): Long` — Epoch millis until which further code checks are paused — the calculator itself keeps working normally throughout.
+  - L168 `fun setCodeCheckLockedUntil (context: Context, until: Long)`
+  - L173 `private fun hashCode (code: String): String`
+  - L185 `private val DUMMY_SALT`
+  - L187 `private fun verifyStoredCode ( context: Context, key: String, input: String, migrate: (String) -> Unit ): Boolean`
+  - L228 `fun isAutoDestructEnabled (context: Context): Boolean`
+  - L231 `fun setAutoDestructEnabled (context: Context, enabled: Boolean)`
+  - L234 `fun getAutoDestructSeconds (context: Context): Int`
+  - L237 `fun setAutoDestructSeconds (context: Context, seconds: Int)`
+  - L244 `fun messageTtlSeconds (context: Context): Int?` — The TTL (in seconds) to apply to a newly sent message, or null if
+  - L249 `fun isStealthEnabled (context: Context): Boolean`
+  - L252 `fun setStealthEnabled (context: Context, enabled: Boolean)`
+  - L257 `fun getUsername (context: Context): String?`
+  - L260 `fun setUsername (context: Context, username: String)`
+  - L263 `fun clearUsername (context: Context)`
+  - L276 `fun isUsernameClaimedRemotely (context: Context): Boolean` — Whether our local username has actually been claimed on the directory
+  - L279 `fun setUsernameClaimedRemotely (context: Context, claimed: Boolean)`
+  - L285 `val autoDestructLabels : List<String>` — Ordered list of the labels shown in the settings dropdown.
+  - L288 `private val labelToSeconds : Map<String, Int>`
+  - L295 `fun labelToSeconds (label: String): Int`
+  - L298 `fun secondsToLabel (seconds: Int): String`
+  - L303 `enum class ThemeMode`
+  - L307 `private val _themeMode`
+  - L313 `val themeMode`
+  - L315 `fun setThemeMode (context: Context, mode: ThemeMode)`
+  - L328 `fun isCoverTrafficEnabled (context: Context): Boolean` — Cover traffic: send indistinguishable dummy messages at random intervals
+  - L331 `fun setCoverTrafficEnabled (context: Context, enabled: Boolean)`
+  - L335 `fun isRelayEnabled (context: Context): Boolean` — Whether to fall back to the blind relay at all when a contact isn't on the local network.
+  - L338 `fun setRelayEnabled (context: Context, enabled: Boolean)`
+  - L369 `private const val MAX_PENDING_SECRETS`
+  - L370 `private const val MAX_EXPORTED_SECRETS`
+  - L371 `private const val PENDING_SECRET_TTL_MS`
+  - L374 `const val EXPORTED_SECRET_VALIDITY_DAYS`
+  - L375 `private const val EXPORTED_SECRET_TTL_MS`
+  - L377 `internal data class PendingSecret (val hex: String, val issuedAt: Long, val exported: Boolean)`
+  - L386 `internal fun withNewSecret ( existing: List<PendingSecret>, secretHex: String, now: Long ): List<PendingSecret>`
+  - L398 `internal fun withExported ( existing: List<PendingSecret>, secretHex: String, now: Long ): List<PendingSecret>`
+  - L412 `fun addPendingPairSecret (context: Context, secretHex: String)` — Record a freshly-minted secret as "issued, not yet claimed".
+  - L425 `fun markPairSecretExported (context: Context, secretHex: String)` — This code has left the device — as an image or as text — so somebody may
+  - L435 `fun pendingPairSecrets (context: Context): List<String>` — Every still-valid issued secret, newest first. Expired entries are pruned on read.
+  - L437 `private fun readPending (context: Context): List<PendingSecret>`
+  - L457 `private fun writePending (context: Context, entries: List<PendingSecret>)`
+  - L471 `fun removePendingPairSecret (context: Context, secretHex: String)` — The secret has been bound to a real contact — stop listening for it as an unclaimed one.
+  - L493 `fun isBackgroundDeliveryEnabled (context: Context): Boolean`
+  - L496 `fun setBackgroundDeliveryEnabled (context: Context, enabled: Boolean)`
+  - L506 `enum class NotificationMode`
+  - L515 `fun notificationMode (context: Context): NotificationMode`
+  - L522 `fun setNotificationMode (context: Context, mode: NotificationMode)`
+  - L552 `private fun readDirectAddresses (context: Context): MutableMap<String, String>`
+  - L565 `fun directAddress (context: Context, contactId: String): String?` — The remembered address for [contactId], or null if we've never had one.
+  - L573 `fun setDirectAddress (context: Context, contactId: String, hostPort: String?)` — Remember (or clear, with a null/blank [hostPort]) where this contact can
 
 ### app/src/main/java/com/securemessenger/app/security/BiometricGate.kt (136 سطر)  [package com.securemessenger.app.security]
 - L21 `object BiometricGate` — Gates revealing the hidden messenger behind the device's own biometric/PIN
@@ -1168,7 +1231,7 @@ data class OutgoingConnectionRequest ( @PrimaryKey val recipientIdentityPublicKe
 - L3 `private val USERNAME_LIKE`
 - L10 `fun formatContactName (raw: String): String` — A stored contact name is either a claimed @username or (when we never
 
-### app/src/main/java/com/securemessenger/app/ui/GlassComponents.kt (147 سطر)  [package com.securemessenger.app.ui]
+### app/src/main/java/com/securemessenger/app/ui/GlassComponents.kt (256 سطر)  [package com.securemessenger.app.ui]
 - L52 `fun Modifier (colors: List<Color>): Modifier` — The page backdrop every glass screen sits on — now the drifting aurora the
 - L61 `fun Modifier` — The backdrop for onboarding and security moments (Setup, Loading, Stealth
 - L71 `fun Modifier (radius: Dp = 16.dp, strong: Boolean = false): Modifier` — The single reusable "glass card" surface — a translucent rounded panel
@@ -1176,6 +1239,14 @@ data class OutgoingConnectionRequest ( @PrimaryKey val recipientIdentityPublicKe
   - L103 `val mc`
 - L128 `@Composable fun GlassTopBar ( title: String, modifier: Modifier = Modifier, onBack: (() -> Unit)? = null, actions: (@Composable RowScope.() -> Unit)? = null )` — Plain-text convenience overload of [GlassTopBar].
   - L134 `val mc`
+- L148 `data class GlassNavItem ( val label: String, val icon: ImageVector, /** e.g. pending connection-request count on "جهات الاتصال" — 0 shows no badge at all. */ val badgeCount: Int = 0 )`
+  يُستخدم في: app/src/main/java/com/securemessenger/app/ui/navigation/AppNavigation.kt
+- L149 `val label : String,`
+- L150 `val icon : ImageVector,`
+- L152 `val badgeCount : Int` — e.g. pending connection-request count on "جهات الاتصال" — 0 shows no badge at all.
+- L179 `@OptIn(ExperimentalMaterial3Api::class)
+@Composable fun GlassBottomNavBar ( items: List<GlassNavItem>, selectedIndex: Int, onSelect: (Int) -> Unit, modifier: Modifier = Modifier )` — Floating frosted-pill bottom navigation bar — Telegram-style, glassy, with
+  - L185 `val mc`
 
 ### app/src/main/java/com/securemessenger/app/ui/MainActivity.kt (112 سطر)  [package com.securemessenger.app.ui]
 - L28 `class MainActivity : FragmentActivity()` — MainActivity - Entry point for the app UI.
@@ -1242,41 +1313,38 @@ private fun rememberLiquidPalette (dark: Boolean): LiquidPalette`
 - L356 `@Composable fun rememberPressScale ( source: MutableInteractionSource, pressedScale: Float = 0.972f ): State<Float>` — Press feedback as a spring rather than a ripple. Glass does not ripple; it
   - L360 `val pressed`
 
-### app/src/main/java/com/securemessenger/app/ui/navigation/AppNavigation.kt (496 سطر) ⚠  [package com.securemessenger.app.ui.navigation]
-- L45 `sealed class Screen (val route: String)`
-  - L46 `object Calculator`
-  - L47 `object Loading`
-  - L48 `object Setup`
-  - L49 `object ChatList`
-  - L50 `object Conversation`
-  - L53 `object Settings`
-  - L54 `object KeyVerification`
-  - L58 `object StealthMode`
-  - L59 `object NewChat`
-  - L60 `object UsernameSearch`
-  - L61 `object ConnectionRequests`
-  - L62 `object ContactDetail`
-  - L65 `object Profile`
-- L80 `private val DISGUISE_ROUTES`
-- L81 `private val TAB_ROUTES`
-- L83 `private val NavEasing`
-- L84 `private const val SLIDE_MS`
-- L85 `private const val CROSSFADE_MS`
-- L87 `private fun baseRoute (entry: NavBackStackEntry): String`
-- L90 `private fun AnimatedContentTransitionScope`
-- L93 `private fun AnimatedContentTransitionScope`
-- L113 `@Composable
+### app/src/main/java/com/securemessenger/app/ui/navigation/AppNavigation.kt (563 سطر) ⚠  [package com.securemessenger.app.ui.navigation]
+- L59 `sealed class Screen (val route: String)`
+  - L60 `object Calculator`
+  - L61 `object Loading`
+  - L62 `object Setup`
+  - L63 `object ChatList`
+  - L64 `object Conversation`
+  - L67 `object Settings`
+  - L68 `object KeyVerification`
+  - L72 `object StealthMode`
+  - L73 `object NewChat`
+  - L74 `object UsernameSearch`
+  - L75 `object ConnectionRequests`
+  - L76 `object ContactDetail`
+  - L79 `object Profile`
+- L101 `private val DISGUISE_ROUTES`
+- L110 `private val ROOT_ROUTES`
+- L116 `private val NavEasing`
+- L117 `private const val SLIDE_MS`
+- L118 `private const val CROSSFADE_MS`
+- L120 `private fun baseRoute (entry: NavBackStackEntry): String`
+- L123 `private fun AnimatedContentTransitionScope`
+- L143 `@Composable
 private fun RevealedOnly (content: @Composable () -> Unit)`
-  - L114 `val isRevealed`
-- L119 `@Composable fun AppNavigation ()`
-  - L120 `val navController`
-  - L121 `val context`
-  - L122 `val isRevealed`
-  - L123 `val currentRoute`
-  - L128 `var showRootWarning`
-  - L180 `val navToChats`
-  - L186 `val navToContacts`
-  - L189 `val navToProfile`
+  - L144 `val isRevealed`
+- L149 `@Composable fun AppNavigation ()`
+  - L150 `val navController`
+  - L151 `val context`
+  - L152 `val isRevealed`
+  - L153 `val currentRoute`
+  - L158 `var showRootWarning`
+  - L183 `val selectTab`
 
 ### app/src/main/java/com/securemessenger/app/ui/screens/calculator/CalculatorScreen.kt (372 سطر) ⚠  [package com.securemessenger.app.ui.screens.calculator]
 - L37 `private data class CalcPalette ( val screenBg: Brush, val display: Color, val expression: Color, val topKey: Color, val topKeyText: Color, val digitKey: Color, val digitText: Color, val operatorKey: Color, val equalsKey: Color, val keyText: Color )`
@@ -1405,54 +1473,48 @@ private fun ChatListItemDarkPreview ()`
 @Composable
 private fun ChatListItemLightPreview ()`
 
-### app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatListScreen.kt (722 سطر) ⚠  [package com.securemessenger.app.ui.screens.chat]
-- L72 `@Composable fun ChatListScreen ( onConversationClick: (String) -> Unit, onSettingsClick: () -> Unit, onNewChatClick: () -> Unit, onProfileClick: () -> Unit = {}, onConnectionRequestsClick: () -> Unit = {}, viewModel: ChatListViewModel = viewModel(), connectionRequestsViewModel: ConnectionRequestsViewModel = viewModel() )` — The home screen, rebuilt on the liquid-glass layer in
-  - L81 `val contacts`
-  - L82 `val isLoading`
-  - L83 `val incomingRequests`
-- L110 `@OptIn(ExperimentalFoundationApi::class)
+### app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatListScreen.kt (646 سطر) ⚠  [package com.securemessenger.app.ui.screens.chat]
+- L71 `@Composable fun ChatListScreen ( onConversationClick: (String) -> Unit, onNewChatClick: () -> Unit, onConnectionRequestsClick: () -> Unit = {}, viewModel: ChatListViewModel = viewModel(), connectionRequestsViewModel: ConnectionRequestsViewModel = viewModel() )` — The home screen, rebuilt on the liquid-glass layer in
+  - L78 `val contacts`
+  - L79 `val isLoading`
+  - L80 `val incomingRequests`
+- L105 `@OptIn(ExperimentalFoundationApi::class)
 @Composable
-internal fun ChatListContent ( contacts: List<ContactUiModel>, isLoading: Boolean, pendingRequestCount: Int, onConversationClick: (String) -> Unit, onTogglePin: (String) -> Unit, onSettingsClick: () -> Unit, onNewChatClick: () -> Unit, onProfileClick: () -> Unit, onConnectionRequestsClick: () -> Unit, modifier: Modifier = Modifier )`
-- L267 `@Composable
-private fun HeaderTitle ( collapse: Float, conversationCount: Int, onSettingsClick: () -> Unit, onProfileClick: () -> Unit )`
-  - L273 `val palette`
-  - L274 `val primary`
-- L333 `private fun conversationSubtitle (count: Int): String`
-- L343 `@Composable
-private fun HeaderAction ( icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, onClick: () -> Unit )`
-  - L348 `val palette`
-- L374 `@Composable
+internal fun ChatListContent ( contacts: List<ContactUiModel>, isLoading: Boolean, pendingRequestCount: Int, onConversationClick: (String) -> Unit, onTogglePin: (String) -> Unit, onNewChatClick: () -> Unit, onConnectionRequestsClick: () -> Unit, modifier: Modifier = Modifier )`
+- L249 `@Composable
+private fun HeaderTitle ( collapse: Float, conversationCount: Int )`
+  - L253 `val palette`
+  - L254 `val primary`
+- L310 `private fun conversationSubtitle (count: Int): String`
+- L327 `@Composable
 private fun PendingRequestsBanner (count: Int, onClick: () -> Unit)`
-  - L375 `val primary`
-- L411 `private fun pendingRequestsLabel (count: Int): String`
-- L428 `@Composable
+  - L328 `val primary`
+- L364 `private fun pendingRequestsLabel (count: Int): String`
+- L381 `@Composable
 private fun LiquidConnectionStrip ()`
-  - L429 `val palette`
-  - L430 `val state`
-- L485 `@Composable
+  - L382 `val palette`
+  - L383 `val state`
+- L438 `@Composable
 private fun SearchField ( value: String, onValueChange: (String) -> Unit, modifier: Modifier = Modifier )`
-  - L490 `val palette`
-  - L491 `val primary`
-  - L492 `val interaction`
-  - L493 `val focused`
-- L547 `@Composable
-private fun NewChatButton (collapsed: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier)`
-  - L548 `val primary`
-- L579 `@Composable
+  - L443 `val palette`
+  - L444 `val primary`
+  - L445 `val interaction`
+  - L446 `val focused`
+- L499 `@Composable
 private fun EmptyState (onNewChatClick: () -> Unit, topPadding: androidx.compose.ui.unit.Dp)`
-  - L580 `val palette`
-  - L581 `val primary`
-  - L582 `val breath`
-  - L583 `val scale`
-- L647 `@Composable
+  - L500 `val palette`
+  - L501 `val primary`
+  - L502 `val breath`
+  - L503 `val scale`
+- L571 `@Composable
 private fun NoResults (query: String, topPadding: androidx.compose.ui.unit.Dp)`
-  - L648 `val palette`
-- L674 `@Composable
+  - L572 `val palette`
+- L598 `@Composable
 private fun LoadingList (topPadding: androidx.compose.ui.unit.Dp)`
-- L687 `@Composable
+- L611 `@Composable
 private fun ChatListItemSkeleton ()`
-- L710 `private fun Modifier (onClick: () -> Unit): Modifier`
-  - L711 `val interaction`
+- L634 `private fun Modifier (onClick: () -> Unit): Modifier`
+  - L635 `val interaction`
 
 ### app/src/main/java/com/securemessenger/app/ui/screens/chat/ComposeStrips.kt (126 سطر)  [package com.securemessenger.app.ui.screens.chat]
 - L28 `@Composable
@@ -1481,7 +1543,7 @@ internal fun MediaGridTile ( message: EncryptedMessage, repository: com.secureme
   - L40 `val context`
   - L56 `val bmp`
 
-### app/src/main/java/com/securemessenger/app/ui/screens/chat/ContactDetailScreen.kt (569 سطر) ⚠  [package com.securemessenger.app.ui.screens.chat]
+### app/src/main/java/com/securemessenger/app/ui/screens/chat/ContactDetailScreen.kt (578 سطر) ⚠  [package com.securemessenger.app.ui.screens.chat]
 - L55 `@OptIn(ExperimentalMaterial3Api::class)
 @Composable fun ContactDetailScreen ( contactId: String, onBackClick: () -> Unit, onVerifyClick: () -> Unit )` — Contact info screen: avatar (tap to set a local photo), nickname, mute,
   - L60 `val repository`
@@ -1499,26 +1561,26 @@ internal fun MediaGridTile ( message: EncryptedMessage, repository: com.secureme
   - L73 `var fullscreenImage`
   - L74 `var transport`
   - L78 `suspend fun reload ()`
-  - L124 `val avatarPicker`
-  - L137 `val shownName`
-  - L138 `val isMuted`
-  - L139 `val isBlocked`
-  - L140 `val isVerified`
-  - L145 `val contactKeyHex`
-  - L428 `val shownImage`
-- L455 `@Composable
+  - L128 `val avatarPicker`
+  - L141 `val shownName`
+  - L142 `val isMuted`
+  - L143 `val isBlocked`
+  - L144 `val isVerified`
+  - L149 `val contactKeyHex`
+  - L437 `val shownImage`
+- L464 `@Composable
 private fun ConnectivityCard ( status: com.securemessenger.app.network.TransportStatus?, onEditAddress: () -> Unit )`
-  - L459 `val mc`
-  - L460 `val tint`
-- L506 `@Composable
+  - L468 `val mc`
+  - L469 `val tint`
+- L515 `@Composable
 private fun QuickAction (icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, onClick: () -> Unit)`
-  - L507 `val mc`
-- L520 `@Composable
+  - L516 `val mc`
+- L529 `@Composable
 private fun SecurityNumberCard (keyHex: String?, onClick: () -> Unit)`
-  - L521 `val mc`
-- L551 `@Composable
+  - L530 `val mc`
+- L560 `@Composable
 private fun MediaPreviewStrip (tiles: List<androidx.compose.ui.graphics.ImageBitmap>)`
-  - L552 `val gradients`
+  - L561 `val gradients`
 
 ### app/src/main/java/com/securemessenger/app/ui/screens/chat/ConversationRows.kt (90 سطر)  [package com.securemessenger.app.ui.screens.chat]
 - L11 `internal sealed class ChatRow (val key: String)`
@@ -1539,7 +1601,7 @@ private fun MediaPreviewStrip (tiles: List<androidx.compose.ui.graphics.ImageBit
   - L78 `val then`
   - L79 `fun sameDay (offset: Int): Boolean`
 
-### app/src/main/java/com/securemessenger/app/ui/screens/chat/ConversationScreen.kt (658 سطر) ⚠  [package com.securemessenger.app.ui.screens.chat]
+### app/src/main/java/com/securemessenger/app/ui/screens/chat/ConversationScreen.kt (703 سطر) ⚠  [package com.securemessenger.app.ui.screens.chat]
 - L58 `@OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable fun ConversationScreen ( contactId: String, onBackClick: () -> Unit, onVerificationClick: () -> Unit, onContactInfoClick: () -> Unit = {}, viewModel: ConversationViewModel = viewModel( key = contactId, factory = ConversationViewModelFactory(contactId) ) )`
   - L68 `var messageText`
@@ -1692,40 +1754,43 @@ internal fun MessageInput ( value: String, onValueChange: (String) -> Unit, onSe
 private fun EmojiPanel (onEmojiClick: (String) -> Unit)`
   - L277 `val emojis`
 
-### app/src/main/java/com/securemessenger/app/ui/screens/chat/NewChatScreen.kt (473 سطر) ⚠  [package com.securemessenger.app.ui.screens.chat]
-- L57 `@Composable fun NewChatScreen ( onBackClick: () -> Unit, onContactAdded: (String) -> Unit, onSearchByUsernameClick: () -> Unit = {}, onConnectionRequestsClick: () -> Unit = {}, connectionRequestsViewModel: ConnectionRequestsViewModel = viewModel() )` — No directory server to search anymore — adding someone is an in-person
-  - L64 `val repository`
-  - L65 `val mc`
-  - L66 `val context`
-  - L67 `val scope`
-  - L68 `val pendingRequests`
-  - L69 `val clipboard`
-  - L70 `var isLoading`
-  - L71 `var errorMessage`
-  - L75 `var statusMessage`
-  - L76 `var myUsername`
-  - L77 `var showShareDialog`
-  - L83 `var showCopyDialog`
-  - L88 `var pendingKeyChangeScan`
-  - L90 `var myQrPayload`
-  - L120 `val myQrBitmap`
-  - L124 `suspend fun pairFromPayload (scanned: String, allowKeyChange: Boolean = false)`
-  - L167 `val scanLauncher`
-  - L175 `val imagePickLauncher`
+### app/src/main/java/com/securemessenger/app/ui/screens/chat/NewChatScreen.kt (512 سطر) ⚠  [package com.securemessenger.app.ui.screens.chat]
+- L57 `@Composable fun NewChatScreen ( /** Null on the tab root — a root has nowhere to go back to. */ onBackClick: (() -> Unit)? = null, onContactAdded: (String) -> Unit, onSearchByUsernameClick: () -> Unit = {}, onConnectionRequestsClick: () -> Unit = {}, connectionRequestsViewModel: ConnectionRequestsViewModel = viewModel() )` — No directory server to search anymore — adding someone is an in-person
+  - L65 `val repository`
+  - L66 `val mc`
+  - L67 `val context`
+  - L68 `val scope`
+  - L69 `val pendingRequests`
+  - L70 `val clipboard`
+  - L71 `var isLoading`
+  - L72 `var errorMessage`
+  - L76 `var statusMessage`
+  - L77 `var myUsername`
+  - L78 `var showShareDialog`
+  - L84 `var showCopyDialog`
+  - L89 `var pendingKeyChangeScan`
+  - L91 `var myQrPayload`
+  - L96 `var myPairSecretHex`
+  - L127 `val myQrBitmap`
+  - L131 `suspend fun pairFromPayload (scanned: String, allowKeyChange: Boolean = false)`
+  - L174 `val scanLauncher`
+  - L182 `val imagePickLauncher`
 
-### app/src/main/java/com/securemessenger/app/ui/screens/chat/QrImage.kt (279 سطر)  [package com.securemessenger.app.ui.screens.chat]
+### app/src/main/java/com/securemessenger/app/ui/screens/chat/QrImage.kt (312 سطر) ⚠  [package com.securemessenger.app.ui.screens.chat]
 - L39 `object QrImage` — Rendering a pairing QR to an image, sharing it, and reading one back out of a
+  يُستخدم في: app/src/main/java/com/securemessenger/app/ui/screens/verification/KeyVerificationScreen.kt
   - L58 `private const val SIZE_PX`
   - L61 `private const val MAX_DECODE_EDGE`
   - L72 `private val ERROR_CORRECTION_LADDER`
-  - L84 `fun stripRelaySecret (payload: String): String` — A copy of [payload] with the relay pair secret removed. The result pairs
-  - L115 `fun render (data: String): Bitmap?` — Render a pairing code, and **prove we can read it back before returning
-  - L140 `private fun verifyReadable (bitmap: Bitmap): String?`
-  - L157 `private fun renderAt (data: String, correction: ErrorCorrectionLevel): Bitmap?`
-  - L195 `fun share (context: Context, payload: String, caption: String): Boolean` — Write the code to a cache file and hand it to the system share sheet.
-  - L225 `fun decodeFromImage (context: Context, uri: Uri): String?` — Read a QR code out of a picture the user selected. Returns null when the
-  - L235 `fun decodeFromBitmap (bitmap: Bitmap): String?` — The decoding itself, split out from the file loading so it can be exercised directly.
-  - L263 `private fun loadDownsampled (context: Context, uri: Uri): Bitmap?`
+  - L97 `fun identityPayload ( userId: String, publicKeyHex: String, username: String, directAddress: String? = null, pairSecretHex: String? = null ): String` — THE app's code. One shape, built in one place.
+  - L117 `fun stripRelaySecret (payload: String): String` — A copy of [payload] with the relay pair secret removed. The result pairs
+  - L148 `fun render (data: String): Bitmap?` — Render a pairing code, and **prove we can read it back before returning
+  - L173 `private fun verifyReadable (bitmap: Bitmap): String?`
+  - L190 `private fun renderAt (data: String, correction: ErrorCorrectionLevel): Bitmap?`
+  - L228 `fun share (context: Context, payload: String, caption: String): Boolean` — Write the code to a cache file and hand it to the system share sheet.
+  - L258 `fun decodeFromImage (context: Context, uri: Uri): String?` — Read a QR code out of a picture the user selected. Returns null when the
+  - L268 `fun decodeFromBitmap (bitmap: Bitmap): String?` — The decoding itself, split out from the file loading so it can be exercised directly.
+  - L296 `private fun loadDownsampled (context: Context, uri: Uri): Bitmap?`
 
 ### app/src/main/java/com/securemessenger/app/ui/screens/chat/UsernameSearchScreen.kt (219 سطر)  [package com.securemessenger.app.ui.screens.chat]
 - L30 `private sealed class LookupState`
@@ -1802,32 +1867,34 @@ internal fun RowValue (text: String)`
 internal fun SettingsDropdownSheet ( title: String, options: List<String>, selectedOption: String, onDismiss: () -> Unit, onOptionSelected: (String) -> Unit )`
   - L124 `val mc`
 
-### app/src/main/java/com/securemessenger/app/ui/screens/settings/SettingsScreen.kt (619 سطر) ⚠  [package com.securemessenger.app.ui.screens.settings]
-- L46 `@OptIn(ExperimentalMaterial3Api::class)
-@Composable fun SettingsScreen ( onBackClick: () -> Unit, onVerificationClick: () -> Unit, onStealthModeClick: () -> Unit, onDataWiped: () -> Unit, onProfileClick: () -> Unit = {}, )` — SettingsScreen - Security settings and app configuration.
-  - L53 `val context`
-  - L54 `val scope`
-  - L55 `val snackbarHostState`
-  - L56 `val mc`
-  - L58 `val themeMode`
-  - L59 `var autoDestructEnabled`
-  - L60 `var autoDestructTime`
-  - L63 `var showThemeDialog`
-  - L64 `var showDestructTimeDialog`
-  - L65 `var showWipeDialog`
-  - L66 `var showCodeDialog`
-  - L67 `var showDuressDialog`
-  - L70 `var accessCodeSet`
-  - L71 `var duressCodeSet`
-  - L72 `var relayEnabled`
-  - L73 `var backgroundDelivery`
-  - L74 `var notificationMode`
-  - L75 `var showNotificationDialog`
-  - L76 `var coverTrafficEnabled`
-  - L79 `val relayAvailable`
-  - L80 `var showCryptoGlossary`
-  - L81 `val username`
-  - L82 `val themeLabel`
+### app/src/main/java/com/securemessenger/app/ui/screens/settings/SettingsScreen.kt (655 سطر) ⚠  [package com.securemessenger.app.ui.screens.settings]
+- L43 `@OptIn(ExperimentalMaterial3Api::class)
+@Composable fun SettingsScreen ( /** Null on the tab root — a root has nowhere to go back to. */ onBackClick: (() -> Unit)? = null, onVerificationClick: () -> Unit, onStealthModeClick: () -> Unit, onDataWiped: () -> Unit, onProfileClick: () -> Unit = {}, )` — SettingsScreen - Security settings and app configuration.
+  - L51 `val context`
+  - L52 `val scope`
+  - L53 `val snackbarHostState`
+  - L54 `val mc`
+  - L56 `val themeMode`
+  - L57 `var autoDestructEnabled`
+  - L58 `var autoDestructTime`
+  - L61 `var showThemeDialog`
+  - L62 `var showDestructTimeDialog`
+  - L63 `var showWipeDialog`
+  - L64 `var showCodeDialog`
+  - L65 `var showDuressDialog`
+  - L68 `var accessCodeSet`
+  - L69 `var duressCodeSet`
+  - L70 `var relayEnabled`
+  - L71 `var backgroundDelivery`
+  - L72 `var notificationMode`
+  - L73 `var showNotificationDialog`
+  - L74 `var coverTrafficEnabled`
+  - L77 `val relayAvailable`
+  - L78 `var showCryptoGlossary`
+  - L79 `val username`
+  - L88 `var myDisplayName`
+  - L89 `var myAvatar`
+  - L104 `val themeLabel`
 
 ### app/src/main/java/com/securemessenger/app/ui/screens/settings/StealthModeScreen.kt (271 سطر)  [package com.securemessenger.app.ui.screens.settings]
 - L43 `@OptIn(ExperimentalMaterial3Api::class)
@@ -1847,84 +1914,95 @@ private fun StealthModeScreenLightPreview ()`
 - L246 `@Composable fun StepItem ( number: String, text: String )`
   - L250 `val mc`
 
-### app/src/main/java/com/securemessenger/app/ui/screens/setup/SetupScreen.kt (202 سطر)  [package com.securemessenger.app.ui.screens.setup]
-- L25 `internal val USERNAME_REGEX`
-- L32 `@OptIn(ExperimentalMaterial3Api::class)
+### app/src/main/java/com/securemessenger/app/ui/screens/setup/SetupScreen.kt (234 سطر)  [package com.securemessenger.app.ui.screens.setup]
+- L29 `internal val USERNAME_REGEX`
+- L36 `@OptIn(ExperimentalMaterial3Api::class)
 @Composable fun SetupScreen ( onSetupComplete: () -> Unit )` — SetupScreen - Initial app setup and key generation.
-  - L35 `var step`
-  - L36 `var displayName`
-  - L37 `var username`
-  - L38 `var accessCode`
-  - L39 `var isGenerating`
-  - L40 `var errorMessage`
-  - L41 `var profileReady`
-  - L43 `val scrollState`
-  - L44 `val scope`
-  - L45 `val context`
-  - L46 `val mc`
-- L186 `@Composable
+  - L39 `var step`
+  - L40 `var displayName`
+  - L41 `var username`
+  - L42 `var accessCode`
+  - L43 `var isGenerating`
+  - L44 `var errorMessage`
+  - L45 `var profileReady`
+  - L48 `var avatarBytes`
+  - L50 `val scrollState`
+  - L51 `val scope`
+  - L52 `val context`
+  - L53 `val mc`
+  - L55 `val avatarPicker`
+- L218 `@Composable
 private fun StepDots (step: Int)`
-  - L187 `val mc`
-  - L188 `val inactive`
+  - L219 `val mc`
+  - L220 `val inactive`
 
-### app/src/main/java/com/securemessenger/app/ui/screens/setup/SetupSteps.kt (383 سطر) ⚠  [package com.securemessenger.app.ui.screens.setup]
-- L48 `@Composable fun WelcomeStep (onContinue: () -> Unit)` — The three [SetupScreen] steps, plus their small supporting composables.
-  - L49 `val mc`
-- L93 `@Composable
+### app/src/main/java/com/securemessenger/app/ui/screens/setup/SetupSteps.kt (414 سطر) ⚠  [package com.securemessenger.app.ui.screens.setup]
+- L53 `@Composable fun WelcomeStep (onContinue: () -> Unit)` — The three [SetupScreen] steps, plus their small supporting composables.
+  - L54 `val mc`
+- L98 `@Composable
 private fun SetupField ( label: String, value: String, onValueChange: (String) -> Unit, modifier: Modifier = Modifier, prefix: String? = null, isError: Boolean = false, supportingText: String? = null, letterSpaced: Boolean = false, keyboardOptions: KeyboardOptions = KeyboardOptions.Default )`
-  - L104 `val mc`
-- L144 `private fun Int ()`
-- L147 `@Composable fun ProfileStep ( displayName: String, onDisplayNameChange: (String) -> Unit, username: String, onUsernameChange: (String) -> Unit, accessCode: String, onAccessCodeChange: (String) -> Unit, onNext: () -> Unit )`
-  - L158 `val isValidFormat`
-  - L159 `val isValidCode`
-  - L160 `val mc`
-- L246 `@Composable fun GeneratingStep ( isGenerating: Boolean, onComplete: () -> Unit )`
-  - L250 `val mc`
-- L310 `@Composable
+  - L109 `val mc`
+- L149 `private fun Int ()`
+- L152 `@Composable fun ProfileStep ( displayName: String, onDisplayNameChange: (String) -> Unit, username: String, onUsernameChange: (String) -> Unit, accessCode: String, onAccessCodeChange: (String) -> Unit, avatarBytes: ByteArray?, onPickAvatar: () -> Unit, onNext: () -> Unit )`
+  - L165 `val isValidFormat`
+  - L166 `val isValidCode`
+  - L167 `val mc`
+- L275 `@Composable fun GeneratingStep ( isGenerating: Boolean, onComplete: () -> Unit )`
+  - L279 `val mc`
+- L339 `@Composable
 private fun KeyGenerationHelix (modifier: Modifier = Modifier)`
-  - L311 `val infiniteTransition`
-  - L312 `val angle`
-  - L318 `val strandA`
-  - L319 `val strandB`
-  - L320 `val centerDot`
-  - L321 `val strokePx`
-- L353 `@Preview(name =                  , showBackground = true)
+  - L340 `val infiniteTransition`
+  - L341 `val angle`
+  - L347 `val strandA`
+  - L348 `val strandB`
+  - L349 `val centerDot`
+  - L350 `val strokePx`
+- L382 `@Preview(name =                  , showBackground = true)
 @Composable
 private fun WelcomeStepPreview ()`
-- L359 `@Preview(name =                  , showBackground = true)
+- L388 `@Preview(name =                  , showBackground = true)
 @Composable
 private fun ProfileStepPreview ()`
-- L378 `@Preview(name =                     , showBackground = true)
+- L409 `@Preview(name =                     , showBackground = true)
 @Composable
 private fun GeneratingStepPreview ()`
-- L382 `private fun Modifier`
+- L413 `private fun Modifier`
 
-### app/src/main/java/com/securemessenger/app/ui/screens/verification/KeyVerificationScreen.kt (299 سطر)  [package com.securemessenger.app.ui.screens.verification]
-- L36 `@OptIn(ExperimentalMaterial3Api::class)
+### app/src/main/java/com/securemessenger/app/ui/screens/verification/KeyVerificationScreen.kt (520 سطر) ⚠  [package com.securemessenger.app.ui.screens.verification]
+- L44 `@OptIn(ExperimentalMaterial3Api::class)
 @Composable fun KeyVerificationScreen ( contactId: String?, onBackClick: () -> Unit )`
-  - L40 `var showMyQR`
-  - L41 `var verificationStatus`
-  - L42 `var myPublicKeyHex`
-  - L43 `var fingerprint`
-  - L44 `var myUserId`
-  - L45 `val scope`
-  - L46 `val repository`
-  - L47 `val mc`
-  - L49 `val scanLauncher`
-  - L62 `fun launchScan ()`
-  - L77 `var loadFailed`
-  - L87 `val pendingLabel`
-  - L89 `val qrData`
-  - L90 `val myQRBitmap`
-- L276 `@Composable
+  - L48 `var showMyQR`
+  - L49 `var verificationStatus`
+  - L50 `var myPublicKeyHex`
+  - L51 `var fingerprint`
+  - L52 `var myUserId`
+  - L53 `val scope`
+  - L54 `val repository`
+  - L55 `val mc`
+  - L56 `val context`
+  - L73 `var chosenContactId`
+  - L74 `var chosenContactName`
+  - L75 `var contacts`
+  - L76 `var contactsLoaded`
+  - L77 `var showContactPicker`
+  - L111 `val scanLauncher`
+  - L125 `fun launchScan ()`
+  - L136 `fun scanOrChooseFirst ()` — Scan straight away when we know the target, otherwise ask who first.
+  - L158 `var loadAttempted`
+  - L170 `val pendingLabel`
+  - L171 `var myUsername`
+  - L181 `val canScan`
+  - L194 `val qrPayload`
+  - L204 `val myQRBitmap`
+- L497 `@Composable
 private fun StatusPill ( icon: androidx.compose.ui.graphics.vector.ImageVector, tint: Color, title: String, subtitle: String )`
 
 ### app/src/main/java/com/securemessenger/app/ui/screens/verification/VerificationComponents.kt (29 سطر)  [package com.securemessenger.app.ui.screens.verification]
-- L8 `internal fun generateQRCode (data: String): Bitmap?`
-- L24 `sealed class VerificationStatus`
-  - L25 `object None`
-  - L26 `object Verified`
-  - L27 `object Failed`
+- L14 `sealed class VerificationStatus`
+  - L15 `object None`
+  - L16 `object Verified`
+  - L19 `object Failed` — A readable identity key that isn't this contact's — the only state that should alarm anyone.
+  - L27 `object NotAKey` — The scan was not an identity key at all. Previously indistinguishable
 
 ### app/src/main/java/com/securemessenger/app/ui/theme/Color.kt (27 سطر)  [package com.securemessenger.app.ui.theme]
 - L10 `val Brand` — Brand + semantic color palette (shared across light/dark). Values are
@@ -1989,39 +2067,39 @@ private fun StatusPill ( icon: androidx.compose.ui.graphics.vector.ImageVector, 
 ### app/src/main/java/com/securemessenger/app/ui/theme/Type.kt (120 سطر)  [package com.securemessenger.app.ui.theme]
 - L13 `val Typography` — Typography for Material Design 3.
 
-### app/src/main/java/com/securemessenger/app/ui/viewmodel/ChatListViewModel.kt (120 سطر)  [package com.securemessenger.app.ui.viewmodel]
-- L19 `data class ContactUiModel ( val id: String, val displayName: String, val isVerified: Boolean, val lastMessage: String, val lastTimestamp: Long, val unreadCount: Int, val avatarBytes: ByteArray? = null, val lastIsMine: Boolean = false, val lastIsRead: Boolean = false, val lastIsSelfDestruct: Boolean = false, val pinnedAt: Long? = null )`
+### app/src/main/java/com/securemessenger/app/ui/viewmodel/ChatListViewModel.kt (139 سطر)  [package com.securemessenger.app.ui.viewmodel]
+- L21 `data class ContactUiModel ( val id: String, val displayName: String, val isVerified: Boolean, val lastMessage: String, val lastTimestamp: Long, val unreadCount: Int, val avatarBytes: ByteArray? = null, val lastIsMine: Boolean = false, val lastIsRead: Boolean = false, val lastIsSelfDestruct: Boolean = false, val pinnedAt: Long? = null )`
   يُستخدم في: app/src/androidTest/java/com/securemessenger/app/ui/HomeScreenshotTest.kt, app/src/androidTest/java/com/securemessenger/app/ui/LiquidHomeRenderTest.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatListItem.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatListScreen.kt
-- L20 `val id : String,`
-- L21 `val displayName : String,`
-- L22 `val isVerified : Boolean,`
-- L23 `val lastMessage : String,`
-- L24 `val lastTimestamp : Long,`
-- L25 `val unreadCount : Int,`
-- L26 `val avatarBytes : ByteArray?`
-- L27 `val lastIsMine : Boolean`
-- L28 `val lastIsRead : Boolean`
-- L29 `val lastIsSelfDestruct : Boolean`
-- L30 `val pinnedAt : Long?`
-- L33 `class ChatListViewModel ( private val repository: SecureRepository = SecureMessengerApp.instance.repository ) : ViewModel()`
+- L22 `val id : String,`
+- L23 `val displayName : String,`
+- L24 `val isVerified : Boolean,`
+- L25 `val lastMessage : String,`
+- L26 `val lastTimestamp : Long,`
+- L27 `val unreadCount : Int,`
+- L28 `val avatarBytes : ByteArray?`
+- L29 `val lastIsMine : Boolean`
+- L30 `val lastIsRead : Boolean`
+- L31 `val lastIsSelfDestruct : Boolean`
+- L32 `val pinnedAt : Long?`
+- L35 `class ChatListViewModel ( private val repository: SecureRepository = SecureMessengerApp.instance.repository ) : ViewModel()`
   يُستخدم في: app/src/androidTest/java/com/securemessenger/app/ui/HomeScreenshotTest.kt, app/src/androidTest/java/com/securemessenger/app/ui/LiquidHomeRenderTest.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatListItem.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatListScreen.kt
-- L34 `private val repository : SecureRepository`
-  - L37 `private val _isLoading`
-  - L39 `val isLoading : StateFlow<Boolean>` — True only until the first contacts/messages snapshot arrives — drives the list-skeleton.
-  - L49 `val contacts : StateFlow<List<ContactUiModel>>` — Chat list with a last-message preview, time and unread badge — recomputed
-  - L72 `fun togglePin (contactId: String)`
-  - L79 `private fun preview (message: EncryptedMessage): String`
-  - L86 `private fun Contact ( lastMessage: String, lastTimestamp: Long, unreadCount: Int, lastIsMine: Boolean, lastIsRead: Boolean, lastIsSelfDestruct: Boolean ): ContactUiModel`
+- L36 `private val repository : SecureRepository`
+  - L39 `private val _isLoading`
+  - L41 `val isLoading : StateFlow<Boolean>` — True only until the first contacts/messages snapshot arrives — drives the list-skeleton.
+  - L51 `val contacts : StateFlow<List<ContactUiModel>>` — Chat list with a last-message preview, time and unread badge — recomputed
+  - L91 `fun togglePin (contactId: String)`
+  - L98 `private fun preview (message: EncryptedMessage): String`
+  - L105 `private fun Contact ( lastMessage: String, lastTimestamp: Long, unreadCount: Int, lastIsMine: Boolean, lastIsRead: Boolean, lastIsSelfDestruct: Boolean ): ContactUiModel`
 
 ### app/src/main/java/com/securemessenger/app/ui/viewmodel/ConnectionRequestsViewModel.kt (97 سطر)  [package com.securemessenger.app.ui.viewmodel]
 - L18 `data class IncomingRequestUiModel ( val senderIdentityPublicKeyHex: String, val senderUserId: String, val senderUsername: String, val receivedAt: Long )`
-  يُستخدم في: app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatListScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ConnectionRequestsScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/NewChatScreen.kt
+  يُستخدم في: app/src/main/java/com/securemessenger/app/ui/navigation/AppNavigation.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatListScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ConnectionRequestsScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/NewChatScreen.kt
 - L19 `val senderIdentityPublicKeyHex : String,`
 - L20 `val senderUserId : String,`
 - L21 `val senderUsername : String,`
 - L22 `val receivedAt : Long`
 - L31 `class ConnectionRequestsViewModel ( private val repository: SecureRepository = SecureMessengerApp.instance.repository ) : ViewModel()` — Pending self-introductions found via username search, waiting on an
-  يُستخدم في: app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatListScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ConnectionRequestsScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/NewChatScreen.kt
+  يُستخدم في: app/src/main/java/com/securemessenger/app/ui/navigation/AppNavigation.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ChatListScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ConnectionRequestsScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/NewChatScreen.kt
 - L32 `private val repository : SecureRepository`
   - L58 `val incomingRequests : StateFlow<List<IncomingRequestUiModel>>` — Built lazily, and that is a crash fix rather than a style preference.
   - L69 `private val _actionInProgress`
@@ -2029,69 +2107,85 @@ private fun StatusPill ( icon: androidx.compose.ui.graphics.vector.ImageVector, 
   - L72 `fun accept (senderIdentityPublicKeyHex: String, onResult: (Boolean) -> Unit)`
   - L85 `fun reject (senderIdentityPublicKeyHex: String)`
 
-### app/src/main/java/com/securemessenger/app/ui/viewmodel/ConversationViewModel.kt (514 سطر) ⚠  [package com.securemessenger.app.ui.viewmodel]
-- L24 `data class MessageUiModel ( val id: Long?, val clientId: String?, val text: String, val direction: Int, val timestamp: Long, val isRead: Boolean, val isExpired: Boolean, val media: MediaCodec.LocalMedia? = null, // Social interaction state val reactionMine: String? = null, val reactionTheirs: String? = null, val replyToClientId: String? = null, val replySnippet: String? = null, val isDeleted: Boolean = false, val edited: Boolean = false, // True while the outgoing envelope still sits in the durable outbox // (queued/in-flight, no relay ack yet) — drives the "sending…" clock tick. val isPending: Boolean = false )`
+### app/src/main/java/com/securemessenger/app/ui/viewmodel/ConversationViewModel.kt (587 سطر) ⚠  [package com.securemessenger.app.ui.viewmodel]
+- L27 `data class MessageUiModel ( val id: Long?, val clientId: String?, val text: String, val direction: Int, val timestamp: Long, val isRead: Boolean, val isExpired: Boolean, val media: MediaCodec.LocalMedia? = null, // Social interaction state val reactionMine: String? = null, val reactionTheirs: String? = null, val replyToClientId: String? = null, val replySnippet: String? = null, val isDeleted: Boolean = false, val edited: Boolean = false, // True while the outgoing envelope still sits in the durable outbox // (queued/in-flight, no relay ack yet) — drives the "sending…" clock tick. val isPending: Boolean = false )`
   يُستخدم في: app/src/androidTest/java/com/securemessenger/app/ui/ScreenTourTest.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/AlbumBubble.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ConversationRows.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ConversationScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ConversationSheets.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ConversationViewModelFactory.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/MessageBubble.kt
-- L25 `val id : Long?,`
-- L26 `val clientId : String?,`
-- L27 `val text : String,`
-- L28 `val direction : Int,`
-- L29 `val timestamp : Long,`
-- L30 `val isRead : Boolean,`
-- L31 `val isExpired : Boolean,`
-- L32 `val media : MediaCodec.LocalMedia?`
-- L34 `val reactionMine : String?`
-- L35 `val reactionTheirs : String?`
-- L36 `val replyToClientId : String?`
-- L37 `val replySnippet : String?`
-- L38 `val isDeleted : Boolean`
-- L39 `val edited : Boolean`
-- L42 `val isPending : Boolean`
-- L46 `@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class) class ConversationViewModel ( private val contactId: String, private val repository: SecureRepository = SecureMessengerApp.instance.repository ) : ViewModel()`
+- L28 `val id : Long?,`
+- L29 `val clientId : String?,`
+- L30 `val text : String,`
+- L31 `val direction : Int,`
+- L32 `val timestamp : Long,`
+- L33 `val isRead : Boolean,`
+- L34 `val isExpired : Boolean,`
+- L35 `val media : MediaCodec.LocalMedia?`
+- L37 `val reactionMine : String?`
+- L38 `val reactionTheirs : String?`
+- L39 `val replyToClientId : String?`
+- L40 `val replySnippet : String?`
+- L41 `val isDeleted : Boolean`
+- L42 `val edited : Boolean`
+- L45 `val isPending : Boolean`
+- L49 `@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class) class ConversationViewModel ( private val contactId: String, private val repository: SecureRepository = SecureMessengerApp.instance.repository ) : ViewModel()`
   يُستخدم في: app/src/androidTest/java/com/securemessenger/app/ui/ScreenTourTest.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/AlbumBubble.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ConversationRows.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ConversationScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ConversationSheets.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/ConversationViewModelFactory.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/MessageBubble.kt
-- L47 `private val contactId : String,`
-- L48 `private val repository : SecureRepository`
-  - L51 `private val _messages`
-  - L52 `val messages : StateFlow<List<MessageUiModel>>`
-  - L54 `private val _isSending`
-  - L55 `val isSending : StateFlow<Boolean>`
-  - L57 `private val _error`
-  - L58 `val error : StateFlow<String?>`
-  - L65 `private val _establishingSession`
-  - L66 `val establishingSession : StateFlow<Boolean>`
-  - L68 `private val _contactName`
-  - L69 `val contactName : StateFlow<String>`
-  - L71 `private val _contactAvatar`
-  - L72 `val contactAvatar : StateFlow<ByteArray?>`
-  - L74 `private val _contactVerified`
-  - L75 `val contactVerified : StateFlow<Boolean>`
-  - L77 `private val _isContactTyping`
-  - L78 `val isContactTyping : StateFlow<Boolean>`
-  - L79 `private var typingResetJob : Job?`
-  - L80 `private var lastTypingSentAt`
-  - L82 `private var sessionId : String?`
-  - L86 `private var lastFailedAction`
-  - L97 `private enum class FailureSeverity`
-  - L119 `private var lastFailureSeverity : FailureSeverity?`
-  - L127 `private fun reportFailure (message: String, severity: FailureSeverity, action: (() -> Unit)? = null)`
-  - L135 `fun clearError ()` — Clears the currently-shown error (the Snackbar dismissed/timed out on its own).
-  - L140 `fun retryLastAction ()` — Re-run whatever just failed, if anything did.
-  - L149 `fun notifyTyping ()` — Call on every text change — throttled so it's a light pulse, not a signal per keystroke.
-  - L221 `private suspend fun needsHandshake (): Boolean`
-  - L223 `fun sendMessage (text: String)`
-  - L280 `private suspend fun loadContactName (): String`
-  - L289 `private fun EncryptedMessage (pendingIds: Set<String> = emptySet()): MessageUiModel`
-  - L311 `private fun parseReactionsJson (json: String?): Map<String, String>`
-  - L322 `suspend fun loadMediaBytes (media: MediaCodec.LocalMedia): ByteArray?`
-  - L325 `fun reportError (message: String)` — Surface a failure that happened outside the send/receive pipeline (e.g. mic access).
-  - L333 `fun sendMedia ( bytes: ByteArray, mimeType: String, fileName: String, mediaType: Int, waveform: List<Float> = emptyList(), caption: String? = null )` — Send a picked/recorded file as an encrypted media message. Mirrors
-  - L407 `private fun deliver (wirePayload: ByteArray, messageId: String?, ttlSeconds: Int?)`
-  - L434 `fun sendReply (text: String, replyToClientId: String)` — Send a reply that quotes an earlier message.
-  - L465 `private fun controlOpTrackingId ()`
-  - L468 `fun react (targetClientId: String, emoji: String)` — Toggle an emoji reaction on a message and mirror it to the peer.
-  - L480 `fun editMessage (targetClientId: String, newText: String)` — Edit the text of a message I sent.
-  - L493 `fun deleteForEveryone (targetClientId: String)` — Delete a message for everyone (tombstone on both sides).
-  - L505 `fun deleteForMe (messageId: Long)` — Delete a message from my device only.
+- L50 `private val contactId : String,`
+- L51 `private val repository : SecureRepository`
+  - L54 `private val _messages`
+  - L55 `val messages : StateFlow<List<MessageUiModel>>`
+  - L57 `private val _isSending`
+  - L58 `val isSending : StateFlow<Boolean>`
+  - L60 `private val _error`
+  - L61 `val error : StateFlow<String?>`
+  - L68 `private val _establishingSession`
+  - L69 `val establishingSession : StateFlow<Boolean>`
+  - L71 `private val _contactName`
+  - L72 `val contactName : StateFlow<String>`
+  - L74 `private val _contactAvatar`
+  - L75 `val contactAvatar : StateFlow<ByteArray?>`
+  - L77 `private val _contactVerified`
+  - L78 `val contactVerified : StateFlow<Boolean>`
+  - L80 `private val _isContactTyping`
+  - L81 `val isContactTyping : StateFlow<Boolean>`
+  - L82 `private var typingResetJob : Job?`
+  - L83 `private var lastTypingSentAt`
+  - L94 `private val windowSize`
+  - L96 `private val _totalMessages`
+  - L99 `val hasMoreHistory : StateFlow<Boolean>` — True while there is older history above what is currently loaded.
+  - L104 `fun loadOlderMessages ()` — Widen the window — called when the user scrolls to the top of what is loaded.
+  - L119 `fun loadEntireHistoryForSearch ()` — Load the whole thread, because in-conversation search reads the loaded
+  - L125 `private var lastFailedAction`
+  - L136 `private enum class FailureSeverity`
+  - L158 `private var lastFailureSeverity : FailureSeverity?`
+  - L166 `private fun reportFailure (message: String, severity: FailureSeverity, action: (() -> Unit)? = null)`
+  - L174 `fun clearError ()` — Clears the currently-shown error (the Snackbar dismissed/timed out on its own).
+  - L179 `fun retryLastAction ()` — Re-run whatever just failed, if anything did.
+  - L188 `fun notifyTyping ()` — Call on every text change — throttled so it's a light pulse, not a signal per keystroke.
+  - L294 `private suspend fun needsHandshake (): Boolean`
+  - L296 `fun sendMessage (text: String)`
+  - L353 `private suspend fun loadContactName (): String`
+  - L362 `private fun EncryptedMessage (pendingIds: Set<String> = emptySet()): MessageUiModel`
+  - L384 `private fun parseReactionsJson (json: String?): Map<String, String>`
+  - L395 `suspend fun loadMediaBytes (media: MediaCodec.LocalMedia): ByteArray?`
+  - L398 `fun reportError (message: String)` — Surface a failure that happened outside the send/receive pipeline (e.g. mic access).
+  - L406 `fun sendMedia ( bytes: ByteArray, mimeType: String, fileName: String, mediaType: Int, waveform: List<Float> = emptyList(), caption: String? = null )` — Send a picked/recorded file as an encrypted media message. Mirrors
+  - L480 `private fun deliver (wirePayload: ByteArray, messageId: String?, ttlSeconds: Int?)`
+  - L507 `fun sendReply (text: String, replyToClientId: String)` — Send a reply that quotes an earlier message.
+  - L538 `private fun controlOpTrackingId ()`
+  - L541 `fun react (targetClientId: String, emoji: String)` — Toggle an emoji reaction on a message and mirror it to the peer.
+  - L553 `fun editMessage (targetClientId: String, newText: String)` — Edit the text of a message I sent.
+  - L566 `fun deleteForEveryone (targetClientId: String)` — Delete a message for everyone (tombstone on both sides).
+  - L578 `fun deleteForMe (messageId: Long)` — Delete a message from my device only.
+
+### app/src/test/java/com/securemessenger/app/data/repository/OrderingTimestampTest.kt (74 سطر)  [package com.securemessenger.app.data.repository]
+- L22 `class OrderingTimestampTest` — Where an arriving message lands in the thread.
+  - L24 `private val now`
+  - L25 `private val hour`
+  - L27 `private fun at (sentAt: Long?)`
+  - L30 `@Test fun anEnvelopeWithoutATimestampUsesArrival ()`
+  - L37 `@Test fun aRealDelayIsHonoured ()`
+  - L43 `@Test fun aClaimOlderThanTheRelayCouldHoldIsRejected ()`
+  - L53 `@Test fun aClaimFromTheFutureIsRejected ()`
+  - L60 `@Test fun smallForwardSkewIsClampedToArrivalRatherThanRejected ()`
+  - L68 `@Test fun theBoundariesThemselvesAreAccepted ()`
 
 ### app/src/test/java/com/securemessenger/app/media/MediaSandboxGeometryTest.kt (133 سطر)  [package com.securemessenger.app.media]
 - L28 `class MediaSandboxGeometryTest` — The guard on the media sandbox's **return** channel — the one direction in
@@ -2103,6 +2197,26 @@ private fun StatusPill ( icon: androidx.compose.ui.graphics.vector.ImageVector, 
   - L112 `@Test fun refusesABigClaimBackedByASmallBuffer ()`
   - L120 `@Test fun refusesAnythingOverTheAbsoluteCeilingHoweverLargeTheRequestWas ()`
   - L127 `@Test fun refusesNonPositiveGeometry ()`
+
+### app/src/test/java/com/securemessenger/app/security/AccessCodeRuleTest.kt (71 سطر)  [package com.securemessenger.app.security]
+- L27 `class AccessCodeRuleTest` — The rule that decides whether a chosen unlock code can ever be entered.
+  - L30 `@Test fun acceptsAnOrdinaryCode ()`
+  - L37 `@Test fun rejectsALeadingZero ()`
+  - L45 `@Test fun acceptsAZeroThatIsNotFirst ()`
+  - L53 `@Test fun rejectsLengthsOutsideTheOneAgreedRange ()`
+  - L63 `@Test fun rejectsAnythingThatIsNotDigits ()`
+
+### app/src/test/java/com/securemessenger/app/security/PendingPairSecretBudgetTest.kt (97 سطر)  [package com.securemessenger.app.security]
+- L27 `class PendingPairSecretBudgetTest` — Which outstanding pair secrets survive, and which get evicted.
+  - L29 `private fun displayed (hex: String, at: Long = 0L)`
+  - L30 `private fun exported (hex: String, at: Long = 0L)`
+  - L32 `private fun List`
+  - L35 `@Test fun newestOnScreenCodeGoesFirstAndIsNotExported ()`
+  - L43 `@Test fun onScreenCodesStayCappedAtFive ()`
+  - L52 `@Test fun aSharedCodeSurvivesABurstOfOnScreenCodes ()`
+  - L68 `@Test fun exportingRestampsTheClock ()`
+  - L77 `@Test fun exportingIsIdempotentAndIgnoresUnknownCodes ()`
+  - L84 `@Test fun sharedCodesHaveTheirOwnCeilingToo ()`
 
 
 ## core/

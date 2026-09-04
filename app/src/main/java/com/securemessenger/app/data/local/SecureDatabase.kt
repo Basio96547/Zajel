@@ -33,7 +33,7 @@ import com.securemessenger.app.data.model.*
         IncomingConnectionRequest::class,
         OutgoingConnectionRequest::class
     ],
-    version = 12,
+    version = 13,
     exportSchema = false
 )
 abstract class SecureDatabase : RoomDatabase() {
@@ -116,6 +116,40 @@ abstract class SecureDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * Gives every message a conversation key, and indexes it.
+         *
+         * `messages.contactId` is derivable from what is already in each row —
+         * a received message's counterpart is its sender, a sent one's is its
+         * recipient — so the backfill is exact and needs no guessing. Nothing
+         * is dropped or rewritten beyond filling in the new column.
+         *
+         * The column is nullable on purpose. A NOT NULL column needs a DEFAULT
+         * to be added to a populated table, and Room's schema validation
+         * compares that default against what SQLite reports; a disagreement
+         * there fails the migration, and this database falls back to
+         * destructive migration when a step fails — which for a user of this
+         * app means every message they have, with no backup and no export. A
+         * nullable column has nothing to disagree about. See
+         * SecureDatabaseMigrationTest.
+         */
+        val MIGRATION_12_13: Migration = object : Migration(12, 13) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE messages ADD COLUMN contactId TEXT")
+                db.execSQL(
+                    "UPDATE messages SET contactId = " +
+                        "CASE WHEN direction = 0 THEN senderId ELSE recipientId END"
+                )
+                // The name is Room's own convention for this index. It has to
+                // match exactly or Room's validation reports the schema as
+                // altered and the destructive fallback takes the data.
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_messages_contactId_timestamp " +
+                        "ON messages (contactId, timestamp)"
+                )
+            }
+        }
+
         @Volatile
         private var INSTANCE: SecureDatabase? = null
 
@@ -155,7 +189,7 @@ abstract class SecureDatabase : RoomDatabase() {
                     // stays only as a last resort for a gap no migration covers
                     // (e.g. a downgrade). NOTE: this is about schema versioning,
                     // it has nothing to do with encryption.
-                    addMigrations(MIGRATION_10_11, MIGRATION_11_12)
+                    addMigrations(MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13)
                     fallbackToDestructiveMigration()
                     addCallback(object : Callback() {
                         override fun onOpen(db: SupportSQLiteDatabase) {

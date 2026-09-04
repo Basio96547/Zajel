@@ -77,6 +77,28 @@ class SecureMessengerApp : Application() {
             incomingJob = applicationScope.launch {
                 for (received in client.incomingMessages) {
                         try {
+                            // Blocking used to be a promise nobody kept.
+                            //
+                            // "حظر جهة الاتصال" wrote isBlocked = true and the
+                            // dialog said "لن تصلك رسائل جديدة من هذه الجهة حتى
+                            // تُلغي الحظر" — and then the flag was read by
+                            // exactly one place in the app: the label on the row
+                            // you just tapped. Nothing on the receive path had
+                            // ever heard of it, so a blocked contact's messages
+                            // kept arriving, kept notifying, and kept appearing
+                            // in the conversation. This is the only path an
+                            // incoming message can take, so it is the one place
+                            // the promise can actually be kept.
+                            //
+                            // Fails open on a read error (the database being
+                            // closed is the only way this throws, and dropping
+                            // real messages because of a transient failure is
+                            // worse than delivering one from a blocked sender).
+                            val senderBlocked = runCatching {
+                                repository.getContact(received.senderId)?.isBlocked == true
+                            }.getOrDefault(false)
+                            if (senderBlocked) continue
+
                             // A control op (reaction/edit/delete) modifies an
                             // existing message rather than creating a new one —
                             // it never creates a contact and never shows as a
@@ -98,7 +120,8 @@ class SecureMessengerApp : Application() {
                                         media = media,
                                         ttlSeconds = received.ttlSeconds,
                                         clientMessageId = received.messageId,
-                                        senderUsername = senderUsername
+                                        senderUsername = senderUsername,
+                                        sentAt = received.sentAt
                                     )
                                     // A reply: plain text plus the quoted-message linkage.
                                     textPayload != null -> repository.saveIncomingMessage(
@@ -109,7 +132,8 @@ class SecureMessengerApp : Application() {
                                         clientMessageId = received.messageId,
                                         senderUsername = senderUsername,
                                         replyToClientId = textPayload.replyToClientId,
-                                        replySnippet = textPayload.replySnippet
+                                        replySnippet = textPayload.replySnippet,
+                                        sentAt = received.sentAt
                                     )
                                     else -> repository.saveIncomingMessage(
                                         senderId = received.senderId,
@@ -117,7 +141,8 @@ class SecureMessengerApp : Application() {
                                         plaintext = received.plaintext,
                                         ttlSeconds = received.ttlSeconds,
                                         clientMessageId = received.messageId,
-                                        senderUsername = senderUsername
+                                        senderUsername = senderUsername,
+                                        sentAt = received.sentAt
                                     )
                                 }
                                 // A plain text message — the overwhelmingly
@@ -154,6 +179,16 @@ class SecureMessengerApp : Application() {
      */
     private suspend fun announceArrival(senderId: String, previewText: String?) {
         if (com.securemessenger.app.security.DisguiseState.isRevealed.value) return
+        // Muting had the same shape of defect as blocking: the bell on the
+        // contact's screen toggled isMuted, redrew itself with a slash through
+        // it, and changed nothing — every muted contact still notified exactly
+        // as loudly as before. Mute is the narrower promise of the two: the
+        // message still arrives and still appears in the conversation, it just
+        // does not announce itself.
+        val muted = runCatching {
+            repository.getContact(senderId)?.isMuted == true
+        }.getOrDefault(false)
+        if (muted) return
         val name = try {
             repository.getContactNickname(senderId)
         } catch (e: Exception) {

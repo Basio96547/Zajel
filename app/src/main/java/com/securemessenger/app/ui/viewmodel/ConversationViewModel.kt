@@ -12,12 +12,15 @@ import com.securemessenger.app.ui.formatContactName
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -79,7 +82,43 @@ class ConversationViewModel(
     private var typingResetJob: Job? = null
     private var lastTypingSentAt = 0L
 
-    private var sessionId: String? = null
+    /**
+     * How far back the thread is loaded.
+     *
+     * The conversation used to select every message it had ever exchanged with
+     * this contact, and Room re-emitted that entire list on every write to the
+     * messages table — a new message, a reaction, a read flag. Each emission
+     * then decrypted every row. A window makes both bounded; scrolling to the
+     * top widens it.
+     */
+    private val windowSize = MutableStateFlow(INITIAL_WINDOW)
+
+    private val _totalMessages = MutableStateFlow(0)
+
+    /** True while there is older history above what is currently loaded. */
+    val hasMoreHistory: StateFlow<Boolean> =
+        combine(windowSize, _totalMessages) { window, total -> total > window }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
+    /** Widen the window — called when the user scrolls to the top of what is loaded. */
+    fun loadOlderMessages() {
+        if (_totalMessages.value > windowSize.value) {
+            windowSize.value += WINDOW_STEP
+        }
+    }
+
+    /**
+     * Load the whole thread, because in-conversation search reads the loaded
+     * messages and nothing else.
+     *
+     * Without this, windowing the thread would have quietly redefined "ابحث في
+     * المحادثة" as "search the last 60 messages" and reported no results for
+     * anything older — the kind of silent narrowing that is worse than a
+     * missing feature, because the empty result looks like an answer.
+     */
+    fun loadEntireHistoryForSearch() {
+        windowSize.value = maxOf(windowSize.value, _totalMessages.value)
+    }
 
     // What to redo when the user taps the error Snackbar's "إعادة" action —
     // set right before each error, cleared once retried (or once superseded).
@@ -184,33 +223,67 @@ class ConversationViewModel(
         }
         viewModelScope.launch {
             try {
-                sessionId = repository.getCurrentSessionId(contactId)
-                    ?: repository.getOrCreateSessionForContact(contactId)
-                val sid = sessionId ?: return@launch
+                repository.countMessages(contactId).collect { _totalMessages.value = it }
+            } catch (e: Exception) {
+                _totalMessages.value = 0
+            }
+        }
+        viewModelScope.launch {
+            try {
+                // Keyed by CONTACT, not by session.
+                //
+                // The thread used to be selected by the current sessionId,
+                // which quietly made the conversation a property of the
+                // cryptographic session underneath it rather than of the
+                // person. It also meant opening a screen ran X3DH key
+                // agreement just to have an id to query by
+                // (getOrCreateSessionForContact) — key work on screen-open,
+                // for a read. Sending still creates the session it needs, at
+                // the moment it needs it.
                 combine(
-                    repository.getMessages(sid),
+                    windowSize.flatMapLatest { limit -> repository.getRecentMessages(contactId, limit) },
                     repository.observePendingClientMessageIds()
                 ) { messageList, pendingIds -> messageList.map { it.toUiModel(pendingIds) } }
+                    // Everything upstream — the Room query and, crucially, the
+                    // per-message Keystore decryption inside toUiModel — now
+                    // runs off the main thread. There was no flowOn anywhere in
+                    // this app: the transform of a combine runs in the
+                    // collector's context, and viewModelScope is Dispatchers.Main,
+                    // so every message in the thread was being decrypted on the
+                    // UI thread on every emission.
+                    .flowOn(Dispatchers.Default)
                     .collect { uiList ->
-                    _messages.value = uiList
-                    // We're actively viewing this conversation — mark any newly
-                    // received messages read and let the sender know. Sent as a
-                    // separate coroutine (not awaited here) so a slow/just-logged-in
-                    // client doesn't stall processing of further message updates;
-                    // it waits for the client to finish connecting rather than
-                    // silently dropping the receipt if it isn't ready yet.
-                    val readIds = repository.markReceivedAsReadAndGetIds(sid)
-                    if (readIds.isNotEmpty()) {
-                        viewModelScope.launch {
-                            val client = SecureMessengerApp.instance.awaitMessagingClient()
-                            client?.sendReadReceipt(contactId, readIds)
+                        _messages.value = uiList
+                        // We're actively viewing this conversation — mark any newly
+                        // received messages read and let the sender know. Sent as a
+                        // separate coroutine (not awaited here) so a slow/just-logged-in
+                        // client doesn't stall processing of further message updates;
+                        // it waits for the client to finish connecting rather than
+                        // silently dropping the receipt if it isn't ready yet.
+                        //
+                        // This write re-triggers the query above, so the list is
+                        // still decrypted twice when a conversation is opened
+                        // with unread messages — but a bounded window is what
+                        // makes that acceptable rather than proportional to the
+                        // whole history.
+                        val readIds = repository.markReceivedAsReadAndGetIds(contactId)
+                        if (readIds.isNotEmpty()) {
+                            viewModelScope.launch {
+                                val client = SecureMessengerApp.instance.awaitMessagingClient()
+                                client?.sendReadReceipt(contactId, readIds)
+                            }
                         }
                     }
-                }
             } catch (e: Exception) {
                 _error.value = e.message
             }
         }
+    }
+
+    private companion object {
+        /** Enough to fill any screen several times over without loading a history. */
+        const val INITIAL_WINDOW = 60
+        const val WINDOW_STEP = 60
     }
 
     /**

@@ -1,5 +1,7 @@
 package com.securemessenger.app.ui.screens.setup
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -19,8 +21,10 @@ import com.securemessenger.app.security.DevicePassphrase
 import com.securemessenger.app.ui.onboardingBackground
 import com.securemessenger.app.ui.theme.LocalMessengerColors
 import com.securemessenger.core.crypto.LibsodiumWrapper
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 internal val USERNAME_REGEX = Regex("^[a-z0-9_]{3,20}$")
 
@@ -39,11 +43,27 @@ fun SetupScreen(
     var isGenerating by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var profileReady by remember { mutableStateOf(false) }
+    // Held here, not written on pick: there is no database to write it into
+    // yet — step 3 is what creates the profile this photo belongs to.
+    var avatarBytes by remember { mutableStateOf<ByteArray?>(null) }
 
     val scrollState = rememberScrollState()
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val mc = LocalMessengerColors.current
+
+    val avatarPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            avatarBytes = withContext(Dispatchers.IO) {
+                try {
+                    context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                } catch (e: Exception) {
+                    null
+                }
+            }
+        }
+    }
 
     Box(modifier = Modifier.fillMaxSize().onboardingBackground(mc.onboardingGradient)) {
         Scaffold(
@@ -77,12 +97,21 @@ fun SetupScreen(
                         onUsernameChange = { username = it.trim().lowercase() },
                         accessCode = accessCode,
                         onAccessCodeChange = { accessCode = it.filter { c -> c.isDigit() }.take(10) },
+                        avatarBytes = avatarBytes,
+                        onPickAvatar = { avatarPicker.launch("image/*") },
                         onNext = {
                             when {
                                 displayName.isBlank() -> errorMessage = "الرجاء إدخال الاسم"
                                 !USERNAME_REGEX.matches(username) ->
                                     errorMessage = "اسم المستخدم: 3-20 حرفاً (أحرف إنجليزية صغيرة وأرقام و _)"
-                                accessCode.length !in 4..10 ->
+                                accessCode.startsWith("0") ->
+                                    // Not a style rule: the calculator keypad
+                                    // physically cannot type a leading zero,
+                                    // so this code would be unenterable and
+                                    // the account unreachable forever. See
+                                    // AppSettings.isTypeableCode.
+                                    errorMessage = "رمز الفتح لا يمكن أن يبدأ بصفر — لن تستطيع كتابته في الحاسبة"
+                                accessCode.length !in AppSettings.CODE_LENGTH_RANGE ->
                                     errorMessage = "رمز الفتح: من 4 إلى 10 أرقام"
                                 else -> {
                                     // Chosen by the user — the app ships with no
@@ -110,6 +139,9 @@ fun SetupScreen(
                                         repository.createProfile()
                                         repository.generatePreKeys(50)
                                         repository.setMyDisplayName(displayName)
+                                        // The photo picked back in step 2 — the
+                                        // first moment there is anywhere to put it.
+                                        avatarBytes?.let { repository.setMyAvatar(it) }
                                         profileReady = true
                                     }
                                     // The handle is local-first regardless — shown on our

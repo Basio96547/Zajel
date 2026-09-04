@@ -1,10 +1,8 @@
 package com.securemessenger.app.ui.screens.settings
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -12,8 +10,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -26,6 +22,7 @@ import com.securemessenger.app.service.MessengerService
 import com.securemessenger.app.ui.GlassTopBar
 import com.securemessenger.app.ui.glassBackground
 import com.securemessenger.app.ui.glassCard
+import com.securemessenger.app.ui.screens.chat.Avatar
 import com.securemessenger.app.ui.theme.LocalMessengerColors
 import com.securemessenger.app.ui.theme.SemanticColors
 import kotlinx.coroutines.launch
@@ -44,7 +41,8 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
-    onBackClick: () -> Unit,
+    /** Null on the tab root — a root has nowhere to go back to. */
+    onBackClick: (() -> Unit)? = null,
     onVerificationClick: () -> Unit,
     onStealthModeClick: () -> Unit,
     onDataWiped: () -> Unit,
@@ -79,6 +77,30 @@ fun SettingsScreen(
     val relayAvailable = remember { BuildConfig.RELAY_URL.isNotBlank() }
     var showCryptoGlossary by remember { mutableStateOf(false) }
     val username = AppSettings.getUsername(context)
+
+    // The row below is a preview of ProfileScreen, and it used to disagree
+    // with it about who you are: it printed the username twice (once as the
+    // name, once as the handle) and drew initials over a gradient no matter
+    // what. So you could set a display name and a photo on the very screen
+    // this row opens, come back, and find neither — the app quietly telling
+    // you the edit hadn't taken. Same two reads ProfileScreen does, guarded
+    // the same way, because both can run before the database is open.
+    var myDisplayName by remember { mutableStateOf("") }
+    var myAvatar by remember { mutableStateOf<ByteArray?>(null) }
+    LaunchedEffect(Unit) {
+        try {
+            myDisplayName = SecureMessengerApp.instance.repository.getMyDisplayName() ?: ""
+        } catch (e: Exception) {
+            myDisplayName = ""
+        }
+    }
+    LaunchedEffect(Unit) {
+        try {
+            SecureMessengerApp.instance.repository.getMyAvatarFlow().collect { myAvatar = it }
+        } catch (e: Exception) {
+            myAvatar = null
+        }
+    }
     val themeLabel = when (themeMode) {
         AppSettings.ThemeMode.SYSTEM -> "تلقائي"
         AppSettings.ThemeMode.LIGHT -> "فاتح"
@@ -88,20 +110,15 @@ fun SettingsScreen(
     Box(modifier = Modifier.fillMaxSize().glassBackground(mc.listGradient)) {
         Scaffold(
             containerColor = Color.Transparent,
-            // A back arrow, and no bottom bar.
+            // No back arrow when this is the tab root, and one when it isn't.
             //
-            // This screen had it the other way round: the top bar carried no
-            // onBack at all, so the bottom bar was the only visible way out —
-            // while AppNavigation was passing onBackClick = { popBackStack() }
-            // that the screen never called. A dead parameter with a live wire
-            // attached, which is worse than an unused one, because the caller
-            // believed it had provided an escape.
-            //
-            // The bar also had to go for a second reason: the home screen
-            // dropped it, so walking home -> settings made a navigation bar
-            // appear from nowhere. Its entries are all still reachable —
-            // chats is back, profile is the row at the top of this screen,
-            // contacts is on the home screen.
+            // The screen has now been all three states: originally it carried
+            // no onBack at all while AppNavigation passed one it never called
+            // (a dead parameter with a live wire attached), then a back arrow
+            // and no bar, and now a root of the restored tab bar. Passing the
+            // callback straight through to GlassTopBar — which already takes
+            // a nullable onBack — means the caller decides, which is the only
+            // party that knows how this screen was reached.
             topBar = { GlassTopBar(title = "الإعدادات", onBack = onBackClick) },
             snackbarHost = { SnackbarHost(snackbarHostState) }
         ) { paddingValues ->
@@ -122,22 +139,20 @@ fun SettingsScreen(
                         .padding(horizontal = 14.dp, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(48.dp)
-                            .clip(CircleShape)
-                            .background(Brush.linearGradient(listOf(MaterialTheme.colorScheme.primary, SemanticColors.purple))),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = (username?.take(2) ?: "؟").uppercase(),
-                            color = Color.White,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
+                    Avatar(
+                        name = myDisplayName.ifBlank { username ?: "؟" },
+                        size = 48.dp,
+                        id = username ?: "me",
+                        avatarBytes = myAvatar
+                    )
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
-                        Text(username ?: "بلا اسم", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium, color = mc.glassOnCard)
+                        Text(
+                            myDisplayName.ifBlank { username ?: "بلا اسم" },
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Medium,
+                            color = mc.glassOnCard
+                        )
                         Text(username?.let { "⁦@$it⁩" } ?: "—", style = MaterialTheme.typography.bodySmall, color = mc.glassOnCard.copy(alpha = 0.55f))
                     }
                     RowChevron()
@@ -365,7 +380,8 @@ fun SettingsScreen(
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                Spacer(modifier = Modifier.height(16.dp))
+                // Clears the floating tab bar this screen now sits under.
+                Spacer(modifier = Modifier.height(104.dp))
             }
         }
     }
@@ -479,6 +495,13 @@ fun SettingsScreen(
         // branch permanently unreachable, with nothing telling the user their
         // panic code stopped working.
         val collidesWithDuressCode = input.isNotEmpty() && AppSettings.verifyDuressCode(context, input)
+        // The calculator's keypad cannot type a leading zero, so a code that
+        // starts with one is unenterable — and since this dialog is behind the
+        // code it just replaced, saving one locks the owner out for good. This
+        // screen used to say "3 to 10" while Setup said "4 to 10"; both now
+        // quote AppSettings.isTypeableCode, which is the only rule.
+        val startsWithZero = input.startsWith("0")
+        val codeAcceptable = AppSettings.isTypeableCode(input) && !collidesWithDuressCode
         AlertDialog(
             onDismissRequest = { showCodeDialog = false },
             containerColor = mc.glassCardStrong,
@@ -498,10 +521,13 @@ fun SettingsScreen(
                             value = input,
                             onValueChange = { new -> input = new.filter { it.isDigit() }.take(10) },
                             singleLine = true,
-                            label = { Text("رقم من 3 إلى 10 أرقام") },
-                            isError = collidesWithDuressCode,
+                            label = { Text("رقم من 4 إلى 10 أرقام، لا يبدأ بصفر") },
+                            isError = collidesWithDuressCode || startsWithZero,
                             supportingText = {
-                                if (collidesWithDuressCode) Text("يجب أن يختلف عن رمز الطوارئ")
+                                when {
+                                    collidesWithDuressCode -> Text("يجب أن يختلف عن رمز الطوارئ")
+                                    startsWithZero -> Text("لا يبدأ بصفر — لن تستطيع كتابته في الحاسبة")
+                                }
                             },
                             keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                                 keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
@@ -513,13 +539,13 @@ fun SettingsScreen(
             confirmButton = {
                 TextButton(
                     onClick = {
-                        if (input.length in 3..10 && !collidesWithDuressCode) {
+                        if (codeAcceptable) {
                             AppSettings.setAccessCode(context, input)
                             accessCodeSet = true
                             showCodeDialog = false
                         }
                     },
-                    enabled = input.length in 3..10 && !collidesWithDuressCode
+                    enabled = codeAcceptable
                 ) {
                     Text("حفظ")
                 }
@@ -538,6 +564,13 @@ fun SettingsScreen(
     if (showDuressDialog) {
         var input by remember { mutableStateOf("") }
         val collidesWithAccessCode = input.isNotEmpty() && AppSettings.verifyAccessCode(context, input)
+        // Same untypeable-code rule as the access code, and here it fails even
+        // quieter: an unenterable panic code doesn't lock anyone out, it just
+        // never fires. The owner would believe they have a wipe-under-duress
+        // and find out otherwise at the exact moment it mattered.
+        val startsWithZero = input.startsWith("0")
+        val duressAcceptable =
+            input.isEmpty() || (AppSettings.isTypeableCode(input) && !collidesWithAccessCode)
         AlertDialog(
             onDismissRequest = { showDuressDialog = false },
             containerColor = mc.glassCardStrong,
@@ -560,10 +593,13 @@ fun SettingsScreen(
                             value = input,
                             onValueChange = { new -> input = new.filter { it.isDigit() }.take(10) },
                             singleLine = true,
-                            label = { Text("رقم من 3 إلى 10 أرقام، أو فارغ للتعطيل") },
-                            isError = collidesWithAccessCode,
+                            label = { Text("رقم من 4 إلى 10 أرقام لا يبدأ بصفر، أو فارغ للتعطيل") },
+                            isError = collidesWithAccessCode || startsWithZero,
                             supportingText = {
-                                if (collidesWithAccessCode) Text("يجب أن يختلف عن رمز فتح المراسل")
+                                when {
+                                    collidesWithAccessCode -> Text("يجب أن يختلف عن رمز فتح المراسل")
+                                    startsWithZero -> Text("لا يبدأ بصفر — لن تستطيع كتابته في الحاسبة")
+                                }
                             },
                             keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                                 keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
@@ -579,13 +615,13 @@ fun SettingsScreen(
                             AppSettings.setDuressCode(context, null)
                             duressCodeSet = false
                             showDuressDialog = false
-                        } else if (input.length in 3..10 && !collidesWithAccessCode) {
+                        } else if (duressAcceptable) {
                             AppSettings.setDuressCode(context, input)
                             duressCodeSet = true
                             showDuressDialog = false
                         }
                     },
-                    enabled = input.isEmpty() || (input.length in 3..10 && !collidesWithAccessCode)
+                    enabled = duressAcceptable
                 ) {
                     Text("حفظ")
                 }

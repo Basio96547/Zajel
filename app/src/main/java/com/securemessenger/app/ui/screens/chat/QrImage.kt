@@ -76,6 +76,39 @@ object QrImage {
     )
 
     /**
+     * THE app's code. One shape, built in one place.
+     *
+     * The app used to draw two different QR codes and call both of them "رمز
+     * QR": this pairing payload, and a bare hex identity key on the key
+     * verification screen. Two black squares, indistinguishable to anyone
+     * holding a phone, reached from two rows of the same profile screen — and
+     * scanning the wrong one at the verification screen reported a possible
+     * wiretap, because an unparseable input and a genuine key mismatch were
+     * the same return value. There is now one payload; the verification screen
+     * renders this too, with [pairSecretHex] left null.
+     *
+     * @param pairSecretHex the relay pair secret, or null for a code that
+     *   pairs on the local network only. Null also means nothing was minted to
+     *   draw this code, which is what the verification screen wants: showing
+     *   your identity to a contact you already have should not hand out a
+     *   fresh relay secret, and should not consume one of the outstanding
+     *   pairing slots (see AppSettings' pending pair secrets).
+     */
+    fun identityPayload(
+        userId: String,
+        publicKeyHex: String,
+        username: String,
+        directAddress: String? = null,
+        pairSecretHex: String? = null
+    ): String = org.json.JSONObject().apply {
+        put("u", userId)
+        put("k", publicKeyHex)
+        put("n", username)
+        if (pairSecretHex != null) put("s", pairSecretHex)
+        if (directAddress != null) put("a", directAddress)
+    }.toString()
+
+    /**
      * A copy of [payload] with the relay pair secret removed. The result pairs
      * for local-network messaging only, and is safe to send over any channel:
      * everything left in it is already public (a user id, an identity public

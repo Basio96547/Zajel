@@ -112,10 +112,14 @@ fun ContactDetailScreen(
     LaunchedEffect(contactId) {
         try {
             reload()
-            val sessionId = repository.getCurrentSessionId(contactId) ?: return@LaunchedEffect
-            repository.getMessages(sessionId).collect { list ->
-                mediaMessages = list.filter { it.type != MediaCodec.TYPE_TEXT && !it.isDeleted }
-            }
+            // Media only, straight from the query. This used to fetch the
+            // current session's entire message history and filter it here —
+            // the whole thread decrypted into memory so a grid could show a
+            // few thumbnails. It also meant the media of a conversation was
+            // scoped to its current cryptographic session rather than to the
+            // contact, so anything exchanged under an earlier session was
+            // simply absent from "الوسائط المشتركة".
+            repository.observeMedia(contactId).collect { list -> mediaMessages = list }
         } catch (e: Exception) {
             mediaMessages = emptyList()
         }
@@ -217,9 +221,14 @@ fun ContactDetailScreen(
 
                     Spacer(Modifier.height(Dims.s16))
 
+                    // No "اتصال" here anymore. It was `onClick = {}` — a button
+                    // that responded to being pressed by doing nothing at all,
+                    // which is the worst of the three possible states (works,
+                    // says it can't, or silently ignores you). This app has no
+                    // calling feature; offering the control anyway made the app
+                    // look broken rather than incomplete.
                     Row(horizontalArrangement = Arrangement.spacedBy(28.dp)) {
                         QuickAction(icon = Icons.Default.Message, label = "رسالة", onClick = onBackClick)
-                        QuickAction(icon = Icons.Default.Call, label = "اتصال", onClick = {})
                         QuickAction(
                             icon = if (isMuted) Icons.Default.NotificationsOff else Icons.Default.Notifications,
                             label = "كتم",

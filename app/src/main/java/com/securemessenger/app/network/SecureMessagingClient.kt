@@ -1438,7 +1438,19 @@ class SecureMessagingClient(
         val ttlSeconds = if (json.has("ttl")) json.optInt("ttl") else null
         val messageId = json.optString("messageId").takeIf { it.isNotBlank() }
 
-        _incomingMessages.send(MessageReceived(senderId, plaintext, senderIdentityKey, ttlSeconds, messageId))
+        // When the sender says they sent it. Every envelope has carried this
+        // field all along (see the "timestamp" put in sendMessage) and nothing
+        // has ever read it: the receiver stamped its own arrival time instead.
+        // With the relay holding a message up to 48h, and background delivery
+        // off by default, a message sent at 09:00 and collected at 18:00 was
+        // filed at 18:00 here and 09:00 on the sender's phone — the same
+        // conversation, two orderings, two sets of day separators, and a reply
+        // able to sit above the message it answers.
+        val sentAt = json.optLong("timestamp").takeIf { it > 0 }
+
+        _incomingMessages.send(
+            MessageReceived(senderId, plaintext, senderIdentityKey, ttlSeconds, messageId, sentAt)
+        )
         return ackToken
     }
 
@@ -2095,7 +2107,14 @@ data class MessageReceived(
     val plaintext: ByteArray,
     val senderIdentityKey: ByteArray? = null,
     val ttlSeconds: Int? = null,
-    val messageId: String? = null
+    val messageId: String? = null,
+    /**
+     * The sender's own send time, straight out of the sealed envelope. Null on
+     * an envelope that carried none. It is a claim by the other device, not a
+     * fact — [SecureRepository.orderingTimestamp] decides how far it is
+     * allowed to move a message.
+     */
+    val sentAt: Long? = null
 )
 
 data class PrekeyBundle(

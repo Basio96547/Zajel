@@ -55,7 +55,8 @@ import org.json.JSONObject
  */
 @Composable
 fun NewChatScreen(
-    onBackClick: () -> Unit,
+    /** Null on the tab root — a root has nowhere to go back to. */
+    onBackClick: (() -> Unit)? = null,
     onContactAdded: (String) -> Unit,
     onSearchByUsernameClick: () -> Unit = {},
     onConnectionRequestsClick: () -> Unit = {},
@@ -88,6 +89,11 @@ fun NewChatScreen(
     var pendingKeyChangeScan by remember { mutableStateOf<String?>(null) }
 
     var myQrPayload by remember { mutableStateOf<String?>(null) }
+    // Kept so the share/copy paths can tell AppSettings that *this* secret has
+    // left the device — see markPairSecretExported. It used to be a local
+    // inside the effect below, which is why nothing downstream could know the
+    // difference between a code drawn on screen and one mailed to someone.
+    var myPairSecretHex by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(Unit) {
         val userId = repository.getUserId()
         val publicKeyHex = repository.getPublicKeyHex()
@@ -102,19 +108,20 @@ fun NewChatScreen(
             // the first message they drop into it.
             val pairSecretHex = MailboxToken.pairSecretToHex(MailboxToken.newPairSecret())
             AppSettings.addPendingPairSecret(context, pairSecretHex)
+            myPairSecretHex = pairSecretHex
             SecureMessengerApp.instance.messagingClient?.refreshRelaySubscriptions()
-            myQrPayload = JSONObject().apply {
-                put("u", userId)
-                put("k", publicKeyHex)
-                put("n", myUsername)
-                put("s", pairSecretHex)
+            myQrPayload = QrImage.identityPayload(
+                userId = userId,
+                publicKeyHex = publicKeyHex,
+                username = myUsername,
                 // Where this device is listening right now. Lets the scanner
                 // reach us even on a network that blocks the multicast mDNS
                 // discovery depends on — which is common enough on consumer
                 // routers that pairing "succeeding" and then silently never
                 // delivering was the likeliest way this app failed.
-                SecureMessengerApp.instance.messagingClient?.myDirectAddress()?.let { put("a", it) }
-            }.toString()
+                directAddress = SecureMessengerApp.instance.messagingClient?.myDirectAddress(),
+                pairSecretHex = pairSecretHex
+            )
         }
     }
     val myQrBitmap = remember(myQrPayload) { myQrPayload?.let { QrImage.render(it) } }
@@ -188,7 +195,15 @@ fun NewChatScreen(
 
     Box(modifier = Modifier.fillMaxSize().onboardingBackground(mc.onboardingGradient)) {
         Column(modifier = Modifier.fillMaxSize()) {
-            GlassTopBar(title = "محادثة جديدة", onBack = onBackClick)
+            // "جهات الاتصال", not "محادثة جديدة".
+            //
+            // This one screen was being called three different things — the
+            // home screen's floating button said "محادثة جديدة", the profile
+            // screen's row said "عرض رمز QR", and the code's own comments
+            // called it "جهات الاتصال". It is the place your code lives and
+            // where you scan someone else's, so it is named after that and
+            // reached from one control: its tab.
+            GlassTopBar(title = "جهات الاتصال", onBack = onBackClick)
 
             Column(
                 modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 22.dp),
@@ -264,7 +279,8 @@ fun NewChatScreen(
             }
 
             Column(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 22.dp).padding(bottom = 30.dp),
+                // Clears the floating tab bar this screen now sits under.
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 22.dp).padding(bottom = 104.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Row(
@@ -383,6 +399,8 @@ fun NewChatScreen(
                     "الرمز الكامل يحتوي سرّ الاقتران الذي يتيح المراسلة خارج الشبكة المحلية. " +
                         "إرساله عبر تطبيق آخر يُخرج هذا السرّ من جهازك: من يعترض الصورة يستطيع " +
                         "تعطيل استقبالك ورؤية توقيت الرسائل — لكنه لا يستطيع قراءة محتواها.\n\n" +
+                        "يبقى الرمز المُشارَك صالحاً ${AppSettings.EXPORTED_SECRET_VALIDITY_DAYS} أيام؛ " +
+                        "بعدها يحتاج من يمسحه رمزاً جديداً منك.\n\n" +
                         "إن لم تكن القناة موثوقة، شارك النسخة المحلية فقط."
                 )
             },
@@ -391,6 +409,10 @@ fun NewChatScreen(
                     enabled = payload != null,
                     onClick = {
                         showShareDialog = false
+                        // Before the share, not after: this is the moment the
+                        // code stops being a disposable on-screen one, and it
+                        // must survive the next few visits to this screen.
+                        myPairSecretHex?.let { AppSettings.markPairSecretExported(context, it) }
                         if (payload != null && !QrImage.share(context, payload, "أضفني: @$myUsername")) {
                             errorMessage = "تعذّرت مشاركة الصورة"
                         }
@@ -423,7 +445,8 @@ fun NewChatScreen(
                         "قناة أخرى تصل بها إلى الجهاز الآخر — لا حاجة لكاميرا أو نقل صورة.\n\n" +
                         "الرمز الكامل يحتوي سرّ الاقتران الذي يتيح المراسلة خارج الشبكة المحلية؛ " +
                         "من يطّلع عليه يستطيع تعطيل استقبالك ورؤية توقيت الرسائل — لكنه لا يقدر " +
-                        "على قراءة محتواها. إن كنتما على نفس الشبكة المحلية الآن، النسخة المحلية " +
+                        "على قراءة محتواها. يبقى صالحاً ${AppSettings.EXPORTED_SECRET_VALIDITY_DAYS} أيام. " +
+                        "إن كنتما على نفس الشبكة المحلية الآن، النسخة المحلية " +
                         "تكفي ولا تُخرج أي سرّ من جهازك."
                 )
             },
@@ -432,6 +455,7 @@ fun NewChatScreen(
                     enabled = payload != null,
                     onClick = {
                         payload?.let { clipboard.setText(AnnotatedString(it)) }
+                        myPairSecretHex?.let { AppSettings.markPairSecretExported(context, it) }
                         statusMessage = "نُسخ الرمز الكامل — الصقه في الجهاز الآخر"
                         showCopyDialog = false
                     }
