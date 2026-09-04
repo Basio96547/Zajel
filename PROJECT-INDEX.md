@@ -5,7 +5,7 @@
 ابحث هنا أولاً بـ Grep قبل فتح أي ملف مصدر كامل. سطر `يُستخدم في:` تحت أي class/object/interface = تطابق استيراد FQN فعلي، أفضل-جهد وليس مضموناً 100%.
 ⚠ بجانب اسم ملف = يتجاوز 300 سطر.
 
-**133** ملف مفحوص، **2512** تعريفاً.
+**134** ملف مفحوص، **2526** تعريفاً.
 
 
 ## app/
@@ -39,6 +39,22 @@
 - L13 `class SignalProtocolTest` — Tests X3DH key agreement symmetry between initiator and responder.
   - L16 `@Test fun x3dh_initiatorAndResponderDeriveSameRootKey ()`
   - L44 `@Test fun signalProtocol_encryptDecryptRoundtrip ()`
+
+### app/src/androidTest/java/com/securemessenger/app/data/ConversationStorageTest.kt (198 سطر)  [package com.securemessenger.app.data]
+- L36 `@RunWith(AndroidJUnit4::class) class ConversationStorageTest` — A message arrives, is stored, and shows up in the conversation — the one
+  - L38 `private lateinit var context : Context`
+  - L39 `private lateinit var repository : SecureRepository`
+  - L40 `private val passphrase`
+  - L43 `private val theirKey`
+  - L44 `private val them`
+  - L47 `@Before fun setUp ()`
+  - L60 `@After fun tearDown ()`
+  - L66 `@Test fun aReceivedMessageAppearsInTheConversationWithThatContact ()`
+  - L83 `@Test fun bothDirectionsLandInOneThread ()`
+  - L103 `@Test fun theChatListSeesTheSameConversation ()`
+  - L130 `@Test fun openingTheConversationClearsItsUnreadCount ()`
+  - L147 `@Test fun aDelayedMessageSitsWhereItWasSent_notWhereItArrived ()`
+  - L176 `@Test fun theWindowReturnsTheNewestMessagesAndCanBeWidened ()`
 
 ### app/src/androidTest/java/com/securemessenger/app/data/local/SecureDatabaseMigrationTest.kt (403 سطر) ⚠  [package com.securemessenger.app.data.local]
 - L37 `@Entity(tableName =           )
@@ -450,7 +466,7 @@ data class OldEncryptedMessage ( @PrimaryKey val id: Long? = null, val sessionId
 
 ### app/src/main/java/com/securemessenger/app/data/local/SecureDatabase.kt (233 سطر)  [package com.securemessenger.app.data.local]
 - L39 `abstract class SecureDatabase : RoomDatabase()`
-  يُستخدم في: app/src/androidTest/java/com/securemessenger/app/network/AckAuthenticationTest.kt, app/src/main/java/com/securemessenger/app/data/repository/SecureRepository.kt
+  يُستخدم في: app/src/androidTest/java/com/securemessenger/app/data/ConversationStorageTest.kt, app/src/androidTest/java/com/securemessenger/app/network/AckAuthenticationTest.kt, app/src/main/java/com/securemessenger/app/data/repository/SecureRepository.kt
   - L41 `abstract fun userProfileDao ()`
   - L42 `abstract fun contactDao ()`
   - L43 `abstract fun sessionDao ()`
@@ -610,20 +626,20 @@ data class OutgoingConnectionRequest ( @PrimaryKey val recipientIdentityPublicKe
 
 ### app/src/main/java/com/securemessenger/app/data/repository/SecureRepository.kt (1550 سطر) ⚠  [package com.securemessenger.app.data.repository]
 - L26 `data class LoadedRatchetSession ( val protocol: SignalProtocol, val isInitiator: Boolean, val responderEphemeralHex: String?, val initiatorOtkId: Int? )`
-  يُستخدم في: app/src/androidTest/java/com/securemessenger/app/network/AckAuthenticationTest.kt, app/src/main/java/com/securemessenger/app/SecureMessengerApp.kt, app/src/main/java/com/securemessenger/app/network/RelayClient.kt, app/src/main/java/com/securemessenger/app/network/SecureMessagingClient.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/UsernameSearchScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/verification/KeyVerificationScreen.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ChatListViewModel.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ConnectionRequestsViewModel.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ConversationViewModel.kt
+  يُستخدم في: app/src/androidTest/java/com/securemessenger/app/data/ConversationStorageTest.kt, app/src/androidTest/java/com/securemessenger/app/network/AckAuthenticationTest.kt, app/src/main/java/com/securemessenger/app/SecureMessengerApp.kt, app/src/main/java/com/securemessenger/app/network/RelayClient.kt, app/src/main/java/com/securemessenger/app/network/SecureMessagingClient.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/UsernameSearchScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/verification/KeyVerificationScreen.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ChatListViewModel.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ConnectionRequestsViewModel.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ConversationViewModel.kt
 - L27 `val protocol : SignalProtocol,`
 - L28 `val isInitiator : Boolean,`
 - L29 `val responderEphemeralHex : String?,`
 - L30 `val initiatorOtkId : Int?`
 - L34 `enum class ContactPairResult`
-  يُستخدم في: app/src/androidTest/java/com/securemessenger/app/network/AckAuthenticationTest.kt, app/src/main/java/com/securemessenger/app/SecureMessengerApp.kt, app/src/main/java/com/securemessenger/app/network/RelayClient.kt, app/src/main/java/com/securemessenger/app/network/SecureMessagingClient.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/UsernameSearchScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/verification/KeyVerificationScreen.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ChatListViewModel.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ConnectionRequestsViewModel.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ConversationViewModel.kt
+  يُستخدم في: app/src/androidTest/java/com/securemessenger/app/data/ConversationStorageTest.kt, app/src/androidTest/java/com/securemessenger/app/network/AckAuthenticationTest.kt, app/src/main/java/com/securemessenger/app/SecureMessengerApp.kt, app/src/main/java/com/securemessenger/app/network/RelayClient.kt, app/src/main/java/com/securemessenger/app/network/SecureMessagingClient.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/UsernameSearchScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/verification/KeyVerificationScreen.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ChatListViewModel.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ConnectionRequestsViewModel.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ConversationViewModel.kt
 - L50 `enum class KeyScanResult`
-  يُستخدم في: app/src/androidTest/java/com/securemessenger/app/network/AckAuthenticationTest.kt, app/src/main/java/com/securemessenger/app/SecureMessengerApp.kt, app/src/main/java/com/securemessenger/app/network/RelayClient.kt, app/src/main/java/com/securemessenger/app/network/SecureMessagingClient.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/UsernameSearchScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/verification/KeyVerificationScreen.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ChatListViewModel.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ConnectionRequestsViewModel.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ConversationViewModel.kt
+  يُستخدم في: app/src/androidTest/java/com/securemessenger/app/data/ConversationStorageTest.kt, app/src/androidTest/java/com/securemessenger/app/network/AckAuthenticationTest.kt, app/src/main/java/com/securemessenger/app/SecureMessengerApp.kt, app/src/main/java/com/securemessenger/app/network/RelayClient.kt, app/src/main/java/com/securemessenger/app/network/SecureMessagingClient.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/UsernameSearchScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/verification/KeyVerificationScreen.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ChatListViewModel.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ConnectionRequestsViewModel.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ConversationViewModel.kt
 - L65 `private fun identityKeyHexFromScan (scanned: String): String?`
   - L66 `val raw`
   - L67 `val hex`
 - L86 `class SecureRepository (private val context: Context)` — SecureRepository - manages all data operations with encryption/decryption.
-  يُستخدم في: app/src/androidTest/java/com/securemessenger/app/network/AckAuthenticationTest.kt, app/src/main/java/com/securemessenger/app/SecureMessengerApp.kt, app/src/main/java/com/securemessenger/app/network/RelayClient.kt, app/src/main/java/com/securemessenger/app/network/SecureMessagingClient.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/UsernameSearchScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/verification/KeyVerificationScreen.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ChatListViewModel.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ConnectionRequestsViewModel.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ConversationViewModel.kt
+  يُستخدم في: app/src/androidTest/java/com/securemessenger/app/data/ConversationStorageTest.kt, app/src/androidTest/java/com/securemessenger/app/network/AckAuthenticationTest.kt, app/src/main/java/com/securemessenger/app/SecureMessengerApp.kt, app/src/main/java/com/securemessenger/app/network/RelayClient.kt, app/src/main/java/com/securemessenger/app/network/SecureMessagingClient.kt, app/src/main/java/com/securemessenger/app/ui/screens/chat/UsernameSearchScreen.kt, app/src/main/java/com/securemessenger/app/ui/screens/verification/KeyVerificationScreen.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ChatListViewModel.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ConnectionRequestsViewModel.kt, app/src/main/java/com/securemessenger/app/ui/viewmodel/ConversationViewModel.kt
   - L88 `private var database : SecureDatabase?`
   - L89 `private var dbPassphrase : CharArray?`
   - L91 `private fun requireDb (): SecureDatabase`
@@ -2382,7 +2398,7 @@ private fun StatusPill ( icon: androidx.compose.ui.graphics.vector.ImageVector, 
 
 ### core/src/main/kotlin/com/securemessenger/core/crypto/SignalProtocol.kt (498 سطر) ⚠  [package com.securemessenger.core.crypto]
 - L17 `class SignalProtocol ( private val identityKeyPair: IdentityKeyPair, private val signedPreKeyPair: PreKeyPair, private val oneTimePreKeys: List<PreKeyPair> )` — SignalProtocol - end-to-end encryption via X3DH + the Double Ratchet.
-  يُستخدم في: app/src/androidTest/java/com/securemessenger/app/crypto/RatchetRoundtripTest.kt, app/src/androidTest/java/com/securemessenger/app/crypto/SignalProtocolTest.kt, app/src/androidTest/java/com/securemessenger/app/security/testing/CryptoSecurityTests.kt, app/src/main/java/com/securemessenger/app/data/repository/SecureRepository.kt, app/src/main/java/com/securemessenger/app/network/SecureMessagingClient.kt, desktop/src/main/kotlin/com/securemessenger/desktop/DesktopMessagingClient.kt, desktop/src/main/kotlin/com/securemessenger/desktop/DesktopStore.kt
+  يُستخدم في: app/src/androidTest/java/com/securemessenger/app/crypto/RatchetRoundtripTest.kt, app/src/androidTest/java/com/securemessenger/app/crypto/SignalProtocolTest.kt, app/src/androidTest/java/com/securemessenger/app/data/ConversationStorageTest.kt, app/src/androidTest/java/com/securemessenger/app/security/testing/CryptoSecurityTests.kt, app/src/main/java/com/securemessenger/app/data/repository/SecureRepository.kt, app/src/main/java/com/securemessenger/app/network/SecureMessagingClient.kt, desktop/src/main/kotlin/com/securemessenger/desktop/DesktopMessagingClient.kt, desktop/src/main/kotlin/com/securemessenger/desktop/DesktopStore.kt
 - L18 `private val identityKeyPair : IdentityKeyPair,`
 - L19 `private val signedPreKeyPair : PreKeyPair,`
 - L20 `private val oneTimePreKeys : List<PreKeyPair>`
