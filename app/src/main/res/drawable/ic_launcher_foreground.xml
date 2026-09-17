@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Calculator glyph: the app disguises itself as "حاسبة متقدمة" (Advanced Calculator). -->
+<!-- Calculator glyph. No longer the launcher icon (that is the Zajel dove, see
+     mipmap-anydpi-v26/ic_launcher.xml) — this is the notification small icon and
+     the Quick Settings tile icon, both of which Android draws as a flat
+     silhouette, which a photographic mark cannot survive. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"

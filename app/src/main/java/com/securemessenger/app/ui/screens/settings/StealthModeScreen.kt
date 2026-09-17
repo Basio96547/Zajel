@@ -134,7 +134,7 @@ fun StealthModeScreen(
                         )
                         Spacer(Modifier.height(8.dp))
                         StepItem(number = "1", text = "اسحب شريط الإشعارات مرّتين")
-                        StepItem(number = "2", text = "اضغط أيقونة التعديل (✎) وأضِف بلاطة \"حاسبة متقدمة\"")
+                        StepItem(number = "2", text = "اضغط أيقونة التعديل (✎) وأضِف بلاطة \"زاجل\"")
                         StepItem(number = "3", text = "اضغط عليها في أي وقت لاحق لإعادة فتح التطبيق فوراً")
                     }
                 }

@@ -143,9 +143,9 @@
              is required for the system to bind this — BIND_QUICK_SETTINGS_TILE
              is a signature-level permission only the system UI holds, so no
              third-party app can invoke it. Label/icon deliberately reuse the
-             app's own public calculator identity (see StealthExitTileService's
-             own doc comment) — the tile is visible to anyone who opens the
-             Quick Settings editor, so it must not be a giveaway either. -->
+             app's own public identity (see StealthExitTileService's own doc
+             comment) — the tile is visible to anyone who opens the Quick
+             Settings editor, so it must not say more than the launcher does. -->
         <service
             android:name=".service.StealthExitTileService"
             android:exported="true"

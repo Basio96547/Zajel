@@ -21,8 +21,8 @@ import com.securemessenger.app.ui.MainActivity
  * The tile itself is visible to anyone who opens the Quick Settings editor —
  * exactly the kind of tell a ForegroundService notification would have been
  * (see the session's earlier discussion) — so it deliberately reuses the
- * app's own public identity (calculator name/icon) everywhere it's shown,
- * the same way MainActivity's launcher entry already does. It is NOT added
+ * app's own public identity (name/icon) everywhere it's shown, the same way
+ * MainActivity's launcher entry already does. It is NOT added
  * to the user's active tiles automatically; it only ever appears if someone
  * deliberately opens the tile editor and adds it.
  *
