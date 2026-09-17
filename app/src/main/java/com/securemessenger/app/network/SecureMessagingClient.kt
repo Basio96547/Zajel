@@ -1841,7 +1841,9 @@ class SecureMessagingClient(
     ): com.securemessenger.app.data.repository.ContactPairResult? =
         withContext(Dispatchers.IO) {
             try {
-                if (scannedUserId == userId) return@withContext null
+                if (scannedUserId == userId) {
+                    return@withContext com.securemessenger.app.data.repository.ContactPairResult.SELF
+                }
                 val pairSecret = pairSecretHex?.let { MailboxToken.pairSecretFromHex(it) }
                 val result = repository.addContactWithPublicKey(
                     scannedUserId, identityKeyHex, displayName,

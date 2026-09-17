@@ -49,6 +49,18 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
 /**
+ * One tag for everything on the pairing path.
+ *
+ * This screen had no logging at all: every failure set a sentence on screen
+ * and vanished. When pairing did not work on a real pair of phones there was
+ * nothing to read — not what was scanned, not what the pairing returned, not
+ * whether an exception had been thrown — so each attempt to diagnose it was a
+ * guess. Nothing here records a payload, an identity key or a pair secret;
+ * only shapes, lengths and outcomes.
+ */
+private const val PAIR_TAG = "Pairing"
+
+/**
  * No directory server to search anymore — adding someone is an in-person
  * action: show them your QR (or scan theirs) while you're physically
  * together, exactly the "meet and pair" model this local-only design needs
@@ -140,6 +152,12 @@ fun NewChatScreen(
     suspend fun pairFromPayload(scanned: String, allowKeyChange: Boolean = false) {
         isLoading = true
         errorMessage = null
+        // Length and shape only — never the payload itself, which carries an
+        // identity key and (on a full code) the relay pair secret.
+        android.util.Log.w(
+            PAIR_TAG,
+            "scan received: ${scanned.length} chars, looksLikeJson=${scanned.trimStart().startsWith("{")}"
+        )
         try {
             val json = JSONObject(scanned)
             val scannedUserId = json.getString("u")
@@ -162,10 +180,19 @@ fun NewChatScreen(
                 scannedUserId, identityKeyHex, displayName, pairSecretHex, directAddress,
                 allowKeyChange = allowKeyChange
             )
+            android.util.Log.w(
+                PAIR_TAG,
+                "pair result=$result peer=${scannedUserId.take(8)} " +
+                    "hasSecret=${pairSecretHex != null} hasAddress=${directAddress != null}"
+            )
             when (result) {
                 com.securemessenger.app.data.repository.ContactPairResult.ADDED,
                 com.securemessenger.app.data.repository.ContactPairResult.UNCHANGED ->
                     onContactAdded(scannedUserId)
+                // Naming the actual reason. "تأكد أن الرمز صحيح" sent you to
+                // re-scan a code that was never wrong.
+                com.securemessenger.app.data.repository.ContactPairResult.SELF ->
+                    errorMessage = "هذا رمزك أنت — الاقتران يحتاج رمز الجهاز الآخر"
                 com.securemessenger.app.data.repository.ContactPairResult.KEY_CHANGED ->
                     // Don't scan-loop or show an error — surface the warning
                     // dialog instead and let the user decide. See
@@ -174,6 +201,12 @@ fun NewChatScreen(
                 null -> errorMessage = "تعذّر إضافة جهة الاتصال — تأكد أن الرمز صحيح"
             }
         } catch (e: Exception) {
+            // Was swallowed entirely: whatever went wrong — malformed JSON, a
+            // missing field, a repository that threw — the user got one
+            // sentence blaming the code, and nothing was written down
+            // anywhere. Diagnosing a failed pairing from that is impossible,
+            // which is exactly the position this screen put us in.
+            android.util.Log.e(PAIR_TAG, "pairing threw (payload ${scanned.length} chars)", e)
             errorMessage = "رمز QR غير صالح لهذا التطبيق"
         } finally {
             isLoading = false
@@ -181,7 +214,32 @@ fun NewChatScreen(
     }
 
     val scanLauncher = rememberLauncherForActivityResult(ScanContract()) { result ->
-        val scanned = result.contents ?: return@rememberLauncherForActivityResult
+        val scanned = result.contents
+        if (scanned == null) {
+            // A null result means three different things — you cancelled, the
+            // camera permission was refused, or the scanner failed — and this
+            // used to treat all three as silence.
+            //
+            // Refusal is the one that must speak. It produces exactly the
+            // symptom that is hardest to act on: the scanner opens, you aim at
+            // the code, nothing happens, and nothing anywhere says why. It is
+            // also trivially fixable by the person holding the phone, if only
+            // they are told. Found on a Samsung "Dual App" clone of this
+            // messenger, where the clone carries its own permission grants and
+            // the camera had never been allowed for it.
+            //
+            // Cancelling stays silent, because the person who cancelled
+            // already knows.
+            val cameraAllowed = androidx.core.content.ContextCompat.checkSelfPermission(
+                context, android.Manifest.permission.CAMERA
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+            android.util.Log.w(PAIR_TAG, "scanner returned nothing (cameraAllowed=$cameraAllowed)")
+            if (!cameraAllowed) {
+                errorMessage = "لا إذن للكاميرا — افتح إعدادات التطبيق وفعّل «الكاميرا»، " +
+                    "أو استعمل «اختيار رمز من الصور»"
+            }
+            return@rememberLauncherForActivityResult
+        }
         scope.launch { pairFromPayload(scanned) }
     }
 

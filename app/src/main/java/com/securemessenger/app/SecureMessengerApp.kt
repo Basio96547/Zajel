@@ -9,9 +9,14 @@ import com.securemessenger.core.crypto.MediaCodec
 import com.securemessenger.app.data.repository.SecureRepository
 import com.securemessenger.app.network.ConnectionState
 import com.securemessenger.app.network.SecureMessagingClient
+import com.securemessenger.app.security.DisguiseState
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.ProcessLifecycleOwner
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -222,6 +227,59 @@ class SecureMessengerApp : Application() {
         repository.purgeDecryptedMediaCache()
     }
 
+    /** Pending [DisguiseState.hide] — see [installDisguiseHideOnLeavingApp]. */
+    private var hideJob: Job? = null
+
+    /**
+     * Hide the messenger when the user leaves THE APP — not when an Activity
+     * stops.
+     *
+     * This debounce used to sit on MainActivity.onStop/onStart, and the
+     * distinction was not academic: it broke QR pairing completely. Opening
+     * the scanner starts CaptureActivity, which stops MainActivity, which
+     * started the ten-second countdown while the user was still aiming the
+     * camera at a code. Aiming takes longer than ten seconds more often than
+     * not, so the messenger hid itself mid-scan. The scan then landed in a
+     * screen that RevealedOnly had already emptied — its activity-result
+     * launcher unregistered with the composition and its coroutine scope
+     * cancelled — so the decoded code was silently dropped. From the outside:
+     * you point the camera at the code and nothing happens, forever, with no
+     * error to explain it.
+     *
+     * ProcessLifecycleOwner answers the question actually being asked. The
+     * scanner runs in this same process (no android:process on it), so the
+     * process never goes background while it is up, and the countdown never
+     * starts. Leaving for another app still stops the process and still hides,
+     * exactly as before.
+     *
+     * Registered here rather than on an Activity for a second reason: the old
+     * job lived on MainActivity's lifecycleScope, so an Activity destroyed
+     * while backgrounded took the pending hide down with it and left the
+     * messenger revealed in memory. This scope outlives any Activity.
+     *
+     * The grace period stays deliberately short. It is a debounce for a stray
+     * app-switch, not a "stay logged in" session: every extra second is a
+     * window where anyone holding the already-unlocked phone sees the real
+     * messenger with no code or biometric prompt. Nothing is exposed to other
+     * apps during it either way — FLAG_SECURE is unconditional in MainActivity.
+     */
+    private fun installDisguiseHideOnLeavingApp() {
+        ProcessLifecycleOwner.get().lifecycle.addObserver(object : DefaultLifecycleObserver {
+            override fun onStop(owner: LifecycleOwner) {
+                hideJob?.cancel()
+                hideJob = applicationScope.launch {
+                    delay(HIDE_GRACE_PERIOD_MS)
+                    DisguiseState.hide()
+                }
+            }
+
+            /** Back within the grace period — no re-unlock needed. */
+            override fun onStart(owner: LifecycleOwner) {
+                hideJob?.cancel()
+            }
+        })
+    }
+
     override fun onCreate() {
         super.onCreate()
 
@@ -248,6 +306,8 @@ class SecureMessengerApp : Application() {
         // over IPC and hands pixels back — so the correct amount of
         // application startup for that process is none of it.
         if (isMediaSandboxProcess()) return
+
+        installDisguiseHideOnLeavingApp()
 
         // Hand :core its platform pieces before anything can touch crypto.
         // :core compiles against the LazySodium API but ships no native library
@@ -343,5 +403,8 @@ class SecureMessengerApp : Application() {
 
         /** Must stay in step with `android:process` on MediaSandboxService in AndroidManifest.xml. */
         private const val MEDIA_SANDBOX_PROCESS_MARKER = ":mediaSandbox"
+
+        /** How long the app may be out of the foreground before the disguise closes over it. */
+        private const val HIDE_GRACE_PERIOD_MS = 10_000L
     }
 }

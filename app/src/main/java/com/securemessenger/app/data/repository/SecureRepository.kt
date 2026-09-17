@@ -37,7 +37,19 @@ enum class ContactPairResult {
     /** An existing contact, scanned again with the same key (or a first-ever scan). */
     UNCHANGED,
     /** An existing contact, but the scanned key differs from the one already pinned — refused; see allowKeyChange. */
-    KEY_CHANGED
+    KEY_CHANGED,
+
+    /**
+     * The scanned code is this device's own.
+     *
+     * Refusing it was always right; reporting it was not. It came back as a
+     * bare null, which the pairing screen renders as "تعذّر إضافة جهة الاتصال
+     * — تأكد أن الرمز صحيح" — telling you to check a code that is perfectly
+     * correct, and sending you off to re-scan it. This is not a rare mistake
+     * either: it is the first thing anyone does when they have one device and
+     * want to see whether pairing works.
+     */
+    SELF
 }
 
 /**

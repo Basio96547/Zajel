@@ -11,13 +11,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.lifecycle.lifecycleScope
 import com.securemessenger.app.security.AppSettings
-import com.securemessenger.app.security.DisguiseState
 import com.securemessenger.app.ui.navigation.AppNavigation
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 
 /**
  * MainActivity - Entry point for the app UI.
@@ -26,9 +21,6 @@ import kotlinx.coroutines.launch
  * BiometricPrompt requires one to host its confirmation dialog.
  */
 class MainActivity : FragmentActivity() {
-
-    // Debounces DisguiseState.hide() below — see onStop()/onStart().
-    private var hideJob: Job? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -58,41 +50,12 @@ class MainActivity : FragmentActivity() {
         }
     }
 
-    /**
-     * A brief interruption (switching to reply to an unrelated notification,
-     * sharing a photo out and straight back, the screen timing out for a
-     * second) used to hide the disguise instantly — forcing the full access
-     * code + biometric unlock again over a momentary switch, not just a real
-     * "walk away." Now debounced: hiding only actually happens if the app
-     * hasn't returned to the foreground within HIDE_GRACE_PERIOD_MS (see
-     * onStart()). Nothing is exposed to anyone else during that window either
-     * way — FLAG_SECURE is set unconditionally in onCreate (independent of
-     * reveal state), so the recents switcher/a screenshot attempt is blocked
-     * the whole time regardless of how long this grace period is.
-     *
-     * Deliberately short: this is a debounce for a stray app-switch, not a
-     * "stay logged in" session. Every extra second here is a window where
-     * anyone who has the phone already unlocked (past the lockscreen) sees
-     * the real messenger with no code or biometric prompt at all.
-     */
-    override fun onStop() {
-        super.onStop()
-        hideJob?.cancel()
-        hideJob = lifecycleScope.launch {
-            delay(HIDE_GRACE_PERIOD_MS)
-            DisguiseState.hide()
-        }
-    }
-
-    /** Back in the foreground within the grace period — cancel the pending hide, no re-unlock needed. */
-    override fun onStart() {
-        super.onStart()
-        hideJob?.cancel()
-    }
-
-    private companion object {
-        const val HIDE_GRACE_PERIOD_MS = 10_000L
-    }
+    // The hide-on-leaving debounce used to live here, on this Activity's
+    // onStop/onStart. It is now on the PROCESS lifecycle — see
+    // SecureMessengerApp — because an Activity stopping does not mean the user
+    // left the app, and reading it that way broke QR pairing outright: opening
+    // the scanner stops this Activity, so the ten-second countdown ran while
+    // the user was still aiming the camera.
 }
 
 @Composable
