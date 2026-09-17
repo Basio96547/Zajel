@@ -31,6 +31,15 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!-- In-app updates (see update/UpdateChecker.kt): installing a downloaded
+         APK requires this even to be offered the "allow" toggle, and that
+         toggle is per-app in Settings — nothing is installed without the
+         person explicitly granting it there first, on top of confirming the
+         install prompt itself. The one real cost of declaring it: an
+         inspection of this app's permissions shows it can install other
+         apps, which a real calculator would never need. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
     <!-- Explicitly NOT requested: -->
     <!-- READ_CONTACTS, CAMERA, READ_EXTERNAL_STORAGE, WRITE_EXTERNAL_STORAGE -->
     <!-- These would be requested only when needed via runtime permission -->

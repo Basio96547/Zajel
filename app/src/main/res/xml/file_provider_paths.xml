@@ -4,4 +4,6 @@
     <cache-path name="camera_capture" path="camera_capture/" />
     <!-- The rendered pairing QR, written only when the user explicitly shares it. -->
     <cache-path name="qr_share" path="qr_share/" />
+    <!-- A downloaded update APK, handed to the system installer as a content:// URI. -->
+    <cache-path name="updates" path="updates/" />
 </paths>

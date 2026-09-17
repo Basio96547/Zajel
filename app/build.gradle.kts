@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -20,6 +22,34 @@ val relayUrl: String = (project.findProperty("relayUrl") as String?) ?: ""
 // or a `directoryUrl=` line in gradle.properties.
 val directoryUrl: String = (project.findProperty("directoryUrl") as String?) ?: ""
 
+// owner/repo whose GitHub Releases the in-app update checker polls (see
+// update/UpdateChecker.kt). Overridable the same way as the URLs above with
+// `-PupdateRepo=owner/repo`, so a fork can point updates at its own releases
+// instead of silently checking someone else's.
+val updateRepo: String = (project.findProperty("updateRepo") as String?) ?: "Basio96547/Zajel"
+
+// Release signing. Loaded from keystore.properties locally (gitignored — see
+// that file's own warning about not committing it) or from these same names
+// as environment variables in CI, which decodes the keystore from a secret
+// instead of ever writing it to a tracked file. Absent both, release builds
+// are simply left unsigned rather than failing every other Gradle task for
+// anyone who clones this repo without the signing key.
+val keystoreProps = Properties().apply {
+    val file = rootProject.file("keystore.properties")
+    if (file.exists()) file.inputStream().use { load(it) }
+}
+fun signingProp(envVar: String, propKey: String): String? =
+    System.getenv(envVar) ?: keystoreProps.getProperty(propKey)
+val releaseStoreFile = signingProp("KEYSTORE_PATH", "storeFile")
+val hasReleaseSigning = releaseStoreFile != null
+
+// Version shown to users and compared against GitHub release tags — set by CI
+// from the pushed tag (`-PreleaseVersionName=1.2.3 -PreleaseVersionCode=42`)
+// so a release never ships without bumping both. Local/dev builds fall back
+// to the placeholders below.
+val releaseVersionName: String = (project.findProperty("releaseVersionName") as String?) ?: "1.0.0"
+val releaseVersionCode: Int = (project.findProperty("releaseVersionCode") as String?)?.toIntOrNull() ?: 1
+
 android {
     namespace = "com.securemessenger.app"
     compileSdk = 35
@@ -28,8 +58,8 @@ android {
         applicationId = "com.securemessenger.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = releaseVersionCode
+        versionName = releaseVersionName
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -37,6 +67,17 @@ android {
         }
 
         android.buildFeatures.buildConfig = true
+    }
+
+    signingConfigs {
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = rootProject.file(releaseStoreFile!!)
+                storePassword = signingProp("KEYSTORE_PASSWORD", "storePassword")
+                keyAlias = signingProp("KEY_ALIAS", "keyAlias")
+                keyPassword = signingProp("KEY_PASSWORD", "keyPassword")
+            }
+        }
     }
 
     buildTypes {
@@ -48,9 +89,13 @@ android {
                 "proguard-rules.pro"
             )
             isDebuggable = false
+            if (hasReleaseSigning) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             buildConfigField("Boolean", "OFFLINE_MODE", "false")
             buildConfigField("String", "RELAY_URL", "\"$relayUrl\"")
             buildConfigField("String", "DIRECTORY_URL", "\"$directoryUrl\"")
+            buildConfigField("String", "UPDATE_REPO", "\"$updateRepo\"")
         }
         debug {
             isMinifyEnabled = false
@@ -58,6 +103,7 @@ android {
             buildConfigField("Boolean", "OFFLINE_MODE", "false")
             buildConfigField("String", "RELAY_URL", "\"$relayUrl\"")
             buildConfigField("String", "DIRECTORY_URL", "\"$directoryUrl\"")
+            buildConfigField("String", "UPDATE_REPO", "\"$updateRepo\"")
         }
     }
 
@@ -112,6 +158,11 @@ dependencies {
     // Core Android
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.6.2")
+    // ProcessLifecycleOwner: tells us the user left the APP, not that an
+    // Activity stopped. See SecureMessengerApp.installDisguiseHideOnLeavingApp
+    // — reading an Activity stop as "left the app" hid the messenger while the
+    // QR scanner was open and silently killed every pairing attempt.
+    implementation("androidx.lifecycle:lifecycle-process:2.6.2")
     implementation("androidx.activity:activity-compose:1.8.1")
     implementation(platform("androidx.compose:compose-bom:2023.10.01"))
     implementation("androidx.compose.ui:ui")

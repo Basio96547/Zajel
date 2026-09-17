@@ -1,5 +1,7 @@
 package com.securemessenger.app.ui.screens.settings
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -25,6 +27,7 @@ import com.securemessenger.app.ui.glassCard
 import com.securemessenger.app.ui.screens.chat.Avatar
 import com.securemessenger.app.ui.theme.LocalMessengerColors
 import com.securemessenger.app.ui.theme.SemanticColors
+import com.securemessenger.app.update.UpdateChecker
 import kotlinx.coroutines.launch
 
 /**
@@ -77,6 +80,42 @@ fun SettingsScreen(
     val relayAvailable = remember { BuildConfig.RELAY_URL.isNotBlank() }
     var showCryptoGlossary by remember { mutableStateOf(false) }
     val username = AppSettings.getUsername(context)
+
+    // Update check/download/install state. Nothing here runs on its own —
+    // every step is a person tapping something, all the way through the final
+    // install prompt (see UpdateChecker's own note on why that is the only
+    // real safeguard here).
+    var updateState by remember { mutableStateOf<UpdateChecker.CheckResult?>(null) }
+    var isCheckingUpdate by remember { mutableStateOf(false) }
+    var downloadProgress by remember { mutableStateOf<Float?>(null) }
+    // Set right before sending the user to grant "install unknown apps", so
+    // the activity-result callback below knows which release to resume —
+    // that Settings screen carries no result of its own to read.
+    var awaitingInstallPermissionFor by remember { mutableStateOf<UpdateChecker.CheckResult.Available?>(null) }
+
+    suspend fun downloadAndInstallUpdate(available: UpdateChecker.CheckResult.Available) {
+        downloadProgress = 0f
+        when (val result = UpdateChecker.download(context, available.downloadUrl) { p -> downloadProgress = p }) {
+            is UpdateChecker.DownloadResult.Success -> {
+                downloadProgress = null
+                UpdateChecker.install(context, result.file)
+            }
+            is UpdateChecker.DownloadResult.Error -> {
+                downloadProgress = null
+                updateState = UpdateChecker.CheckResult.Error(result.message)
+            }
+        }
+    }
+
+    val installPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) {
+        val available = awaitingInstallPermissionFor
+        awaitingInstallPermissionFor = null
+        if (available != null && UpdateChecker.canInstallPackages(context)) {
+            scope.launch { downloadAndInstallUpdate(available) }
+        }
+    }
 
     // The row below is a preview of ProfileScreen, and it used to disagree
     // with it about who you are: it printed the username twice (once as the
@@ -368,6 +407,79 @@ fun SettingsScreen(
                             danger = true,
                             onClick = { showWipeDialog = true }
                         )
+                    }
+                }
+
+                Column {
+                    SettingsGroupLabel("التحديثات")
+                    SettingsGroupCard {
+                        when (val state = updateState) {
+                            null -> SettingsRow(
+                                icon = Icons.Default.SystemUpdate,
+                                iconTint = SemanticColors.purple,
+                                title = if (isCheckingUpdate) "جارٍ التحقق…" else "التحقق من وجود تحديث",
+                                onClick = if (isCheckingUpdate) null else {
+                                    {
+                                        scope.launch {
+                                            isCheckingUpdate = true
+                                            updateState = UpdateChecker.check()
+                                            isCheckingUpdate = false
+                                        }
+                                    }
+                                },
+                                trailing = {
+                                    if (isCheckingUpdate) {
+                                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                                    } else {
+                                        RowChevron()
+                                    }
+                                }
+                            )
+                            is UpdateChecker.CheckResult.UpToDate -> SettingsRow(
+                                icon = Icons.Default.CheckCircle,
+                                iconTint = SemanticColors.green,
+                                title = "التطبيق محدَّث لأحدث إصدار",
+                                onClick = { updateState = null }
+                            )
+                            is UpdateChecker.CheckResult.Error -> SettingsRow(
+                                icon = Icons.Default.ErrorOutline,
+                                iconTint = SemanticColors.red,
+                                title = state.message,
+                                onClick = { updateState = null },
+                                trailing = { RowValue("إعادة المحاولة") }
+                            )
+                            is UpdateChecker.CheckResult.Available -> {
+                                val progress = downloadProgress
+                                SettingsRow(
+                                    icon = Icons.Default.SystemUpdate,
+                                    iconTint = SemanticColors.amber,
+                                    title = "إصدار جديد متوفر: ${state.versionName}",
+                                    onClick = if (progress != null) null else {
+                                        {
+                                            if (UpdateChecker.canInstallPackages(context)) {
+                                                scope.launch { downloadAndInstallUpdate(state) }
+                                            } else {
+                                                awaitingInstallPermissionFor = state
+                                                installPermissionLauncher.launch(
+                                                    UpdateChecker.installPermissionSettingsIntent(context)
+                                                )
+                                            }
+                                        }
+                                    },
+                                    trailing = {
+                                        if (progress != null) {
+                                            CircularProgressIndicator(
+                                                progress = progress,
+                                                modifier = Modifier.size(16.dp),
+                                                strokeWidth = 2.dp
+                                            )
+                                        } else {
+                                            RowValue("تثبيت")
+                                        }
+                                    }
+                                )
+                            }
+                        }
                     }
                 }
 
