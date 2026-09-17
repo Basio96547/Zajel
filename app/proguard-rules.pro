@@ -33,6 +33,14 @@
 -keep class com.google.zxing.** { *; }
 -dontwarn com.google.zxing.**
 
+# Google Tink (used for AEAD/keyset handling): its errorprone annotations are
+# compile-time-only checks, never present at runtime, but referenced widely
+# enough that R8 refuses to proceed without being told they're expected to be
+# missing. First surfaced only now — this project's release build type was
+# never actually signable before, so minification against the real dependency
+# set had never run to completion.
+-dontwarn com.google.errorprone.annotations.**
+
 # Security: Obfuscate package names
 -overloadaggressively
 -repackageclasses ""
