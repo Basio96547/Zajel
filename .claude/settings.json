@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(.gradle/**)",
+      "Read(.kotlin/**)",
+      "Read(.idea/**)",
+      "Read(build/**)",
+      "Read(app/build/**)",
+      "Read(core/build/**)",
+      "Read(desktop/build/**)",
+      "Read(hisn/build/**)",
+      "Read(relay/build/**)"
+    ]
+  },
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node scripts/gen-index-kotlin.mjs *> $null; if ($LASTEXITCODE -ne 0) { Write-Output '[gen-index] فشل التحديث التلقائي — شغّل node scripts/gen-index-kotlin.mjs يدوياً لمعرفة السبب' }",
+            "shell": "powershell",
+            "timeout": 30,
+            "statusMessage": "تحديث فهرس المشروع..."
+          }
+        ]
+      }
+    ]
+  }
+}
